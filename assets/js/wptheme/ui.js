@@ -73,11 +73,11 @@
       tls_blocked: 'The scanner server could not open a secure connection to the site (the TLS handshake was reset). This can be the site refusing server-side scanners — or the scanner server having no direct outbound access. Retrying through your browser usually resolves it.',
       timeout: 'The website took too long to respond.',
       unreachable: 'The website could not be reached. It may be offline or blocking this scanner.',
-      blocked: 'The website refused every automated reader we tried — the direct connection, your browser, and three public relays (403/401). Some sites block all server-side traffic with their firewall. WordPress status cannot be honestly determined from here — this is an access failure, not a “not WordPress” result.',
+      blocked: 'The site’s firewall refuses automated readers — the direct connection, your browser, and the public relays all got 403. That is an access failure, not a “not WordPress” result. You can still get a result: open the site yourself and paste its page source (button below) — the detector runs on exactly what you paste.',
       rate_limited_target: 'The website rate-limited this scanner (429).',
       server_error: 'The website returned a server error (5xx).',
       not_found: 'The page returned 404 — check the URL.',
-      challenge: 'The site is behind a bot challenge (e.g. Cloudflare) that defeats automated readers, including public relays. Status: Unable to Verify — not “not WordPress”.',
+      challenge: 'The site is behind a bot challenge (e.g. Cloudflare) that defeats automated readers, including public relays. Status: Unable to Verify — not “not WordPress”. You can still get a result by pasting the page source (button below).',
       js_only: 'The page renders via JavaScript with almost no server HTML, so WordPress could not be verified from the initial response.',
       empty: 'The server returned an empty or non-HTML page.',
       redirect: 'Too many redirects or an unsafe redirect.',
@@ -94,9 +94,71 @@
       + '<p>' + esc(friendly) + '</p>'
       + (code !== 'cancelled' && msg ? '<p class="muted">Reason: ' + esc(msg) + '</p>' : '')
       + (err.scan ? scanDetailsMini(err.scan) : '')
-      + '<div class="report-actions"><button class="btn" id="wptheme-retry">' + (NETWORK_FALLBACK_CODES.indexOf(code) >= 0 ? 'Retry through browser' : 'Try again') + '</button></div></div>';
+      + '<div class="report-actions"><button class="btn" id="wptheme-retry">' + (NETWORK_FALLBACK_CODES.indexOf(code) >= 0 ? 'Retry through browser' : 'Try again') + '</button>'
+      + (['blocked', 'challenge'].indexOf(code) >= 0 ? '<button class="btn" id="wptheme-paste-btn">Analyse pasted page source</button>' : '')
+      + '</div></div>';
     var b = document.getElementById('wptheme-retry');
     if (b) b.onclick = function () { if (NETWORK_FALLBACK_CODES.indexOf(code) >= 0) browserScan(); else form.requestSubmit(); };
+    var pb = document.getElementById('wptheme-paste-btn');
+    if (pb) pb.onclick = pastePanel;
+  }
+
+  /* ---------- manual paste mode (unblockable) ---------- */
+  function pastePanel() {
+    out.innerHTML = '<div class="paper paper-padded wptheme-paste">'
+      + '<h3>Analyse the page source you paste</h3>'
+      + '<p class="muted">The site blocks automated readers, so bring the HTML yourself:</p>'
+      + '<ol class="muted" style="margin:0 0 14px;padding-left:20px">'
+      + '<li>Open <b>' + esc(urlInput.value.trim() || 'the website') + '</b> in a new tab (you can pass any firewall because you are human).</li>'
+      + '<li>View the source: right-click → <b>View Page Source</b> (or press <b>Ctrl+U</b> / <b>Cmd+Option+U</b>).</li>'
+      + '<li>Select all (<b>Ctrl+A</b> / <b>Cmd+A</b>), copy, and paste it below.</li>'
+      + '</ol>'
+      + '<textarea id="wptheme-paste-html" class="text-input" rows="9" placeholder="Paste the full page source here (<!doctype html> or <html>…)" aria-label="Pasted page source"></textarea>'
+      + '<div class="report-actions" style="margin-top:12px">'
+      + '<button class="btn" type="button" id="wptheme-paste-run">Detect from pasted source</button>'
+      + '<button class="btn" type="button" id="wptheme-paste-cancel">Cancel</button>'
+      + '</div>'
+      + '<p class="muted" style="margin-top:10px">The pasted HTML never leaves this site’s server except to run the same deterministic detection engine. It is analysed as-is and labelled “manually provided” in the report.</p>'
+      + '</div>';
+    var run = document.getElementById('wptheme-paste-run');
+    var cancel = document.getElementById('wptheme-paste-cancel');
+    var ta = document.getElementById('wptheme-paste-html');
+    if (ta) ta.focus();
+    if (cancel) cancel.onclick = function () { out.innerHTML = ''; };
+    if (run) run.onclick = function () {
+      var pasted = ta ? ta.value : '';
+      if (!pasted || pasted.trim().length < 60) { toast('Paste the page source first (Ctrl+A, Ctrl+C on the source view)'); return; }
+      pasteScan(pasted);
+    };
+  }
+
+  function pasteScan(pastedHtml) {
+    if (!(window.WpThemeCollector && window.WpThemeCollector.collect)) {
+      errorUI({ code: 'error', message: 'Paste analysis is not available on this page.' });
+      return;
+    }
+    abortCtrl = new AbortController();
+    progressUI({ stage: 'connect', message: 'Analysing the page source you pasted…' });
+    window.WpThemeCollector.collect(urlInput.value.trim(), {
+      pastedHtml: pastedHtml,
+      signal: abortCtrl.signal,
+      onProgress: progressUI
+    }).then(function (bundle) {
+      return fetch('/api/wptheme-analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bundle: bundle }),
+        signal: abortCtrl.signal
+      }).then(function (res) {
+        return res.json().then(function (j) {
+          if (!res.ok || (j && j.code && !j.wordpress)) throw j;
+          return j;
+        });
+      });
+    }).then(render).catch(function (err) {
+      if (err && (err.name === 'AbortError' || (abortCtrl && abortCtrl.signal.aborted))) { errorUI({ code: 'cancelled', message: 'Cancelled' }); return; }
+      errorUI(err && err.code ? err : { code: 'fetch_failed', message: (err && err.message) || 'Paste analysis failed.' });
+    }).then(function () { abortCtrl = null; });
   }
 
   function scanDetailsMini(scan) {
@@ -148,6 +210,7 @@
       + '<div class="source-chip">Confidence ' + ring + '% · every verdict is evidence-based · no AI, no third-party detection API' + (r.via === 'browser' ? ' · collected through your browser (server could not reach the site directly)' : '') + '</div>'
       + (r.homeBlocked ? '<p class="calc-note"><span class="material-icons">block</span>The live homepage refused automated readers (' + esc(r.homeBlocked.code === 'challenge' ? 'bot challenge' : 'HTTP ' + r.homeBlocked.status) + '). This verdict is based on other public endpoints, and the active theme could not be identified without the homepage HTML.</p>' : '')
       + (r.homeArchived ? '<p class="calc-note"><span class="material-icons">history</span>Theme discovery used an archived snapshot of the homepage (Wayback Machine' + (r.homeArchived.timestamp ? ', ' + esc(r.homeArchived.timestamp.slice(0, 8)) : '') + ') because the live site refused readers. Theme details were read from the live site; the discovered folder may lag behind reality.</p>' : '')
+      + (r.manualPaste ? '<p class="calc-note"><span class="material-icons">content_paste</span>The homepage source was pasted manually — this verdict is based on exactly that HTML. Theme files were still read from the live site where possible.</p>' : '')
       + stats + plat + builders
       + '</div></div>';
   }

@@ -219,3 +219,7 @@ button.btn .material-icons{font-size:18px}
 @media(max-width:400px){
   .wptheme-results .ad-summary-grid{grid-template-columns:1fr}
 }
+
+/* WordPress Theme Detector — manual paste mode (reuses inputs/buttons) */
+.wptheme-paste ol{line-height:1.7}
+.wptheme-paste textarea{width:100%}

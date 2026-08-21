@@ -225,6 +225,28 @@
     }).sort(function (a, b) { return b.score - a.score; });
   }
 
+  /*
+   * CORS-free existence probe: <link rel=stylesheet> loads are not subject to
+   * CORS and carry the visitor's real browser fingerprint. Only WordPress
+   * serves /wp-includes/css/dist/block-library/style.css (core since WP 5.0),
+   * so a successful load is a definitive WordPress signal. The element is
+   * removed immediately; a stylesheet cannot execute scripts.
+   */
+  function cssLoads(url, signal) {
+    return new Promise(function (resolve) {
+      var link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = url;
+      var done = false;
+      var to = setTimeout(function () { finish(false); }, 7000);
+      function finish(ok) { if (done) return; done = true; clearTimeout(to); try { link.remove(); } catch (e) {} resolve(ok); }
+      if (signal) signal.addEventListener('abort', function () { finish(false); }, { once: true });
+      link.onload = function () { finish(true); };
+      link.onerror = function () { finish(false); };
+      (document.head || document.documentElement).appendChild(link);
+    });
+  }
+
   function imageExists(url, signal) {
     return new Promise(function (resolve) {
       var img = new Image();
@@ -270,6 +292,8 @@
     var home = null;
     var homeBlocked = null;   // {status, code} when the live homepage was refused
     var homeArchived = null;  // {timestamp} when discovery used a Wayback snapshot
+    var manualPaste = !!opt.pastedHtml;
+    var resourceProbe = null; // {loaded:[paths]} when a WP core asset loaded in the browser
 
     function fetchText(u, fo) {
       return fetchOnce(u, Object.assign({ signal: signal }, fo || {})).then(function (res) {
@@ -287,6 +311,15 @@
 
     /* ---- homepage (with cross-relay retry inside fetchOnce) ---- */
     function getHome() {
+      if (opt.pastedHtml) {
+        onProgress({ stage: 'connect', message: 'Using the page source you pasted…' });
+        var pasted = String(opt.pastedHtml).slice(0, MAX_HTML);
+        home = { url: urlObj.href, finalUrl: urlObj.href, status: 200, text: pasted, via: 'user-paste', bytes: pasted.length, headers: {} };
+        scanInfo.finalUrl = urlObj.href;
+        scanInfo.status = 200;
+        scanInfo.notes.push('Homepage HTML was pasted manually by the user — the analysis ran on exactly that source.');
+        return Promise.resolve(null);
+      }
       onProgress({ stage: 'connect', message: 'Fetching the homepage through your browser…' });
       return fetchText(urlObj.href).then(function (res) {
         if (looksLikeChallenge(res.status, res.text)) {
@@ -332,6 +365,21 @@
           });
         })
         .catch(function () { return null; });
+    }
+
+    /* ---- direct browser asset probe (works when every fetch is walled) ---- */
+    function tryResourceProbe() {
+      if (!homeBlocked || home) return Promise.resolve(null);
+      onProgress({ stage: 'wordpress', message: 'Probing a WordPress core asset directly from your browser…' });
+      var asset = origin + '/wp-includes/css/dist/block-library/style.css';
+      return cssLoads(asset, signal).then(function (ok) {
+        if (ok) {
+          resourceProbe = { loaded: [asset] };
+          scanInfo.notes.push('A WordPress core asset (wp-includes block-library stylesheet) loaded directly in your browser — the homepage is walled, but the server is provably WordPress.');
+          return resourceProbe;
+        }
+        return null;
+      }).catch(function () { return null; });
     }
 
     function robotsAndRest() {
@@ -487,6 +535,7 @@
 
     return getHome()
       .then(tryWayback)
+      .then(tryResourceProbe)
       .then(robotsAndRest)
       .then(themePhase)
       .then(parentAndCss)
@@ -505,6 +554,8 @@
           homeHtml: home ? home.text : '',
           homeBlocked: homeBlocked,
           homeArchived: homeArchived,
+          manualPaste: manualPaste,
+          resourceProbe: resourceProbe,
           robotsText: phase.robotsText || '',
           probes: probes,
           candidates: phase.candidates || [],
