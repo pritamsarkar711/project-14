@@ -1,5 +1,8 @@
 {
-  "scripts": {"dev": "node server.js"},
+  "scripts": {
+    "dev": "node server.js",
+    "test": "node lib/wptheme/selftest.js && node lib/wptheme/uitest.js"
+  },
   "dependencies": {},
   "devDependencies": {}
 }

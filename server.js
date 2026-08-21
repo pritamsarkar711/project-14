@@ -4,6 +4,7 @@ const path = require('path');
 const ezoicApi = require('./lib/ezoic/api');
 const mediavineApi = require('./lib/mediavine/api');
 const raptiveApi = require('./lib/raptive/api');
+const wpthemeApi = require('./lib/wptheme/api');
 
 const criticalCss = fs.readFileSync('assets/css/style.css', 'utf8');
 const esc = s => String(s ?? '').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
@@ -17,6 +18,7 @@ function otherToolsMenu(active) {
       <a href="/ezoic-eligibility-checker" role="menuitem" class="${active==='ezoic'?'is-active':''}">${icon('insights')}<span><b>Ezoic Eligibility Checker</b><small>Website readiness for Ezoic</small></span></a>
       <a href="/mediavine-eligibility-checker" role="menuitem" class="${active==='mediavine'?'is-active':''}">${icon('trending_up')}<span><b>Mediavine Eligibility Checker</b><small>Website readiness for Mediavine</small></span></a>
       <a href="/raptive-eligibility-checker" role="menuitem" class="${active==='raptive'?'is-active':''}">${icon('campaign')}<span><b>Raptive Eligibility Checker</b><small>Website readiness for Raptive</small></span></a>
+      <a href="/wordpress-theme-detector" role="menuitem" class="${active==='wptheme'?'is-active':''}">${icon('palette')}<span><b>WordPress Theme Detector</b><small>Detect the active WP theme</small></span></a>
     </div></details>`;
 }
 
@@ -26,7 +28,7 @@ function layout(title, body, opts) {
   const scripts = opts.scripts || ['/assets/js/common.js','/assets/js/audit.js'];
   const meta = opts.meta || '';
   const jsonLd = opts.jsonLd ? `<script type="application/ld+json">${JSON.stringify(opts.jsonLd)}</script>` : '';
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">${meta}<title>${esc(title)}</title><link rel="canonical" href="${opts.canonical||'https://huvanti.com/'}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Icons&display=swap" rel="stylesheet"><style>${criticalCss}</style>${jsonLd}</head><body><a class="skip-link" href="#main">Skip to content</a><div class="app"><header class="appbar"><div class="toolbar"><a class="brand" href="/">${icon('travel_explore')}<span class="brand-name">huvanti</span></a><nav class="desktop-nav" aria-label="Primary"><a href="/">${icon('home')}<span>Home</span></a>${otherToolsMenu(active)}<a href="/about">${icon('info')}<span>About</span></a><a href="/contact">${icon('mail')}<span>Contact</span></a></nav><button type="button" class="icon-button theme-toggle" aria-label="toggle theme" id="theme-toggle"><span class="material-icons">brightness_4</span></button></div></header><main id="main">${body}</main><footer class="footer"><div class="container footer-grid"><div><div class="footer-brand">huvanti</div><p class="footer-tagline">Free, no-account website tools.</p></div><div><div class="footer-heading">Tools</div><div class="footer-links"><a href="/">SEO Audit</a><a href="/adsense-eligibility-checker">AdSense Eligibility Checker</a><a href="/ezoic-eligibility-checker">Ezoic Eligibility Checker</a><a href="/mediavine-eligibility-checker">Mediavine Eligibility Checker</a></div></div><div><div class="footer-heading">Pages</div><div class="footer-links"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div></div></div><div class="container footer-copyright">&copy; 2026 huvanti. All rights reserved. Not affiliated with Google, Ezoic or Mediavine.</div></footer></div>${scripts.map(s=>`<script src="${s}"></script>`).join('')}</body></html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">${meta}<title>${esc(title)}</title><link rel="canonical" href="${opts.canonical||'https://huvanti.com/'}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Icons&display=swap" rel="stylesheet"><style>${criticalCss}</style>${jsonLd}</head><body><a class="skip-link" href="#main">Skip to content</a><div class="app"><header class="appbar"><div class="toolbar"><a class="brand" href="/">${icon('travel_explore')}<span class="brand-name">huvanti</span></a><nav class="desktop-nav" aria-label="Primary"><a href="/">${icon('home')}<span>Home</span></a>${otherToolsMenu(active)}<a href="/about">${icon('info')}<span>About</span></a><a href="/contact">${icon('mail')}<span>Contact</span></a></nav><button type="button" class="icon-button theme-toggle" aria-label="toggle theme" id="theme-toggle"><span class="material-icons">brightness_4</span></button></div></header><main id="main">${body}</main><footer class="footer"><div class="container footer-grid"><div><div class="footer-brand">huvanti</div><p class="footer-tagline">Free, no-account website tools.</p></div><div><div class="footer-heading">Tools</div><div class="footer-links"><a href="/">SEO Audit</a><a href="/adsense-eligibility-checker">AdSense Eligibility Checker</a><a href="/ezoic-eligibility-checker">Ezoic Eligibility Checker</a><a href="/mediavine-eligibility-checker">Mediavine Eligibility Checker</a><a href="/raptive-eligibility-checker">Raptive Eligibility Checker</a><a href="/wordpress-theme-detector">WordPress Theme Detector</a></div></div><div><div class="footer-heading">Pages</div><div class="footer-links"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div></div></div><div class="container footer-copyright">&copy; 2026 huvanti. All rights reserved. Not affiliated with Google, Ezoic or Mediavine.</div></footer></div>${scripts.map(s=>`<script src="${s}"></script>`).join('')}</body></html>`;
 }
 
 function home() {
@@ -183,7 +185,48 @@ function raptivePage() {
   });
 }
 
-function page(name) { return layout(name, `<div class="container page"><h1 class="page-title">${esc(name)}</h1><div class="paper paper-padded"><p>huvanti provides free, no-account website tools including an SEO audit, an AdSense eligibility checker, an Ezoic eligibility checker, a Mediavine eligibility checker, and a Raptive eligibility checker.</p></div></div>`); }
+function wpthemePage() {
+  const meta = `<meta name="description" content="Free WordPress Theme Detector. Enter a URL to detect the active WordPress theme, version, author, child/parent theme and detection confidence — evidence-based, no account, no AI."><meta name="robots" content="index,follow">
+<meta property="og:title" content="WordPress Theme Detector — huvanti"><meta property="og:description" content="Multi-signal WordPress theme detection with transparent evidence and confidence. No account, no AI, no third-party API."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
+  const jsonLd = {'@context':'https://schema.org','@graph':[
+    {'@type':'WebSite',name:'huvanti',url:'https://huvanti.com/'},
+    {'@type':'WebApplication',name:'WordPress Theme Detector',applicationCategory:'DeveloperApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',featureList:'WordPress detection, active theme detection, theme version, child and parent theme, premium and custom theme signals, fingerprint database, detection evidence, confidence score, public exposure notes',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free, deterministic WordPress theme detector that reads only publicly observable evidence. No login, no account, no API keys, no AI.'}
+  ]};
+  const body = `<section class="hero audit-home wptheme-home"><span class="material-icons hero-icon" aria-hidden="true">palette</span><h1>WordPress Theme Detector</h1><p class="hero-subtitle">Detect the active WordPress theme from public evidence — no account, no AI.</p>
+<form id="wptheme-form" class="search-field audit-search" role="search" aria-label="WordPress theme detector"><span class="material-icons" aria-hidden="true">link</span><input id="wptheme-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="Enter website URL — e.g. https://example.com" required aria-label="Website URL"><button class="btn" type="submit">Detect Theme</button></form>
+<div class="audit-trust"><span>Theme name &amp; slug</span><span>Version</span><span>Child &amp; parent</span><span>Author</span><span>Fingerprints</span><span>Evidence-based</span><span>No fake results</span></div></section>
+<div id="wptheme-results" class="audit-results wptheme-results"></div>
+<div class="container section">
+  <div class="section-heading-row">${icon('rule_folder')}<h4 style="margin:0;">How detection works — nine methods, one transparent verdict</h4></div>
+  <div class="grid feature-grid">
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('verified')} WordPress detection engine</h6><p>Weighted, family-based signals: /wp-content/, /wp-includes/, /wp-json/, generator metadata, REST API, HTML patterns, headers and feeds. One weak signal is never enough — “Detected” needs independent, corroborating evidence.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('search')} Theme path discovery</h6><p>Homepage HTML, CSS URLs, JS URLs, enqueued asset handles, REST content and oEmbed output are all scanned for /wp-content/themes/&lt;slug&gt;/ references before a theme is named.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('description')} style.css analysis</h6><p>The public WordPress theme header is parsed for Theme Name, Version, Author, Author URI, Theme URI, Description, License, Text Domain, Tags and Template — the exact same header WordPress itself reads.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('account_tree')} Child &amp; parent themes</h6><p>A Template: field proves a child theme. The parent’s public style.css is then read for its name, author and version — the parent is never guessed from appearance.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('fingerprint')} Fingerprint database</h6><p>A maintainable local database covers popular free themes (Astra, GeneratePress, Kadence, Neve, OceanWP, Hello Elementor…), premium themes (Divi, Avada, Flatsome, WoodMart, Newspaper…) and frameworks. Naming requires multiple distinct markers.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('history')} Honest version reporting</h6><p>Exact versions are labelled exact, ?ver= estimates are labelled “appears to be”, and hidden versions say “not publicly detectable”. Versions are never invented, and no vulnerability claims are made from a local dataset.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('visibility')} Theme exposure</h6><p>A short informational section showing which theme details are publicly observable (metadata, version, screenshot, readme, source maps, directory listings) — with no exploitation or intrusive testing.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('security')} Safe by design</h6><p>SSRF-protected scanning: private IPs, loopback, cloud metadata and DNS-rebinding targets are refused; every redirect is re-validated; requests, bytes and time are budgeted so a scan can never flood a site.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('block')} Four honest outcomes</h6><p>Every scan ends in Detected, Likely, Unable to Verify or Not Detected. A blocked, challenged or JavaScript-only site is reported as “Unable to determine” — never as “not WordPress”.</p></div></div></div>
+  </div>
+</div>
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('help')}<h4 style="margin:0;">FAQ</h4></div>
+  <div class="faq-accordion">
+<details><summary>Is this accurate?</summary><p>Accuracy is prioritised over producing a result for every site. Detection combines nine independent methods, shows every signal and weight, and labels results Detected, Likely, Unable to Verify or Not Detected. It never names a theme it could not evidence.</p></details>
+<details><summary>Does it work on any WordPress site?</summary><p>No tool can. Sites can hide or rename theme paths, block scanners, serve assets from rewritten CDNs, or be behind bot protection. In those cases this tool reports exactly what blocked the scan and what partial evidence exists, instead of guessing.</p></details><details><summary>What happens if the scanner server can’t reach a site?</summary><p>The server first tries a direct, SSRF-protected connection. If that is impossible (firewall, TLS reset, blocked egress — for example on this preview sandbox), the same small set of resources is collected through your own browser and analysed by the identical engine. The report always states which transport was used, and a blocked or unreadable site is reported as Unable to determine — never as “not WordPress”.</p></details>
+<details><summary>Does it need an account, API key or AI?</summary><p>No. Detection is deterministic: direct HTTP requests, HTML/CSS parsing, WordPress fingerprints and a weighted evidence engine. No OpenAI, Gemini, Claude, or paid third-party detection APIs.</p></details>
+<details><summary>Can it detect premium or custom themes?</summary><p>Premium themes are identified when multiple fingerprint markers match a known commercial theme or its marketplace URI. Custom themes are flagged as “Possible custom theme” with confidence from several weak signals — never stated as certainty.</p></details>
+<details><summary>Does it check security?</summary><p>It only reports publicly observable theme information (exposure). It does not attempt exploitation, does not test for vulnerabilities, and never claims a version is vulnerable. Version age is compared against a bundled dataset that may lag reality.</p></details>
+<details><summary>What about privacy and abuse?</summary><p>The submitted URL is treated as untrusted: private, loopback, internal and cloud-metadata targets are refused; redirects are re-validated against the same rules; and scans are rate-limited and budgeted (a handful of small requests).</p></details>
+  </div>
+</div>`;
+  return layout('WordPress Theme Detector — Detect the Active WP Theme from Evidence | huvanti', body, {
+    active: 'wptheme', canonical: 'https://huvanti.com/wordpress-theme-detector', meta, jsonLd,
+    scripts: ['/assets/js/common.js', '/assets/js/wptheme/collector.js', '/assets/js/wptheme/ui.js']
+  });
+}
+
+function page(name) { return layout(name, `<div class="container page"><h1 class="page-title">${esc(name)}</h1><div class="paper paper-padded"><p>huvanti provides free, no-account website tools including an SEO audit, an AdSense eligibility checker, an Ezoic eligibility checker, a Mediavine eligibility checker, a Raptive eligibility checker, and a WordPress theme detector.</p></div></div>`); }
 
 function readJson(req){ return new Promise(resolve=>{let b=''; req.on('data',d=>b+=d); req.on('end',()=>{try{resolve(JSON.parse(b||'{}'))}catch{resolve({})}});}); }
 
@@ -227,6 +270,16 @@ http.createServer(async (req,res)=>{
     await raptiveApi.handleAnalyze(req, res, body);
     return;
   }
+  if (p === '/api/wptheme-scan' && req.method === 'POST') {
+    const body = await readJson(req);
+    await wpthemeApi.handle(req, res, body);
+    return;
+  }
+  if (p === '/api/wptheme-analyze' && req.method === 'POST') {
+    const body = await readJson(req);
+    await wpthemeApi.handleAnalyze(req, res, body);
+    return;
+  }
   if (p.startsWith('/assets/')) {
     const safe = path.normalize(p).replace(/^([.][.][/\\])+/, '');
     const f = path.join(process.cwd(), safe);
@@ -243,6 +296,7 @@ http.createServer(async (req,res)=>{
   else if (p === '/ezoic-eligibility-checker') html = ezoicPage();
   else if (p === '/mediavine-eligibility-checker') html = mediavinePage();
   else if (p === '/raptive-eligibility-checker') html = raptivePage();
+  else if (p === '/wordpress-theme-detector') html = wpthemePage();
   else if (['/about','/contact','/privacy','/terms'].includes(p)) html = page(p.slice(1).replace(/^./,c=>c.toUpperCase()));
   else html = layout('Not found', `<div class="container notfound"><h1>404</h1><p>Page not found.</p><a class="btn" href="/">Back home</a></div>`);
   res.setHeader('content-type','text/html; charset=utf-8'); res.setHeader('cache-control','no-store'); res.end(html);

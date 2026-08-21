@@ -164,3 +164,76 @@ button.btn .material-icons{font-size:18px}
 #rp-issue-search,#rp-page-search{max-width:420px;margin-bottom:10px}
 @media(max-width:800px){.raptive-home h1{font-size:2.2rem!important}.raptive-results .page-table{min-width:640px}.raptive-optional-grid{grid-template-columns:1fr 1fr}}
 @media print{.raptive-home,.raptive-optional{display:none!important}}
+
+/* WordPress Theme Detector — reuses the existing design system; no new color scheme */
+.wptheme-home{background:var(--appbar-bg)!important}
+.wptheme-progress .progress-list{margin-top:8px}
+.wptheme-error{text-align:center}
+.wp-card{display:grid;grid-template-columns:180px 1fr;gap:16px;align-items:start}
+.wp-preview{aspect-ratio:4/3;border-radius:8px;overflow:hidden;background:var(--chip-bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;padding:8px}
+.wp-preview img{width:100%;height:100%;object-fit:cover;display:block;border-radius:6px}
+.wp-preview .material-icons{font-size:34px;color:var(--text-secondary)}
+.wp-preview small{color:var(--text-secondary);font-size:.78rem}
+.wp-preview-missing img{display:none}
+.wp-field-value{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:1.05rem}
+.wp-field-value .row-detail{flex:0 0 auto}
+.wp-details-table td{vertical-align:top;word-break:break-word}
+.wptheme-report .audit-panel{margin-bottom:0}
+@media(max-width:800px){.wptheme-home h1{font-size:2.2rem!important}.wp-card{grid-template-columns:1fr}.wp-preview{max-width:280px}.wp-field-value{font-size:.98rem}}
+@media print{.wptheme-home{display:none!important}.wp-preview img{max-height:180px}}
+
+/* WordPress Theme Detector — result section hardening: no overflow/overlap at any width.
+   Scoped to .wptheme-results only; the shared design system is untouched. */
+.wptheme-results{overflow-x:clip;min-width:0}
+.wptheme-results .score-card>*{min-width:0}
+.wptheme-results .score-summary{min-width:0}
+.wptheme-results .verdict{max-width:100%;flex-wrap:wrap}
+.wptheme-results .source-chip{display:inline-block;max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.45}
+.wptheme-results .ad-summary-grid{grid-template-columns:repeat(auto-fit,minmax(min(150px,100%),1fr))}
+.wptheme-results .ad-summary-grid>*{min-width:0}
+.wptheme-results .ad-stat{min-width:0}
+.wptheme-results .ad-stat b,.wptheme-results .ad-stat span,.wptheme-results .ad-stat a,.wptheme-results .ad-stat code{overflow-wrap:anywhere;word-break:break-word;max-width:100%}
+.wptheme-results .ad-stat a{color:var(--primary);text-decoration:none}
+.wp-card{min-width:0}
+.wp-card>*{min-width:0}
+.wp-field-value{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0;max-width:100%;overflow-wrap:anywhere;line-height:1.4}
+.wp-field-value .row-detail{flex:0 0 auto}
+.wptheme-report .calc-line,.wptheme-report .prog-line{align-items:flex-start}
+.wptheme-report .calc-line span,.wptheme-report .prog-line span{min-width:0;overflow-wrap:anywhere}
+.wptheme-report .calc-line b,.wptheme-report .prog-line b{flex:0 0 auto;white-space:nowrap}
+.wptheme-report .audit-fold summary{flex-wrap:wrap;gap:6px 10px}
+.wptheme-report .audit-fold summary b{white-space:nowrap}
+.wptheme-report .issue{min-width:0}
+.wptheme-report .issue>div:last-child{min-width:0}
+.wptheme-report .issue p,.wptheme-report .issue h6{overflow-wrap:anywhere}
+.wptheme-report .issue .issue-icon{flex:0 0 32px}
+.wp-details-table td{overflow-wrap:anywhere}
+.wptheme-results img{max-width:100%}
+.wptheme-error .ad-summary-grid{text-align:left}
+@media(max-width:600px){
+  .wptheme-results .ad-summary-grid{grid-template-columns:1fr 1fr}
+  .wptheme-results .ad-stat b{font-size:1rem}
+  .wp-preview{max-width:280px}
+  .wptheme-results .score-card{padding:16px}
+}
+@media(max-width:400px){
+  .wptheme-results .ad-summary-grid{grid-template-columns:1fr}
+}
+
+/* WordPress Theme Detector — manual paste mode (reuses inputs/buttons) */
+.wptheme-paste ol{line-height:1.7}
+.wptheme-paste textarea{width:100%}
+
+/* WordPress Theme Detector — report layout: single column, compact chips */
+.wptheme-report{display:block}
+.wptheme-report>*+*{margin-top:16px}
+.wp-chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
+.wp-chips .source-chip{display:inline-block;margin:0;padding:4px 9px}
+.wp-preview small{display:block;padding:4px 2px 2px}
+
+/* WordPress Theme Detector — report layout: single column, compact chips */
+.wptheme-report{display:block}
+.wptheme-report>*+*{margin-top:16px}
+.wp-chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
+.wp-chips .source-chip{display:inline-block;margin:0;padding:4px 9px}
+.wp-preview small{display:block;padding:4px 2px 2px}
