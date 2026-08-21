@@ -213,7 +213,7 @@ function wpthemePage() {
 <div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('help')}<h4 style="margin:0;">FAQ</h4></div>
   <div class="faq-accordion">
 <details><summary>Is this accurate?</summary><p>Accuracy is prioritised over producing a result for every site. Detection combines nine independent methods, shows every signal and weight, and labels results Detected, Likely, Unable to Verify or Not Detected. It never names a theme it could not evidence.</p></details>
-<details><summary>Does it work on any WordPress site?</summary><p>No tool can. Sites can hide or rename theme paths, block scanners, serve assets from rewritten CDNs, or be behind bot protection. In those cases this tool reports exactly what blocked the scan and what partial evidence exists, instead of guessing.</p></details>
+<details><summary>Does it work on any WordPress site?</summary><p>No tool can. Sites can hide or rename theme paths, block scanners, serve assets from rewritten CDNs, or be behind bot protection. In those cases this tool reports exactly what blocked the scan and what partial evidence exists, instead of guessing.</p></details><details><summary>What happens if the scanner server can’t reach a site?</summary><p>The server first tries a direct, SSRF-protected connection. If that is impossible (firewall, TLS reset, blocked egress — for example on this preview sandbox), the same small set of resources is collected through your own browser and analysed by the identical engine. The report always states which transport was used, and a blocked or unreadable site is reported as Unable to determine — never as “not WordPress”.</p></details>
 <details><summary>Does it need an account, API key or AI?</summary><p>No. Detection is deterministic: direct HTTP requests, HTML/CSS parsing, WordPress fingerprints and a weighted evidence engine. No OpenAI, Gemini, Claude, or paid third-party detection APIs.</p></details>
 <details><summary>Can it detect premium or custom themes?</summary><p>Premium themes are identified when multiple fingerprint markers match a known commercial theme or its marketplace URI. Custom themes are flagged as “Possible custom theme” with confidence from several weak signals — never stated as certainty.</p></details>
 <details><summary>Does it check security?</summary><p>It only reports publicly observable theme information (exposure). It does not attempt exploitation, does not test for vulnerabilities, and never claims a version is vulnerable. Version age is compared against a bundled dataset that may lag reality.</p></details>
@@ -222,7 +222,7 @@ function wpthemePage() {
 </div>`;
   return layout('WordPress Theme Detector — Detect the Active WP Theme from Evidence | huvanti', body, {
     active: 'wptheme', canonical: 'https://huvanti.com/wordpress-theme-detector', meta, jsonLd,
-    scripts: ['/assets/js/common.js', '/assets/js/wptheme/ui.js']
+    scripts: ['/assets/js/common.js', '/assets/js/wptheme/collector.js', '/assets/js/wptheme/ui.js']
   });
 }
 
@@ -273,6 +273,11 @@ http.createServer(async (req,res)=>{
   if (p === '/api/wptheme-scan' && req.method === 'POST') {
     const body = await readJson(req);
     await wpthemeApi.handle(req, res, body);
+    return;
+  }
+  if (p === '/api/wptheme-analyze' && req.method === 'POST') {
+    const body = await readJson(req);
+    await wpthemeApi.handleAnalyze(req, res, body);
     return;
   }
   if (p.startsWith('/assets/')) {

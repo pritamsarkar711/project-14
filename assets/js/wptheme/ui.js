@@ -69,7 +69,8 @@
       invalid_url: 'Please enter a valid public website URL (e.g. https://example.com).',
       ssrf: 'That address cannot be scanned (private, local, or metadata target).',
       dns: 'The domain could not be resolved. Check the spelling or DNS.',
-      ssl: 'A secure HTTPS connection could not be established.',
+      ssl: 'The site’s HTTPS certificate could not be validated (expired, self-signed or incomplete chain). The scan cannot continue safely.',
+      tls_blocked: 'The scanner server could not open a secure connection to the site (the TLS handshake was reset). This can be the site refusing server-side scanners — or the scanner server having no direct outbound access. Retrying through your browser usually resolves it.',
       timeout: 'The website took too long to respond.',
       unreachable: 'The website could not be reached. It may be offline or blocking this scanner.',
       blocked: 'The website blocked this scanner (403/401) — access was denied, so WordPress status cannot be determined.',
@@ -87,15 +88,15 @@
       ratelimit: 'Too many scans from this network. Please wait a few minutes.'
     }[code] || 'The scan could not be completed.';
     var title = code === 'cancelled' ? 'Scan cancelled'
-      : ['challenge', 'blocked', 'rate_limited_target', 'server_error', 'js_only', 'not_found', 'dns', 'ssl', 'timeout', 'unreachable', 'redirect'].indexOf(code) >= 0
+      : ['challenge', 'blocked', 'rate_limited_target', 'server_error', 'js_only', 'not_found', 'dns', 'ssl', 'tls_blocked', 'timeout', 'unreachable', 'redirect'].indexOf(code) >= 0
         ? 'Unable to determine' : 'Could not complete the scan';
     out.innerHTML = '<div class="paper paper-padded adsense-error wptheme-error"><span class="material-icons">' + (code === 'cancelled' ? 'cancel' : 'error_outline') + '</span><h3>' + title + '</h3>'
       + '<p>' + esc(friendly) + '</p>'
       + (code !== 'cancelled' && msg ? '<p class="muted">Reason: ' + esc(msg) + '</p>' : '')
       + (err.scan ? scanDetailsMini(err.scan) : '')
-      + '<div class="report-actions"><button class="btn" id="wptheme-retry">Try again</button></div></div>';
+      + '<div class="report-actions"><button class="btn" id="wptheme-retry">' + (NETWORK_FALLBACK_CODES.indexOf(code) >= 0 ? 'Retry through browser' : 'Try again') + '</button></div></div>';
     var b = document.getElementById('wptheme-retry');
-    if (b) b.onclick = function () { form.requestSubmit(); };
+    if (b) b.onclick = function () { if (NETWORK_FALLBACK_CODES.indexOf(code) >= 0) browserScan(); else form.requestSubmit(); };
   }
 
   function scanDetailsMini(scan) {
@@ -144,7 +145,7 @@
       + '<div class="verdict ' + vc + '"><span class="material-icons">' + icon + '</span>' + esc(r.statusLabel) + '</div>'
       + '<h2>WordPress ' + (isDetected ? 'Detected' : r.status === 'likely' ? 'Likely' : r.status === 'not_detected' ? 'Not Detected' : 'Unverifiable') + '</h2>'
       + '<p>' + esc(summary) + '</p>'
-      + '<div class="source-chip">Confidence ' + ring + '% · every verdict is evidence-based · no AI, no third-party detection API</div>'
+      + '<div class="source-chip">Confidence ' + ring + '% · every verdict is evidence-based · no AI, no third-party detection API' + (r.via === 'browser' ? ' · collected through your browser (server could not reach the site directly)' : '') + '</div>'
       + stats + plat + builders
       + '</div></div>';
   }
@@ -338,6 +339,43 @@
     out.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  /* ---------- server scan + browser-relay fallback ---------- */
+  /* When the scanner server itself cannot reach the site (no outbound access,
+     TLS reset, firewall), the same resources are collected through the
+     visitor's browser and analysed by the identical server-side engine. */
+  var NETWORK_FALLBACK_CODES = ['tls_blocked', 'ssl', 'unreachable', 'timeout', 'dns', 'fetch_failed', 'network'];
+
+  function browserScan() {
+    if (!(window.WpThemeCollector && window.WpThemeCollector.collect)) {
+      errorUI({ code: 'error', message: 'Browser collection is not available on this page.' });
+      return;
+    }
+    progressUI({ stage: 'connect', message: 'The scanner server could not reach the site directly. Collecting evidence through your browser…' });
+    window.WpThemeCollector.collect(urlInput.value.trim(), {
+      signal: abortCtrl ? abortCtrl.signal : undefined,
+      onProgress: progressUI
+    }).then(function (bundle) {
+      return fetch('/api/wptheme-analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bundle: bundle }),
+        signal: abortCtrl ? abortCtrl.signal : undefined
+      }).then(function (res) {
+        return res.json().then(function (j) {
+          if (!res.ok || (j && j.code && !j.wordpress)) throw j;
+          return j;
+        });
+      });
+    }).then(render).catch(function (err) {
+      if (err && (err.name === 'AbortError' || (abortCtrl && abortCtrl.signal.aborted))) { errorUI({ code: 'cancelled', message: 'Cancelled' }); return; }
+      errorUI(err && err.code ? err : { code: 'fetch_failed', message: (err && err.message) || 'Browser collection failed.' });
+    });
+  }
+
+  function shouldFallback(err) {
+    return err && NETWORK_FALLBACK_CODES.indexOf(err.code) >= 0;
+  }
+
   /* ---------- SSE consumption ---------- */
   function run() {
     var url = urlInput.value.trim();
@@ -383,6 +421,7 @@
       });
     }).then(render).catch(function (err) {
       if (err && (err.name === 'AbortError' || (abortCtrl && abortCtrl.signal.aborted))) { errorUI({ code: 'cancelled', message: 'Cancelled' }); return; }
+      if (shouldFallback(err)) { browserScan(); return; }
       errorUI(err && err.code ? err : { code: 'fetch_failed', message: (err && err.message) || 'Network error' });
     }).then(function () { abortCtrl = null; });
   }
