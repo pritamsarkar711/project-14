@@ -141,12 +141,13 @@
 
   function fetchViaServer(url, profile, onStage, signal) {
     var result = null;
-    return fetch('/api/cwv-fetch', {
+    var attempt = fetch('/api/cwv-fetch', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ url: url, profile: profile }), signal: signal
     }).then(function (res) {
       if (!res.ok) {
-        return res.json().then(function (j) { var e = new Error(j.message || 'Server fetch failed.'); e.code = j.code; throw e; });
+        return res.json().then(function (j) { var e = new Error(j.message || 'Server fetch failed.'); e.code = j.code; throw e; },
+          function () { var e = new Error('The server rejected the request (HTTP ' + res.status + ').'); e.code = 'network'; throw e; });
       }
       return readSSE(res, function (ev, data) {
         if (ev === 'progress') onStage && onStage('server-progress', data);
@@ -156,6 +157,21 @@
         if (!result) { var e2 = new Error('The server returned no result.'); e2.code = 'empty'; throw e2; }
         return result;
       });
+    });
+    // Overall deadline: a stalled SSE stream (proxy buffering, dropped
+    // connection) must not hang the audit — fail over to browser-direct.
+    return new Promise(function (resolve, reject) {
+      var settled = false;
+      var t = setTimeout(function () {
+        if (!settled) {
+          settled = true;
+          var e = new Error('The server did not respond in time — switching to browser-direct measurement.');
+          e.code = 'empty';
+          reject(e);
+        }
+      }, 35000);
+      attempt.then(function (r) { if (!settled) { settled = true; clearTimeout(t); resolve(r); } },
+        function (e) { if (!settled) { settled = true; clearTimeout(t); reject(e); } });
     });
   }
 
@@ -292,12 +308,54 @@
     }
   };
 
+  // Errors that are real audit results (target-site or usage problems) —
+  // anything else is transport trouble and triggers the browser-direct path.
+  var HARD_CODES = ['ratelimit', 'busy', 'invalid_url', 'ssrf', 'not_found', 'blocked', 'challenge', 'not_html', 'dns'];
+  var CHALLENGE_RE = /just a moment|attention required|cf-browser-verification|challenge-platform|cdn-cgi\/challenge|checking your browser|enable javascript and cookies|access denied|perimeterx|datadome/i;
+
   function mapStages(stage) {
     if (stage === 'ready') markStep('browser');
     else if (stage === 'loaded') markStep('loaded');
     else if (stage === 'settled') { markStep('captured'); markStep('lcp'); }
     else if (stage === 'interactions') { markStep('inp'); markStep('cls'); progressMsg('Analyzing the captured data…'); }
     else if (stage === 'timeout') progressMsg('The page did not finish loading — using partial data.');
+  }
+
+  // Browser-direct measurement through public relays (used when the server
+  // transport is unavailable).
+  function relayRun(url, profile, measureOpts, serverErr) {
+    progressMsg('The server could not reach the site — switching to browser-direct measurement…');
+    var t0 = performance.now();
+    return relayFetch(url, abortCtl ? abortCtl.signal : null).then(function (res) {
+      if (abortCtl && abortCtl.signal.aborted) throw Object.assign(new Error('Cancelled.'), { code: 'cancelled' });
+      var head = String(res.html || '').slice(0, 8000);
+      if (CHALLENGE_RE.test(head)) {
+        throw Object.assign(new Error('The site is protected by a bot challenge and could not be measured in this environment.'), { code: 'challenge' });
+      }
+      if (String(res.html || '').length < 200) throw Object.assign(new Error('The relay returned no readable HTML.'), { code: 'unreachable' });
+      return measurePage(null, profile, {
+        srcdocBuilder: function (nonce) { return buildSrcdoc(res.html, url, profile, nonce, measureOpts); },
+        onStage: mapStages, timeout: 80000
+      }).then(function (payload) {
+        if (payload && payload.internalLinks && payload.internalLinks.length && !CWV._internalLinks) CWV._internalLinks = payload.internalLinks;
+        if (/^http:\/\//i.test(url)) {
+          payload.meta.notes = payload.meta.notes || [];
+          payload.meta.notes.push('The page is HTTP-only. In browser-direct mode the browser may block its HTTP subresources as mixed content — results can be incomplete. The server-proxy transport (production) does not have this limitation.');
+        }
+        return analyzeBundle(payload, {
+          profile: profile,
+          relayInfo: { requestedUrl: url, finalUrl: url, status: res.status, bytes: res.html.length, relay: res.relay, ms: performance.now() - t0 }
+        });
+      });
+    }).catch(function (e) {
+      if (e.code === 'cancelled' || (abortCtl && abortCtl.signal.aborted)) {
+        throw Object.assign(new Error('Cancelled.'), { code: 'cancelled' });
+      }
+      if (e.code === 'challenge') throw e;
+      var msg = (e.message || 'Could not fetch the page through any public relay.');
+      if (serverErr && serverErr.code !== 'no_egress') msg += ' (The server transport also failed: ' + (serverErr.message || serverErr.code || 'unknown') + '.)';
+      throw Object.assign(new Error(msg), { code: e.code || 'unreachable' });
+    });
   }
 
   function runProfile(url, profile, measureOpts) {
@@ -310,9 +368,16 @@
       function fail(e) { if (!done) { done = true; reject(e); } }
 
       // Path 1: server-proxied measurement.
-      fetchViaServer(url, profile, function (stage, data) {
-        progressMsg('Server: ' + (data && data.message || 'working…'));
-      }, signal)
+      var attempt;
+      if (CWV._serverNoEgress) {
+        attempt = Promise.reject(Object.assign(new Error('Server transport skipped: no server egress in this environment.'), { code: 'no_egress' }));
+      } else {
+        attempt = fetchViaServer(url, profile, function (stage, data) {
+          progressMsg('Server: ' + (data && data.message || 'working…'));
+        }, signal);
+      }
+
+      attempt
         .then(function (info) {
           if (signal.aborted) throw Object.assign(new Error('Cancelled.'), { code: 'cancelled' });
           progressMsg('Browser sandbox initialized — loading the page…');
@@ -330,35 +395,14 @@
         })
         .catch(function (e) {
           if (signal.aborted) return fail(Object.assign(new Error('Cancelled.'), { code: 'cancelled' }));
-          var fallbackCodes = ['no_egress', 'network', 'timeout', 'unreachable', 'dns', 'tls', 'redirect'];
-          if (fallbackCodes.indexOf(e.code) >= 0) {
-            // Path 2: browser-direct measurement via public relays.
-            progressMsg('The server could not reach the site — switching to browser-direct measurement…');
-            var t0 = performance.now();
-            relayFetch(url, signal).then(function (res) {
-              if (signal.aborted) throw Object.assign(new Error('Cancelled.'), { code: 'cancelled' });
-              if (String(res.html || '').length < 200) throw Object.assign(new Error('The relay returned no readable HTML.'), { code: 'unreachable' });
-              return measurePage(null, profile, {
-                srcdocBuilder: function (nonce) { return buildSrcdoc(res.html, url, profile, nonce, measureOpts); },
-                onStage: mapStages, timeout: 80000
-              }).then(function (payload) {
-                if (payload && payload.internalLinks && payload.internalLinks.length && !CWV._internalLinks) CWV._internalLinks = payload.internalLinks;
-                if (/^http:\/\//i.test(url)) {
-                  payload.meta.notes = payload.meta.notes || [];
-                  payload.meta.notes.push('The page is HTTP-only. In browser-direct mode the browser may block its HTTP subresources as mixed content — results can be incomplete. The server-proxy transport (production) does not have this limitation.');
-                }
-                return analyzeBundle(payload, {
-                  profile: profile,
-                  relayInfo: { requestedUrl: url, finalUrl: url, status: res.status, bytes: res.html.length, relay: res.relay, ms: performance.now() - t0 }
-                });
-              });
-            }).then(function (report) {
-              markStep('js'); markStep('images'); markStep('fonts'); markStep('report');
-              ok(report, { fallback: true });
-            }).catch(fail);
-            return;
-          }
-          fail(e);
+          if (HARD_CODES.indexOf(e.code) >= 0) return fail(e);
+          // Transport trouble (no egress, empty/truncated SSE stream, stalled
+          // connection…) → browser-direct measurement.
+          CWV._serverNoEgress = true;
+          relayRun(url, profile, measureOpts, e).then(function (report) {
+            markStep('js'); markStep('images'); markStep('fonts'); markStep('report');
+            ok(report, { fallback: true });
+          }, fail);
         });
     });
   }
@@ -622,15 +666,25 @@
 
   function crawlOne(url, profile) {
     var measureOpts = { settleMs: 2500, maxIx: 4 };
-    var attempt = fetchViaServer(url, profile, null, null).then(function (info) {
-      return measurePage(info.pageUrl, profile, { onStage: function () {}, timeout: 60000, qs: 'settle=2500&maxIx=4' }).then(function (payload) {
-        return analyzeBundle(payload, { serverInfo: info, sessionMeta: null, profile: profile });
+    var attempt;
+    if (CWV._serverNoEgress) {
+      attempt = Promise.reject(Object.assign(new Error('Server transport skipped.'), { code: 'no_egress' }));
+    } else {
+      attempt = fetchViaServer(url, profile, null, null).then(function (info) {
+        return measurePage(info.pageUrl, profile, { onStage: function () {}, timeout: 60000, qs: 'settle=2500&maxIx=4' }).then(function (payload) {
+          return analyzeBundle(payload, { serverInfo: info, sessionMeta: null, profile: profile });
+        });
       });
-    });
+    }
     return attempt.catch(function (e) {
+      if (HARD_CODES.indexOf(e.code) >= 0) throw e;
+      CWV._serverNoEgress = true;
       var t0 = performance.now();
       return relayFetch(url, null).then(function (res) {
-        if (String(res.html || '').length < 200) throw new Error('Relay returned no readable HTML.');
+        if (CHALLENGE_RE.test(String(res.html || '').slice(0, 8000))) {
+          throw Object.assign(new Error('Bot challenge on this page.'), { code: 'challenge' });
+        }
+        if (String(res.html || '').length < 200) throw Object.assign(new Error('Relay returned no readable HTML.'), { code: 'unreachable' });
         return measurePage(null, profile, {
           srcdocBuilder: function (nonce) { return buildSrcdoc(res.html, url, profile, nonce, measureOpts); },
           onStage: function () {}, timeout: 60000
@@ -708,7 +762,7 @@
       renderAll();
     }, function (e) {
       out.innerHTML = '<div class="paper paper-padded cwv-error"><span class="material-icons" aria-hidden="true">error_outline</span><b>' + esc((e && e.message) || 'The audit failed.') + '</b>' +
-        '<p class="muted">' + (e && e.code === 'cancelled' ? 'Cancelled.' : 'Check the URL, then try again. Sites behind bot protection or with unreachable servers cannot be measured.') + '</p>' +
+        '<p class="muted">' + (e && e.code === 'cancelled' ? 'Cancelled.' : 'Check the URL, then try again. Both measurement transports were attempted (server proxy, then your browser via public relays). Sites behind bot protection or with unreachable servers cannot be measured.') + '</p>' +
         '<button class="btn" type="button" onclick="location.reload()">Try Again</button></div>';
     });
   });
