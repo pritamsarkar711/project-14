@@ -5,6 +5,7 @@ const ezoicApi = require('./lib/ezoic/api');
 const mediavineApi = require('./lib/mediavine/api');
 const raptiveApi = require('./lib/raptive/api');
 const wpthemeApi = require('./lib/wptheme/api');
+const sitemapApi = require('./lib/sitemap/api');
 
 const criticalCss = fs.readFileSync('assets/css/style.css', 'utf8');
 const esc = s => String(s ?? '').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
@@ -19,6 +20,7 @@ function otherToolsMenu(active) {
       <a href="/mediavine-eligibility-checker" role="menuitem" class="${active==='mediavine'?'is-active':''}">${icon('trending_up')}<span><b>Mediavine Eligibility Checker</b><small>Website readiness for Mediavine</small></span></a>
       <a href="/raptive-eligibility-checker" role="menuitem" class="${active==='raptive'?'is-active':''}">${icon('campaign')}<span><b>Raptive Eligibility Checker</b><small>Website readiness for Raptive</small></span></a>
       <a href="/wordpress-theme-detector" role="menuitem" class="${active==='wptheme'?'is-active':''}">${icon('palette')}<span><b>WordPress Theme Detector</b><small>Detect the active WP theme</small></span></a>
+      <a href="/xml-sitemap-generator" role="menuitem" class="${active==='sitemap'?'is-active':''}">${icon('account_tree')}<span><b>XML Sitemap Generator</b><small>Crawl, validate &amp; export XML sitemaps</small></span></a>
     </div></details>`;
 }
 
@@ -28,7 +30,7 @@ function layout(title, body, opts) {
   const scripts = opts.scripts || ['/assets/js/common.js','/assets/js/audit.js'];
   const meta = opts.meta || '';
   const jsonLd = opts.jsonLd ? `<script type="application/ld+json">${JSON.stringify(opts.jsonLd)}</script>` : '';
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">${meta}<title>${esc(title)}</title><link rel="canonical" href="${opts.canonical||'https://huvanti.com/'}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Icons&display=swap" rel="stylesheet"><style>${criticalCss}</style>${jsonLd}</head><body><a class="skip-link" href="#main">Skip to content</a><div class="app"><header class="appbar"><div class="toolbar"><a class="brand" href="/">${icon('travel_explore')}<span class="brand-name">huvanti</span></a><nav class="desktop-nav" aria-label="Primary"><a href="/">${icon('home')}<span>Home</span></a>${otherToolsMenu(active)}<a href="/about">${icon('info')}<span>About</span></a><a href="/contact">${icon('mail')}<span>Contact</span></a></nav><button type="button" class="icon-button theme-toggle" aria-label="toggle theme" id="theme-toggle"><span class="material-icons">brightness_4</span></button></div></header><main id="main">${body}</main><footer class="footer"><div class="container footer-grid"><div><div class="footer-brand">huvanti</div><p class="footer-tagline">Free, no-account website tools.</p></div><div><div class="footer-heading">Tools</div><div class="footer-links"><a href="/">SEO Audit</a><a href="/adsense-eligibility-checker">AdSense Eligibility Checker</a><a href="/ezoic-eligibility-checker">Ezoic Eligibility Checker</a><a href="/mediavine-eligibility-checker">Mediavine Eligibility Checker</a><a href="/raptive-eligibility-checker">Raptive Eligibility Checker</a><a href="/wordpress-theme-detector">WordPress Theme Detector</a></div></div><div><div class="footer-heading">Pages</div><div class="footer-links"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div></div></div><div class="container footer-copyright">&copy; 2026 huvanti. All rights reserved. Not affiliated with Google, Ezoic or Mediavine.</div></footer></div>${scripts.map(s=>`<script src="${s}"></script>`).join('')}</body></html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">${meta}<title>${esc(title)}</title><link rel="canonical" href="${opts.canonical||'https://huvanti.com/'}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Icons&display=swap" rel="stylesheet"><style>${criticalCss}</style>${jsonLd}</head><body><a class="skip-link" href="#main">Skip to content</a><div class="app"><header class="appbar"><div class="toolbar"><a class="brand" href="/">${icon('travel_explore')}<span class="brand-name">huvanti</span></a><nav class="desktop-nav" aria-label="Primary"><a href="/">${icon('home')}<span>Home</span></a>${otherToolsMenu(active)}<a href="/about">${icon('info')}<span>About</span></a><a href="/contact">${icon('mail')}<span>Contact</span></a></nav><button type="button" class="icon-button theme-toggle" aria-label="toggle theme" id="theme-toggle"><span class="material-icons">brightness_4</span></button></div></header><main id="main">${body}</main><footer class="footer"><div class="container footer-grid"><div><div class="footer-brand">huvanti</div><p class="footer-tagline">Free, no-account website tools.</p></div><div><div class="footer-heading">Tools</div><div class="footer-links"><a href="/">SEO Audit</a><a href="/adsense-eligibility-checker">AdSense Eligibility Checker</a><a href="/ezoic-eligibility-checker">Ezoic Eligibility Checker</a><a href="/mediavine-eligibility-checker">Mediavine Eligibility Checker</a><a href="/raptive-eligibility-checker">Raptive Eligibility Checker</a><a href="/wordpress-theme-detector">WordPress Theme Detector</a><a href="/xml-sitemap-generator">XML Sitemap Generator</a></div></div><div><div class="footer-heading">Pages</div><div class="footer-links"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div></div></div><div class="container footer-copyright">&copy; 2026 huvanti. All rights reserved. Not affiliated with Google, Ezoic or Mediavine.</div></footer></div>${scripts.map(s=>`<script src="${s}"></script>`).join('')}</body></html>`;
 }
 
 function home() {
@@ -226,6 +228,44 @@ function wpthemePage() {
   });
 }
 
+
+function sitemapPage() {
+  const meta = `<meta name="description" content="Free XML Sitemap Generator. Crawl a public website safely, respect robots.txt, analyse existing sitemaps, validate indexable URLs, and download standards-compliant XML."><meta name="robots" content="index,follow">
+<meta property="og:title" content="XML Sitemap Generator — huvanti"><meta property="og:description" content="Production-quality sitemap generator and analyzer with robots.txt, canonical, noindex, redirect and XML validation."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
+  const jsonLd = {'@context':'https://schema.org','@graph':[
+    {'@type':'WebSite',name:'huvanti',url:'https://huvanti.com/'},
+    {'@type':'WebApplication',name:'XML Sitemap Generator',applicationCategory:'DeveloperApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',featureList:'URL validation, SSRF-safe fetching, robots.txt parsing, sitemap discovery, internal crawling, canonical and noindex detection, XML validation, sitemap splitting, existing sitemap analysis',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free deterministic XML sitemap generator and analyzer. No login, account, AI or paid SEO API.'}
+  ]};
+  const body = `<section class="hero audit-home sitemap-home"><span class="material-icons hero-icon" aria-hidden="true">account_tree</span><h1>XML Sitemap Generator</h1><p class="hero-subtitle">Generate or analyse technically valid XML sitemaps from real crawlable pages.</p>
+<form id="sitemap-form" class="sitemap-form" aria-label="XML sitemap generator">
+  <div class="mode-tabs" role="radiogroup" aria-label="Mode"><label><input type="radio" name="sitemap-mode" value="generate" checked> Generate New Sitemap</label><label><input type="radio" name="sitemap-mode" value="analyze"> Analyze Existing Sitemap</label></div>
+  <div class="search-field audit-search"><span class="material-icons" aria-hidden="true">link</span><input name="url" id="sitemap-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website or sitemap URL"><button class="btn" type="submit">Generate Sitemap</button></div>
+  <details class="sitemap-options sitemap-advanced"><summary>${icon('tune')} Advanced crawl settings</summary>
+    <div class="sitemap-option-row"><label>Maximum URLs <select name="maxUrls" class="select"><option value="100">100</option><option value="500" selected>500</option><option value="1000">1,000</option><option value="5000">5,000</option><option value="10000">10,000</option></select></label><label>Crawl Depth <select name="depth" class="select"><option value="unlimited">Unlimited (capped safely)</option><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="5">5</option><option value="10">10</option></select></label><label>Changefreq <select name="changefreq" class="select"><option value="" selected>Don't include</option><option value="always">Always</option><option value="hourly">Hourly</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option><option value="never">Never</option></select></label></div>
+    <div class="sitemap-option-row"><label><input type="checkbox" name="includeSubdomains"> Include subdomains</label><label><input type="checkbox" name="includeNoindex"> Include noindex URLs <small>(not recommended)</small></label><label><input type="checkbox" name="includeImages"> Include Images</label></div>
+  </details>
+</form>
+<div class="audit-trust"><span>No account</span><span>No AI API</span><span>Robots.txt respected</span><span>Canonicals checked</span><span>Noindex excluded</span><span>XML validated</span><span>Download ready</span></div></section>
+<div id="sitemap-results" class="audit-results sitemap-results"></div>
+<div class="container section"><div class="section-heading-row">${icon('verified')}<h4 style="margin:0;">Built for accurate sitemap generation — not link dumping</h4></div><div class="grid feature-grid">
+  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('security')} Safe crawler</h6><p>Only public HTTP/HTTPS URLs are accepted. Private IPs, localhost, metadata endpoints, unsafe redirects, oversized responses and request flooding are blocked.</p></div></div></div>
+  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('rule')} Robots and indexability</h6><p>robots.txt, HTTP status, content type, canonical links, meta robots and X-Robots-Tag are checked before a URL is included.</p></div></div></div>
+  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('fact_check')} Existing sitemap analysis</h6><p>Inspect XML validity, broken URLs, redirects, duplicates, non-canonical pages, non-indexable URLs and structure issues with an internal health score.</p></div></div></div>
+  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('code')} Standards-compliant XML</h6><p>Generated files use the sitemap protocol namespace, properly escaped loc values, reliable lastmod only, automatic splitting and validation.</p></div></div></div>
+  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('image')} Optional image sitemap</h6><p>When enabled, page-associated image URLs from img, picture/srcset and Open Graph are included without tracking pixels or UI icons.</p></div></div></div>
+  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('table_view')} Transparent URL explorer</h6><p>Every crawled URL is shown with status, indexability, canonical target, inclusion decision and a precise exclusion reason.</p></div></div></div>
+</div></div>
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('help')}<h4 style="margin:0;">FAQ</h4></div><div class="faq-accordion">
+<details><summary>Why can a crawl fail?</summary><p>Some sites block datacenter crawlers, require JavaScript challenges, rate-limit requests, have DNS/SSL issues, or disallow crawling in robots.txt. The tool now tries a server crawl first and then a browser/relay fallback, but it still reports a real access failure instead of inventing URLs.</p></details>
+<details><summary>Does this include every discovered link?</summary><p>No. A URL must be internal, allowed by robots.txt, return a successful HTML response, be indexable, and pass canonical and duplicate checks before it is included in the generated sitemap.</p></details>
+<details><summary>Are lastmod, changefreq and priority fabricated?</summary><p>No. lastmod is only included when reliable data exists. changefreq is optional and user-selected. priority is not generated by default because arbitrary priorities do not guarantee search-engine ranking behavior.</p></details>
+<details><summary>What happens if an existing sitemap is detected?</summary><p>The generator shows Existing Sitemap Detected. You can still generate a fresh crawl-based sitemap or switch to Analyze Existing Sitemap mode to inspect broken URLs, redirects, duplicates, canonical problems and non-indexable URLs.</p></details>
+<details><summary>Does this work with WordPress and JavaScript sites?</summary><p>It detects common WordPress sitemap structures and crawlable WordPress URLs. For JavaScript-heavy pages, it reports limited crawlability when the server HTML has too little content; it does not fake rendered links.</p></details>
+<details><summary>Is this affiliated with Google?</summary><p>No. The sitemap health score is an internal diagnostic score, not an official Google score. A valid sitemap helps discovery but never guarantees indexing.</p></details>
+</div></div>`;
+  return layout('XML Sitemap Generator — Free Crawl, Validate & Download | huvanti', body, { active:'sitemap', canonical:'https://huvanti.com/xml-sitemap-generator', meta, jsonLd, scripts:['/assets/js/common.js','/assets/js/sitemap/browser.js','/assets/js/sitemap/ui.js'] });
+}
+
 function page(name) { return layout(name, `<div class="container page"><h1 class="page-title">${esc(name)}</h1><div class="paper paper-padded"><p>huvanti provides free, no-account website tools including an SEO audit, an AdSense eligibility checker, an Ezoic eligibility checker, a Mediavine eligibility checker, a Raptive eligibility checker, and a WordPress theme detector.</p></div></div>`); }
 
 function readJson(req){ return new Promise(resolve=>{let b=''; req.on('data',d=>b+=d); req.on('end',()=>{try{resolve(JSON.parse(b||'{}'))}catch{resolve({})}});}); }
@@ -280,6 +320,11 @@ http.createServer(async (req,res)=>{
     await wpthemeApi.handleAnalyze(req, res, body);
     return;
   }
+  if (p === '/api/sitemap' && req.method === 'POST') {
+    const body = await readJson(req);
+    await sitemapApi.handle(req, res, body);
+    return;
+  }
   if (p.startsWith('/assets/')) {
     const safe = path.normalize(p).replace(/^([.][.][/\\])+/, '');
     const f = path.join(process.cwd(), safe);
@@ -297,6 +342,7 @@ http.createServer(async (req,res)=>{
   else if (p === '/mediavine-eligibility-checker') html = mediavinePage();
   else if (p === '/raptive-eligibility-checker') html = raptivePage();
   else if (p === '/wordpress-theme-detector') html = wpthemePage();
+  else if (p === '/xml-sitemap-generator') html = sitemapPage();
   else if (['/about','/contact','/privacy','/terms'].includes(p)) html = page(p.slice(1).replace(/^./,c=>c.toUpperCase()));
   else html = layout('Not found', `<div class="container notfound"><h1>404</h1><p>Page not found.</p><a class="btn" href="/">Back home</a></div>`);
   res.setHeader('content-type','text/html; charset=utf-8'); res.setHeader('cache-control','no-store'); res.end(html);
