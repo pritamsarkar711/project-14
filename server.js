@@ -9,6 +9,7 @@ const sitemapApi = require('./lib/sitemap/api');
 const domaincheckApi = require('./lib/domaincheck/api');
 const brokenlinkApi = require('./lib/brokenlink/api');
 const llmstxtApi = require('./lib/llmstxt/api');
+const botblockerApi = require('./lib/botblocker/api');
 
 const criticalCss = fs.readFileSync('assets/css/style.css', 'utf8');
 const esc = s => String(s ?? '').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
@@ -27,6 +28,7 @@ function otherToolsMenu(active) {
       <a href="/xml-sitemap-generator" role="menuitem" class="${active==='sitemap'?'is-active':''}">${icon('account_tree')}<span><b>XML Sitemap Generator</b><small>Crawl, validate &amp; export XML sitemaps</small></span></a>
       <a href="/broken-link-checker" role="menuitem" class="${active==='brokenlink'?'is-active':''}">${icon('link_off')}<span><b>Broken Link Checker</b><small>Find &amp; classify broken links accurately</small></span></a>
       <a href="/llms-txt-generator" role="menuitem" class="${active==='llmstxt'?'is-active':''}">${icon('auto_stories')}<span><b>LLMs.txt Generator</b><small>Generate &amp; validate an llms.txt file</small></span></a>
+      <a href="/ai-crawler-blocker" role="menuitem" class="${active==='botblocker'?'is-active':''}">${icon('security')}<span><b>AI Crawler &amp; LLM Bot Blocker</b><small>Control AI bots via robots.txt + server rules</small></span></a>
     </div></details>`;
 }
 
@@ -36,7 +38,7 @@ function layout(title, body, opts) {
   const scripts = opts.scripts || ['/assets/js/common.js','/assets/js/audit.js'];
   const meta = opts.meta || '';
   const jsonLd = opts.jsonLd ? `<script type="application/ld+json">${JSON.stringify(opts.jsonLd)}</script>` : '';
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">${meta}<title>${esc(title)}</title><link rel="canonical" href="${opts.canonical||'https://huvanti.com/'}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Icons&display=swap" rel="stylesheet"><style>${criticalCss}</style>${jsonLd}</head><body><a class="skip-link" href="#main">Skip to content</a><div class="app"><header class="appbar"><div class="toolbar"><a class="brand" href="/">${icon('travel_explore')}<span class="brand-name">huvanti</span></a><nav class="desktop-nav" aria-label="Primary"><a href="/">${icon('home')}<span>Home</span></a>${otherToolsMenu(active)}<a href="/about">${icon('info')}<span>About</span></a><a href="/contact">${icon('mail')}<span>Contact</span></a></nav><button type="button" class="icon-button theme-toggle" aria-label="toggle theme" id="theme-toggle"><span class="material-icons">brightness_4</span></button></div></header><main id="main">${body}</main><footer class="footer"><div class="container footer-grid"><div><div class="footer-brand">huvanti</div><p class="footer-tagline">Free, no-account website tools.</p></div><div><div class="footer-heading">Tools</div><div class="footer-links"><a href="/">SEO Audit</a><a href="/adsense-eligibility-checker">AdSense Eligibility Checker</a><a href="/ezoic-eligibility-checker">Ezoic Eligibility Checker</a><a href="/mediavine-eligibility-checker">Mediavine Eligibility Checker</a><a href="/raptive-eligibility-checker">Raptive Eligibility Checker</a><a href="/wordpress-theme-detector">WordPress Theme Detector</a><a href="/domain-information-checker">Domain Information Checker</a><a href="/xml-sitemap-generator">XML Sitemap Generator</a><a href="/broken-link-checker">Broken Link Checker</a><a href="/llms-txt-generator">LLMs.txt Generator</a></div></div><div><div class="footer-heading">Pages</div><div class="footer-links"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div></div></div><div class="container footer-copyright">&copy; 2026 huvanti. All rights reserved. Not affiliated with Google, Ezoic or Mediavine.</div></footer></div>${scripts.map(s=>`<script src="${s}"></script>`).join('')}</body></html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">${meta}<title>${esc(title)}</title><link rel="canonical" href="${opts.canonical||'https://huvanti.com/'}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Icons&display=swap" rel="stylesheet"><style>${criticalCss}</style>${jsonLd}</head><body><a class="skip-link" href="#main">Skip to content</a><div class="app"><header class="appbar"><div class="toolbar"><a class="brand" href="/">${icon('travel_explore')}<span class="brand-name">huvanti</span></a><nav class="desktop-nav" aria-label="Primary"><a href="/">${icon('home')}<span>Home</span></a>${otherToolsMenu(active)}<a href="/about">${icon('info')}<span>About</span></a><a href="/contact">${icon('mail')}<span>Contact</span></a></nav><button type="button" class="icon-button theme-toggle" aria-label="toggle theme" id="theme-toggle"><span class="material-icons">brightness_4</span></button></div></header><main id="main">${body}</main><footer class="footer"><div class="container footer-grid"><div><div class="footer-brand">huvanti</div><p class="footer-tagline">Free, no-account website tools.</p></div><div><div class="footer-heading">Tools</div><div class="footer-links"><a href="/">SEO Audit</a><a href="/adsense-eligibility-checker">AdSense Eligibility Checker</a><a href="/ezoic-eligibility-checker">Ezoic Eligibility Checker</a><a href="/mediavine-eligibility-checker">Mediavine Eligibility Checker</a><a href="/raptive-eligibility-checker">Raptive Eligibility Checker</a><a href="/wordpress-theme-detector">WordPress Theme Detector</a><a href="/domain-information-checker">Domain Information Checker</a><a href="/xml-sitemap-generator">XML Sitemap Generator</a><a href="/broken-link-checker">Broken Link Checker</a><a href="/llms-txt-generator">LLMs.txt Generator</a><a href="/ai-crawler-blocker">AI Crawler &amp; LLM Bot Blocker</a></div></div><div><div class="footer-heading">Pages</div><div class="footer-links"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div></div></div><div class="container footer-copyright">&copy; 2026 huvanti. All rights reserved. Not affiliated with Google, Ezoic or Mediavine.</div></footer></div>${scripts.map(s=>`<script src="${s}"></script>`).join('')}</body></html>`;
 }
 
 function home() {
@@ -354,6 +356,114 @@ function llmstxtPage() {
   return layout('LLMs.txt Generator — Free Crawl, Validate & Download | huvanti', body, { active:'llmstxt', canonical:'https://huvanti.com/llms-txt-generator', meta, jsonLd, scripts:['/assets/js/common.js','/assets/js/llmstxt/browser.js','/assets/js/llmstxt/ui.js'] });
 }
 
+function botblockerPage() {
+  const meta = `<meta name="description" content="Free AI Crawler & LLM Bot Blocker. Generate robots.txt, Nginx, Apache, Cloudflare and middleware rules for GPTBot, ClaudeBot, PerplexityBot, Bytespider & more — with a bot access simulator and conflict detection. No account, no AI API."><meta name="robots" content="index,follow">
+<meta property="og:title" content="AI Crawler & LLM Bot Blocker — huvanti"><meta property="og:description" content="Control which AI crawlers, LLM bots and AI search agents may access your site: robots.txt + server-level rules, validation, simulator, coverage and protection score."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
+  const jsonLd = {'@context':'https://schema.org','@graph':[
+    {'@type':'WebSite',name:'huvanti',url:'https://huvanti.com/'},
+    {'@type':'WebApplication',name:'AI Crawler & LLM Bot Blocker',applicationCategory:'DeveloperApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',featureList:'AI bot database, crawler classification, protection presets, robots.txt generation, Nginx and Apache and Cloudflare and middleware generation, configuration validation, rule conflict detection, bot access simulator, existing robots.txt analyzer, coverage analysis, protection score, export',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free, deterministic AI crawler management and configuration generator. Clearly separates advisory robots.txt control from technical server-level blocking. No login, no account, no AI, no paid API.'}
+  ]};
+  const body = `<section class="hero audit-home botblocker-home"><span class="material-icons hero-icon" aria-hidden="true">security</span><h1>AI Crawler &amp; LLM Bot Blocker</h1><p class="hero-subtitle">Control which AI crawlers, LLM bots and AI search agents may access your site — advisory <code>robots.txt</code> plus real server-level rules, with an access simulator. No account, no AI API.</p>
+<form id="botblocker-form" class="botblocker-form" aria-label="AI Crawler &amp; LLM Bot Blocker">
+  <div class="search-field audit-search"><span class="material-icons" aria-hidden="true">link</span><input id="botblocker-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" value="https://example.com" aria-label="Website URL"><button class="btn" type="submit">Generate Protection Rules</button></div>
+  <div class="botblocker-formrow">
+    <label class="botblocker-modelabel" for="botblocker-mode">Protection mode</label>
+    <select id="botblocker-mode" class="select botblocker-modeselect" aria-label="Protection mode">
+      <option value="block-all">Block All Known AI Crawlers (Maximum AI Restriction)</option>
+      <option value="block-training">Block AI Training Crawlers Only</option>
+      <option value="block-search">Block AI Search Crawlers Only</option>
+      <option value="block-extraction">Block AI Content Extraction Crawlers</option>
+      <option value="allow-all">Allow All AI Crawlers</option>
+      <option value="allow-selected">Allow Selected AI Crawlers (block the rest)</option>
+      <option value="custom">Custom AI Crawler Rules (per-bot choices below)</option>
+      <option value="advanced">Custom Advanced Configuration</option>
+    </select>
+    <small class="muted botblocker-mode-desc" id="botblocker-mode-desc"></small>
+  </div>
+  <details class="botblocker-advanced-sub"><summary>${icon('tune')} Advanced options — paths, exceptions, formats, rate control</summary>
+    <div class="botblocker-optgroup">
+      <fieldset class="botblocker-fieldset"><legend>Apply rules to</legend>
+        <label class="botblocker-radio"><input type="radio" name="botblocker-scope" id="botblocker-scope-entire" value="entire" checked> Entire website <code>/</code></label>
+        <label class="botblocker-radio"><input type="radio" name="botblocker-scope" id="botblocker-scope-specific" value="specific"> Specific paths</label>
+        <div id="botblocker-pathchips" class="botblocker-chiprow" aria-label="Blocked paths"></div>
+        <div class="botblocker-addrow"><input type="text" id="botblocker-path-input" class="text-input" placeholder="Add custom path, e.g. /private-content/"><button type="button" class="btn" id="botblocker-path-add">${icon('add')} Add</button></div>
+      </fieldset>
+      <fieldset class="botblocker-fieldset"><legend>Block everywhere except (Allow carve-outs)</legend>
+        <label class="botblocker-radio"><input type="checkbox" id="botblocker-exceptions-on"> Enable exception paths</label>
+        <div id="botblocker-exceptionchips" class="botblocker-chiprow" aria-label="Allowed exception paths"></div>
+        <div class="botblocker-addrow"><input type="text" id="botblocker-exc-input" class="text-input" placeholder="Add allow path, e.g. /public/"><button type="button" class="btn" id="botblocker-exc-add">${icon('add')} Add</button></div>
+        <p class="muted">robots.txt has no nested-exception operator — carve-outs rely on longest-match precedence. Verify with the simulator.</p>
+      </fieldset>
+    </div>
+    <div class="botblocker-optgroup">
+      <fieldset class="botblocker-fieldset"><legend>Default group (User-agent: *)</legend>
+        <select id="botblocker-default-group" class="select" aria-label="Default wildcard group">
+          <option value="allow" selected>Allow everything (Allow: /)</option>
+          <option value="none">No wildcard group</option>
+          <option value="mirror">Apply the same path rules to all other crawlers</option>
+          <option value="block-others">Block all other crawlers (Disallow: /) — high impact</option>
+        </select>
+        <p class="muted">Specific groups above always take precedence for their crawler.</p>
+      </fieldset>
+      <fieldset class="botblocker-fieldset"><legend>Sitemap (optional)</legend>
+        <input type="text" id="botblocker-sitemap" class="text-input" placeholder="https://example.com/sitemap.xml" spellcheck="false">
+      </fieldset>
+    </div>
+    <div class="botblocker-optgroup">
+      <fieldset class="botblocker-fieldset"><legend>Output formats (robots.txt is always generated)</legend>
+        <div class="botblocker-checkrow">
+          <label><input type="checkbox" id="botblocker-out-nginx" checked> Nginx</label>
+          <label><input type="checkbox" id="botblocker-out-apache"> Apache (.htaccess)</label>
+          <label><input type="checkbox" id="botblocker-out-cloudflare"> Cloudflare</label>
+          <label><input type="checkbox" id="botblocker-out-node"> Node.js / Express</label>
+          <label><input type="checkbox" id="botblocker-out-php"> PHP</label>
+          <label><input type="checkbox" id="botblocker-out-laravel"> Laravel</label>
+        </div>
+      </fieldset>
+      <fieldset class="botblocker-fieldset"><legend>AI Crawler Rate Control (optional recommendations)</legend>
+        <label class="botblocker-radio"><input type="checkbox" id="botblocker-rate-on"> Include rate-control recommendations</label>
+        <div class="botblocker-raterow">
+          <label>Req/min <input type="number" id="botblocker-rpm" class="number-input" min="1" max="3000" value="60"></label>
+          <label>Req/sec <input type="number" id="botblocker-rps" class="number-input" min="1" max="50" value="1"></label>
+          <label>Burst <input type="number" id="botblocker-burst" class="number-input" min="1" max="100" value="20"></label>
+        </div>
+      </fieldset>
+    </div>
+  </details>
+</form>
+<div class="audit-trust"><span>No account</span><span>Deterministic rules database</span><span>robots.txt + server rules</span><span>Access simulator</span><span>Runs in your browser</span></div>
+</section>
+<div id="botblocker-results" class="audit-results botblocker-results"></div>
+<div class="container section">
+  <div class="section-heading-row">${icon('verified')}<h4 style="margin:0;">What this tool does — and what it honestly cannot</h4></div>
+  <div class="grid feature-grid">
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('smart_toy')} Bot database &amp; classification</h6><p>A structured, updatable database of known AI crawlers (GPTBot, ClaudeBot, Claude-SearchBot, OAI-SearchBot, Google-Extended, Applebot-Extended, PerplexityBot, Amazonbot, Bytespider, CCBot, Meta-ExternalAgent, DuckAssistBot, MistralAI-Index and more) with organization, purpose, category, official documentation, robots.txt support and confidence. Bots are classified by documented behavior — never by name.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('rule')} Generation, validation &amp; conflict detection</h6><p>robots.txt, Nginx (map-based, not unsafe if-spam), Apache, Cloudflare WAF expressions and Node.js/PHP/Laravel middleware. Every output is re-validated: syntax, duplicates, contradictions, invalid paths and User-Agent patterns. Contradictory rules are explained via robots.txt matching behavior, never silently shipped.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('science')} Access simulator &amp; analyzer</h6><p>Pick a bot and a path and see exactly which rule wins — with the matching logic explained (exact group beats wildcard, longest pattern wins, Allow wins ties). Paste or fetch your existing robots.txt to analyze, compare before/after and test bots against it.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('balance')} Advisory vs technical — always distinct</h6><p>robots.txt requests compliant crawlers not to access paths; it does not enforce access control. Server/CDN-level rules (Nginx, Apache, Cloudflare, middleware) provide stronger enforcement. The tool never claims “robots.txt completely blocks AI bots”.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('security')} False-positive protection</h6><p>Only exact User-Agent product tokens from the verified database are matched, with token boundaries: “MyAIBrowser” is never blocked because it contains “AI”, and a rule for “Applebot” does not catch “Applebot-Extended”. User-Agent spoofing limits are clearly stated.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('lock')} Privacy &amp; performance</h6><p>No account, nothing stored server-side. All generation runs locally in your browser against a cached database — the only external requests are the ones you explicitly trigger (fetch robots.txt / live website check), with limits and clear labeling.</p></div></div></div>
+  </div>
+</div>
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('help')}<h4 style="margin:0;">FAQ</h4></div><div class="faq-accordion">
+<details><summary>Does robots.txt block AI bots?</summary><p>No — it requests compliant crawlers not to access the paths you list. Most major AI crawlers document that they honor robots.txt, but a malicious crawler can simply ignore it. For stronger enforcement use the Nginx/Apache/Cloudflare/middleware rules this tool generates, and combine with IP verification where the operator publishes ranges.</p></details>
+<details><summary>Can I block AI training but allow AI search?</summary><p>Yes — choose “Block AI Training Crawlers Only”. Training crawlers (GPTBot, ClaudeBot, CCBot, Meta-ExternalAgent…) get disallow rules while AI search and retrieval crawlers (OAI-SearchBot, Claude-SearchBot, PerplexityBot, DuckAssistBot…) get explicit allow rules. You can still flip any individual bot below.</p></details>
+<details><summary>What about Google-Extended and Applebot-Extended?</summary><p>These are usage-control tokens, not crawlers: they change how already-crawled content may be used (model training). A robots.txt rule for them does not stop Googlebot or Applebot from crawling for search. The tool labels them clearly so you never get a false sense of blocking.</p></details>
+<details><summary>Can someone bypass the blocking?</summary><p>Yes. Any client can change its User-Agent, and robots.txt is voluntary. User-Agent filtering is practical filtering, not a guarantee. IP/network verification (where the operator publishes ranges, e.g. OpenAI or Perplexity) is stronger; authentication and network-level controls are strongest.</p></details>
+<details><summary>Is my configuration sent anywhere?</summary><p>No. Generation runs entirely in your browser. Saved profiles live in your browser\u2019s local storage. The only external requests are the two you explicitly trigger: fetching an existing robots.txt by URL and the live website check — both are labeled and limited.</p></details>
+<details><summary>Does the database contain every AI crawler?</summary><p>No, and it never claims to. Coverage reports count “known crawlers in our database”. The database is versioned and structured so it can be updated; unknown crawlers simply follow your default (*) group.</p></details>
+</div></div>`;
+  const scripts = ['/assets/js/common.js',
+    '/lib/botblocker/botDatabase.js', '/lib/botblocker/botClassifier.js', '/lib/botblocker/botPatternMatcher.js',
+    '/lib/botblocker/robotsParser.js', '/lib/botblocker/robotsSimulator.js', '/lib/botblocker/robotsGenerator.js',
+    '/lib/botblocker/ruleConflictDetector.js', '/lib/botblocker/userAgentAnalyzer.js',
+    '/lib/botblocker/nginxGenerator.js', '/lib/botblocker/apacheGenerator.js', '/lib/botblocker/cloudflareGenerator.js',
+    '/lib/botblocker/middlewareGenerator.js', '/lib/botblocker/configurationValidator.js', '/lib/botblocker/protectionScore.js',
+    '/lib/botblocker/coverageAnalyzer.js', '/lib/botblocker/securityChecker.js', '/lib/botblocker/index.js',
+    '/assets/js/botblocker/ui.js'];
+  return layout('AI Crawler & LLM Bot Blocker — robots.txt, Nginx, Apache & Cloudflare Rules | huvanti', body, { active:'botblocker', canonical:'https://huvanti.com/ai-crawler-blocker', meta, jsonLd, scripts });
+}
+
 function brokenlinkPage() {
   const meta = `<meta name="description" content="Free Broken Link Checker. Crawl any public website, find confirmed broken links (404,410,5xx,DNS,SSL), detect redirect chains & loops, bot protection, anchor errors — accurate classification, no false positives. No account, no AI."><meta name="robots" content="index,follow">
 <meta property="og:title" content="Broken Link Checker — huvanti"><meta property="og:description" content="Production-grade broken link checker with accurate classification, retry verification, redirect loop detection, DNS/TLS analysis, and transparent health score. No account required."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
@@ -518,7 +628,14 @@ http.createServer(async (req,res)=>{
     await llmstxtApi.handleBrowser(req, res, body);
     return;
   }
-  if (p.startsWith('/assets/')) {
+  if (p === '/api/botblocker-inspect' && req.method === 'POST') {
+    const body = await readJson(req);
+    await botblockerApi.handle(req, res, body);
+    return;
+  }
+  if (p.startsWith('/assets/') || p.startsWith('/lib/botblocker/')) {
+    // Only expose the browser engine modules, not server-only or test files.
+    if (p.startsWith('/lib/botblocker/') && /(selftest|uitest|api)\.js$/.test(p)) { res.statusCode = 404; res.end('Not found'); return; }
     const safe = path.normalize(p).replace(/^([.][.][/\\])+/, '');
     const f = path.join(process.cwd(), safe);
     if (fs.existsSync(f) && fs.statSync(f).isFile()) {
@@ -539,6 +656,7 @@ http.createServer(async (req,res)=>{
   else if (p === '/xml-sitemap-generator') html = sitemapPage();
   else if (p === '/broken-link-checker') html = brokenlinkPage();
   else if (p === '/llms-txt-generator') html = llmstxtPage();
+  else if (p === '/ai-crawler-blocker') html = botblockerPage();
   else if (['/about','/contact','/privacy','/terms'].includes(p)) html = page(p.slice(1).replace(/^./,c=>c.toUpperCase()));
   else html = layout('Not found', `<div class="container notfound"><h1>404</h1><p>Page not found.</p><a class="btn" href="/">Back home</a></div>`);
   res.setHeader('content-type','text/html; charset=utf-8'); res.setHeader('cache-control','no-store'); res.end(html);
