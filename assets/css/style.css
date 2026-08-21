@@ -223,3 +223,17 @@ button.btn .material-icons{font-size:18px}
 /* WordPress Theme Detector — manual paste mode (reuses inputs/buttons) */
 .wptheme-paste ol{line-height:1.7}
 .wptheme-paste textarea{width:100%}
+
+/* WordPress Theme Detector — report layout: single column, compact chips */
+.wptheme-report{display:block}
+.wptheme-report>*+*{margin-top:16px}
+.wp-chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
+.wp-chips .source-chip{display:inline-block;margin:0;padding:4px 9px}
+.wp-preview small{display:block;padding:4px 2px 2px}
+
+/* WordPress Theme Detector — report layout: single column, compact chips */
+.wptheme-report{display:block}
+.wptheme-report>*+*{margin-top:16px}
+.wp-chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
+.wp-chips .source-chip{display:inline-block;margin:0;padding:4px 9px}
+.wp-preview small{display:block;padding:4px 2px 2px}

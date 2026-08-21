@@ -101,6 +101,7 @@
     if (b) b.onclick = function () { if (NETWORK_FALLBACK_CODES.indexOf(code) >= 0) browserScan(); else form.requestSubmit(); };
     var pb = document.getElementById('wptheme-paste-btn');
     if (pb) pb.onclick = pastePanel;
+    Array.prototype.forEach.call(out.querySelectorAll('.wp-open-paste'), function (b) { b.onclick = pastePanel; });
   }
 
   /* ---------- manual paste mode (unblockable) ---------- */
@@ -180,9 +181,9 @@
     var icon = r.status === 'detected' ? 'public' : r.status === 'not_detected' ? 'do_not_disturb_on' : 'help_outline';
     var vc = r.status === 'detected' ? 'ready' : r.status === 'not_detected' ? 'improve' : 'unverifiable';
     var summary;
-    if (r.status === 'detected') summary = 'WordPress is running on this website. ' + (wp.note || '');
-    else if (r.status === 'likely') summary = 'Strong WordPress signals were found, but not enough independent evidence for a definitive “Detected” verdict. ' + (wp.note || '');
-    else if (r.status === 'not_detected') summary = 'No meaningful WordPress evidence was found in the readable page. ' + (wp.note || '');
+    if (r.status === 'detected') summary = 'WordPress is running on this website.';
+    else if (r.status === 'likely') summary = 'Strong WordPress signals found — not enough for a definitive verdict.';
+    else if (r.status === 'not_detected') summary = 'No meaningful WordPress evidence was found.';
     else summary = r.reason ? r.reason.message : 'The website could not be scanned.';
     var stats = '';
     if (wp) {
@@ -199,7 +200,7 @@
       plat = '<p class="calc-note"><span class="material-icons">travel_explore</span>Possible platform: <b>' + esc(r.possiblePlatform.name) + '</b> (' + r.possiblePlatform.confidence + '% match on ' + esc((r.possiblePlatform.matched || []).slice(0, 2).join(', ')) + '). This is a hint, not a CMS detection.</p>';
     }
     var builders = wp && wp.plugins && wp.plugins.length
-      ? '<p class="muted" style="margin-top:10px">Detected WordPress plugins/builders (supporting evidence only): ' + wp.plugins.slice(0, 5).map(function (p) { return esc(p.name); }).join(' · ') + '</p>'
+      ? '<p class="muted" style="margin-top:10px">Plugins/builders seen: ' + wp.plugins.slice(0, 4).map(function (p) { return esc(p.name); }).join(' · ') + '</p>'
       : '';
     return '<div class="score-card adsense-scorecard wptheme-scorecard">'
       + '<div class="score-ring" style="--score:' + ring + ';background:conic-gradient(' + ringColor(ring) + ' calc(var(--score)*1%),var(--chip-bg) 0)"><b style="color:' + ringColor(ring) + '">' + ring + '</b></div>'
@@ -207,10 +208,11 @@
       + '<div class="verdict ' + vc + '"><span class="material-icons">' + icon + '</span>' + esc(r.statusLabel) + '</div>'
       + '<h2>WordPress ' + (isDetected ? 'Detected' : r.status === 'likely' ? 'Likely' : r.status === 'not_detected' ? 'Not Detected' : 'Unverifiable') + '</h2>'
       + '<p>' + esc(summary) + '</p>'
-      + '<div class="source-chip">Confidence ' + ring + '% · every verdict is evidence-based · no AI, no third-party detection API' + (r.via === 'browser' ? ' · collected through your browser (server could not reach the site directly)' : '') + '</div>'
-      + (r.homeBlocked ? '<p class="calc-note"><span class="material-icons">block</span>The live homepage refused automated readers (' + esc(r.homeBlocked.code === 'challenge' ? 'bot challenge' : 'HTTP ' + r.homeBlocked.status) + '). This verdict is based on other public endpoints, and the active theme could not be identified without the homepage HTML.</p>' : '')
-      + (r.homeArchived ? '<p class="calc-note"><span class="material-icons">history</span>Theme discovery used an archived snapshot of the homepage (Wayback Machine' + (r.homeArchived.timestamp ? ', ' + esc(r.homeArchived.timestamp.slice(0, 8)) : '') + ') because the live site refused readers. Theme details were read from the live site; the discovered folder may lag behind reality.</p>' : '')
-      + (r.manualPaste ? '<p class="calc-note"><span class="material-icons">content_paste</span>The homepage source was pasted manually — this verdict is based on exactly that HTML. Theme files were still read from the live site where possible.</p>' : '')
+      + '<div class="wp-chips"><span class="source-chip">Confidence ' + ring + '%</span><span class="source-chip">Evidence-based</span><span class="source-chip">No AI</span>' + (r.via === 'browser' ? '<span class="source-chip">Via your browser</span>' : '') + (r.manualPaste ? '<span class="source-chip">Source pasted manually</span>' : '') + (r.homeInner ? '<span class="source-chip">Inner page used</span>' : '') + (r.homeArchived ? '<span class="source-chip">Archived snapshot</span>' : '') + '</div>'
+      + (r.homeBlocked ? '<p class="calc-note"><span class="material-icons">block</span>Live homepage blocked (' + esc(r.homeBlocked.code === 'challenge' ? 'bot challenge' : 'HTTP ' + r.homeBlocked.status) + ') — verdict from other public endpoints.' + (r.homeInner ? '' : ' The theme could not be identified without page HTML — use “Identify by pasting the source” below.') + '</p>' : '')
+      + (r.homeInner && !r.manualPaste ? '<p class="calc-note"><span class="material-icons">description</span>Homepage was blocked; a public inner page (' + esc(String(r.homeInner.url).slice(0, 80)) + ') supplied the HTML.</p>' : '')
+      + (r.homeArchived ? '<p class="calc-note"><span class="material-icons">history</span>Discovery used an archived homepage snapshot (Wayback' + (r.homeArchived.timestamp ? ', ' + esc(r.homeArchived.timestamp.slice(0, 8)) : '') + '); theme files were read from the live site.</p>' : '')
+      + (r.manualPaste ? '<p class="calc-note"><span class="material-icons">content_paste</span>Based on the page source you pasted; theme files read from the live site where possible.</p>' : '')
       + stats + plat + builders
       + '</div></div>';
   }
@@ -238,11 +240,13 @@
         + '</div></details>'
         + '<details class="audit-fold"><summary>Detection attempts <b>' + t.attempts.length + '</b></summary><div>'
         + t.attempts.map(function (a) { return '<div class="prog-line small"><span>' + esc(a) + '</span></div>'; }).join('')
-        + '</div></details></div>';
+        + '</div></details>'
+        + '<div class="report-actions" style="margin-top:12px"><button class="btn wp-open-paste" type="button">Identify by pasting the page source</button></div>'
+        + '</div>';
     }
     var preview = '';
     if (t.preview && t.preview.available) {
-      preview = '<div class="wp-preview"><img src="' + esc(t.preview.url) + '" alt="' + esc(t.name || t.slug) + ' theme screenshot" loading="lazy" onerror="this.closest(\'.wp-preview\').classList.add(\'wp-preview-missing\')"></div>';
+      preview = '<div class="wp-preview"><img src="' + esc(t.preview.url) + '" alt="' + esc(t.name || t.slug) + ' theme screenshot" loading="lazy" onerror="this.closest(\'.wp-preview\').classList.add(\'wp-preview-missing\')">' + (t.preview.fromDirectory ? '<small>WordPress.org directory image</small>' : '') + '</div>';
     } else {
       preview = '<div class="wp-preview wp-preview-missing"><span class="material-icons" aria-hidden="true">palette</span><small>No public preview available</small></div>';
     }
@@ -401,6 +405,7 @@
     Array.prototype.forEach.call(out.querySelectorAll('.wp-copy'), function (b) {
       b.addEventListener('click', function () { copy(b.getAttribute('data-copy') || '', b.getAttribute('data-label') || 'Value'); });
     });
+    Array.prototype.forEach.call(out.querySelectorAll('.wp-open-paste'), function (b) { b.onclick = pastePanel; });
     out.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 

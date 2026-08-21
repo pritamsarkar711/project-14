@@ -21,9 +21,10 @@
   'use strict';
   var WP = global.WpThemeCollector = global.WpThemeCollector || {};
 
-  var TIMEOUT = 15000;
+  var TIMEOUT = 9000;
   var MAX_HTML = 400000;
-  var MAX_FETCHES = 18;
+  var MAX_FETCHES = 20;
+  var SCAN_BUDGET_MS = 48000; /* hard wall-clock budget for the whole collection */
   var PRIVATE = /^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[01])\.|\[?::1\]?$|fc00:|fd[0-9a-f]{2}:|fe80:|metadata\.google\.internal)/i;
   /* Statuses that mean "this path was refused" — try the next transport. */
   var RETRY_STATUSES = [401, 403, 429, 500, 502, 503, 504];
@@ -51,6 +52,9 @@
     u.hash = '';
     return u;
   }
+
+  var deadlineTs = Date.now() + SCAN_BUDGET_MS;
+  function timeLeft() { return deadlineTs - Date.now(); }
 
   function withTimeout(signal, cb) {
     var ctrl = new AbortController();
@@ -269,6 +273,17 @@
     try { return document.implementation.createHTMLDocument('x'); } catch (e) { return null; }
   }
 
+  function altHostUrl(u) {
+    try {
+      var h = u.hostname.toLowerCase();
+      var alt = h.startsWith('www.') ? h.slice(4) : 'www.' + h;
+      if (alt === h) return null;
+      var v = new URL(u.href);
+      v.hostname = alt;
+      return v.href;
+    } catch (e) { return null; }
+  }
+
   /*
    * Collect the full bundle for /api/wptheme-analyze.
    */
@@ -294,8 +309,11 @@
     var homeArchived = null;  // {timestamp} when discovery used a Wayback snapshot
     var manualPaste = !!opt.pastedHtml;
     var resourceProbe = null; // {loaded:[paths]} when a WP core asset loaded in the browser
+    var homeInner = null;     // {url} when a public inner page replaced the blocked homepage
+    var wporgInfo = null;     // WordPress.org theme-directory lookup for the slug
 
     function fetchText(u, fo) {
+      if (timeLeft() < 1500) return Promise.reject(makeError('deadline', 'Scan time budget reached.'));
       return fetchOnce(u, Object.assign({ signal: signal }, fo || {})).then(function (res) {
         scanInfo.requests += 1;
         scanInfo.bytes += res.bytes || 0;
@@ -337,13 +355,33 @@
         else if (res.finalUrl && res.finalUrl !== urlObj.href) scanInfo.notes.push('Redirected to ' + res.finalUrl);
         return null;
       }, function (err) {
-        if (['cancelled', 'budget', 'invalid_url', 'ssrf'].indexOf(err.code) >= 0) throw err;
-        // Homepage refused on every transport — do NOT give up yet.
-        homeBlocked = { status: err.code === 'challenge' ? 403 : 403, code: err.code, message: err.message };
-        scanInfo.status = 403;
-        scanInfo.notes.push('Live homepage refused every automated reader (' + err.message + ') — continuing with other public endpoints.');
-        onProgress({ stage: 'connect', message: 'Homepage blocked — probing REST and robots endpoints instead…' });
-        return null;
+        if (['cancelled', 'budget', 'deadline', 'invalid_url', 'ssrf'].indexOf(err.code) >= 0) throw err;
+        // Homepage refused on every transport — try the www/non-www variant
+        // (WAF rules are frequently configured for only one host), then move on
+        // to other public endpoints.
+        var altHref = altHostUrl(urlObj);
+        var altTry = altHref
+          ? fetchText(altHref, {}).then(function (altRes) {
+              if (altRes.status === 200 && altRes.text && !looksLikeChallenge(altRes.status, altRes.text)) {
+                home = altRes;
+                scanInfo.finalUrl = altRes.finalUrl || altHref;
+                scanInfo.status = altRes.status;
+                try { origin = new URL(scanInfo.finalUrl).origin; } catch (e2) {}
+                scanInfo.notes.push('Homepage was reachable on the alternate host variant (' + altHref + ') after the original host refused readers.');
+                onProgress({ stage: 'connect', message: 'Homepage reached via alternate host variant…' });
+                return true;
+              }
+              return false;
+            }).catch(function () { return false; })
+          : Promise.resolve(false);
+        return altTry.then(function (altOk) {
+          if (altOk) return null;
+          homeBlocked = { status: 403, code: err.code, message: err.message };
+          scanInfo.status = 403;
+          scanInfo.notes.push('Live homepage refused every automated reader (' + err.message + ') — continuing with other public endpoints.');
+          onProgress({ stage: 'connect', message: 'Homepage blocked — probing other public endpoints…' });
+          return null;
+        });
       });
     }
 
@@ -365,6 +403,99 @@
           });
         })
         .catch(function () { return null; });
+    }
+
+    /*
+     * Inner-page discovery: when the homepage is walled, public inner pages
+     * usually are not. Sitemaps and feeds list them; /blog/ is a common entry.
+     * The first readable page whose HTML carries WordPress/theme markers
+     * becomes the analysis page (clearly labelled in the report).
+     */
+    function tryInnerPages() {
+      if (homeBlocked === null || home) return Promise.resolve(null);
+      onProgress({ stage: 'theme', message: 'Homepage blocked — trying sitemap and inner pages…' });
+      var indexes = [origin + '/sitemap.xml', origin + '/sitemap_index.xml', origin + '/wp-sitemap.xml', origin + '/feed/'];
+      var pageUrls = [];
+      var chain = Promise.resolve();
+      indexes.forEach(function (ix) {
+        chain = chain.then(function () {
+          if (pageUrls.length >= 4 || timeLeft() < 9000) return null;
+          return softFetch(ix, { cap: 131072 }).then(function (r) {
+            if (r.status !== 200 || !r.text) return null;
+            var re = /<(?:loc|link)\s*>\s*(https?:\/\/[^<\s]+)\s*<\//gi, m;
+            while ((m = re.exec(r.text)) && pageUrls.length < 6) {
+              var u = m[1];
+              try {
+                var pu = new URL(u);
+                var ph = pu.hostname.toLowerCase().replace(/^www\./, '');
+                var hh = urlObj.hostname.toLowerCase().replace(/^www\./, '');
+                if (ph !== hh) continue;
+                if (/\.(jpe?g|png|webp|gif|svg|css|js|pdf|zip|xml|woff2?)(\?|$)/i.test(pu.pathname)) continue;
+                if (pu.pathname.replace(/\/$/, '') === urlObj.pathname.replace(/\/$/, '') && ph === hh) continue;
+                if (pageUrls.indexOf(u) < 0) pageUrls.push(u);
+              } catch (e) {}
+            }
+            return null;
+          });
+        });
+      });
+      chain = chain.then(function () {
+        if (pageUrls.indexOf(origin + '/blog/') < 0) pageUrls.unshift(origin + '/blog/');
+        pageUrls = pageUrls.slice(0, 4);
+        var found = null;
+        function next(i) {
+          if (found || i >= pageUrls.length || timeLeft() < 7000) return Promise.resolve(found);
+          return softFetch(pageUrls[i], { cap: MAX_HTML }).then(function (r) {
+            if (r.status === 200 && r.text && r.text.length > 400 && !looksLikeChallenge(r.status, r.text)) {
+              var wpMarkers = /\/wp-(content|includes|json)\/|<meta[^>]+generator[^>]+wordpress/i.test(r.text);
+              if (wpMarkers) {
+                home = { url: pageUrls[i], finalUrl: pageUrls[i], status: 200, text: r.text, via: r.via, bytes: r.bytes, headers: r.headers || {} };
+                homeInner = { url: pageUrls[i] };
+                scanInfo.notes.push('The homepage was blocked, but a public inner page (' + pageUrls[i] + ') provided readable HTML with WordPress/theme markers.');
+                found = home;
+                return found;
+              }
+              if (!found) {
+                home = { url: pageUrls[i], finalUrl: pageUrls[i], status: 200, text: r.text, via: r.via, bytes: r.bytes, headers: r.headers || {} };
+                homeInner = { url: pageUrls[i] };
+                scanInfo.notes.push('The homepage was blocked; analysis used a readable inner page (' + pageUrls[i] + ').');
+              }
+            }
+            return next(i + 1);
+          });
+        }
+        return next(0);
+      });
+      return chain.catch(function () { return null; });
+    }
+
+    /*
+     * WordPress.org public theme-directory lookup (free, no key). Resolves the
+     * official name/author/homepage/screenshot for FREE themes from the slug
+     * alone — valuable when the site's own style.css is blocked. Never used as
+     * the installed version (the directory lists the latest release).
+     */
+    function tryWporgLookup(slug) {
+      var api = 'https://api.wordpress.org/themes/info/1.2/?action=theme_information&request%5Bslug%5D=' + encodeURIComponent(slug);
+      return softFetch(api, { cap: 65536, accept: 'application/json' }).then(function (r) {
+        if (r.status !== 200 || !r.text) return null;
+        try {
+          var j = JSON.parse(r.text);
+          if (!j || !j.name || (j.slug && String(j.slug).toLowerCase() !== String(slug).toLowerCase())) return null;
+          wporgInfo = {
+            slug: String(j.slug || slug).slice(0, 80),
+            name: String(j.name).slice(0, 120),
+            version: j.version ? String(j.version).slice(0, 30) : null,
+            author: j.author && (j.author.display_name || j.author.author) ? String(j.author.display_name || j.author.author).slice(0, 120) : null,
+            authorUrl: j.author && j.author.author_url ? String(j.author.author_url).slice(0, 300) : null,
+            homepage: j.homepage ? String(j.homepage).slice(0, 300) : null,
+            screenshotUrl: j.screenshot_url ? String(j.screenshot_url).slice(0, 400) : null,
+            parent: j.parent && j.parent.slug ? { slug: String(j.parent.slug).slice(0, 80), name: j.parent.name ? String(j.parent.name).slice(0, 120) : null } : null
+          };
+          scanInfo.notes.push('Theme slug looked up in the public WordPress.org theme directory.');
+        } catch (e) { wporgInfo = null; }
+        return wporgInfo;
+      });
     }
 
     /* ---- direct browser asset probe (works when every fetch is walled) ---- */
@@ -449,7 +580,9 @@
         return softFetch(origin + '/wp-content/themes/' + cand.slug + '/style.css', { cap: 262144, accept: 'text/css,*/*;q=0.1' })
           .then(function (styleRes) {
             methodsUsed.push('style.css header');
-            return { candidates: candidates, cand: cand, themeCssRes: { attempted: true, status: styleRes.status || 0, text: styleRes.text || '', error: styleRes.error }, robotsText: robotsText };
+            var out = { candidates: candidates, cand: cand, themeCssRes: { attempted: true, status: styleRes.status || 0, text: styleRes.text || '', error: styleRes.error }, robotsText: robotsText };
+            if (timeLeft() > 5000) return tryWporgLookup(cand.slug).then(function () { return out; });
+            return out;
           });
       });
     }
@@ -535,6 +668,7 @@
 
     return getHome()
       .then(tryWayback)
+      .then(tryInnerPages)
       .then(tryResourceProbe)
       .then(robotsAndRest)
       .then(themePhase)
@@ -556,6 +690,8 @@
           homeArchived: homeArchived,
           manualPaste: manualPaste,
           resourceProbe: resourceProbe,
+          homeInner: homeInner,
+          wporgInfo: wporgInfo,
           robotsText: phase.robotsText || '',
           probes: probes,
           candidates: phase.candidates || [],
