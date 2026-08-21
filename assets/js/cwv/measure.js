@@ -35,8 +35,13 @@
   var MAX_INTERACTIONS = Math.max(0, Math.min(8, parseInt(QS.maxIx, 10) || 8));
 
   var PROXY_MODE = /\/api\/cwv-page\?sid=/.test(location.href);
+  // Relay mode: the HTML was fetched server-side via a public relay; the page
+  // is served same-origin but subresources load cross-origin (direct URLs).
+  var RELAY_MODE = /[?&]mode=relay/.test(location.href);
   var SID = null;
   try { var sm = location.href.match(/[?&]sid=([^&]+)/); if (sm) SID = sm[1]; } catch (e) {}
+  var PAGE_URL = null;
+  try { if (QS.u) PAGE_URL = decodeURIComponent(QS.u); } catch (e) {}
 
   function parentOrigin() {
     try { return window.parent.location.origin || '*'; } catch (e) { return '*'; }
@@ -169,10 +174,11 @@
   var out = {
     v: 1,
     meta: {
-      requestedUrl: null, finalUrl: PROXY_MODE ? null : location.href,
-      transport: PROXY_MODE ? 'server-proxy' : 'browser-direct',
+      requestedUrl: null,
+      finalUrl: PROXY_MODE ? (RELAY_MODE ? PAGE_URL : null) : location.href,
+      transport: PROXY_MODE ? (RELAY_MODE ? 'server-relay' : 'server-proxy') : 'browser-direct',
       relay: null, htmlStatus: null, htmlContentType: 'text/html', htmlBytes: null, htmlTruncated: false,
-      challenge: false, challengeGuard: null, redirects: [], protocolDoc: null,
+      challenge: false, challengeGuard: null, redirects: [], protocolDoc: RELAY_MODE ? null : undefined,
       userAgent: navigator.userAgent,
       startedAt: M.startedAt, completedAt: null, notes: [], sid: SID
     },
@@ -270,7 +276,9 @@
       out.nav.domInteractive = round(nav.domInteractive, 1);
       out.nav.domContentLoaded = round(nav.domContentLoaded, 1);
       out.nav.load = round(nav.loadEventEnd, 1);
-      out.meta.protocolDoc = nav.nextHopProtocol || null;
+      // The iframe navigation protocol is the auditor's own connection — it
+      // says nothing about the target site in relay/direct modes.
+      if (!RELAY_MODE) out.meta.protocolDoc = nav.nextHopProtocol || null;
     }
     var fcp = paintEntries.filter(function (p) { return p.name === 'first-contentful-paint'; })[0];
     if (fcp) { out.vitals.fcp.status = 'measured'; out.vitals.fcp.value = round(fcp.startTime, 1); }

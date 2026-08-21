@@ -175,23 +175,52 @@
     });
   }
 
-  // Relay fallback (browser-direct transport) — used when the server cannot
-  // reach the site (e.g. this preview sandbox has no outbound egress).
-  function relayFetch(url, signal) {
-    var opts = { signal: signal };
-    var relays = [
-      function () { return fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(url), opts).then(function (r) { return r.text().then(function (t) { return { html: t, status: r.status, relay: 'allorigins' }; }); }); },
-      function () { return fetch('https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(url), opts).then(function (r) { return r.text().then(function (t) { return { html: t, status: r.status, relay: 'codetabs' }; }); }); },
-      function () { return fetch('https://corsproxy.io/?url=' + encodeURIComponent(url), opts).then(function (r) { return r.text().then(function (t) { return { html: t, status: r.status, relay: 'corsproxy' }; }); }); },
-      function () { return fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(url), opts).then(function (r) { return r.json().then(function (j) { return { html: j.contents || '', status: (j.status && j.status.http_code) || 200, relay: 'allorigins' }; }); }); }
-    ];
+  /* ---------------- browser-side relays (last-resort fetch) ---------------- */
+  var BROWSER_RELAYS = [
+    { id: 'allorigins', label: 'AllOrigins', run: function (u, o) { return fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(u), o).then(function (r) { return r.text().then(function (t) { return { html: t, status: r.status }; }); }); } },
+    { id: 'codetabs', label: 'CodeTabs', run: function (u, o) { return fetch('https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(u), o).then(function (r) { return r.text().then(function (t) { return { html: t, status: r.status }; }); }); } },
+    { id: 'corsproxy', label: 'CORSProxy', run: function (u, o) { return fetch('https://corsproxy.io/?url=' + encodeURIComponent(u), o).then(function (r) { return r.text().then(function (t) { return { html: t, status: r.status }; }); }); } },
+    { id: 'corseu', label: 'CORS.EU', run: function (u, o) { return fetch('https://cors.eu.org/' + u, o).then(function (r) { return r.text().then(function (t) { return { html: t, status: r.status }; }); }); } },
+    { id: 'corslol', label: 'CORS.LOL', run: function (u, o) { return fetch('https://api.cors.lol/?url=' + encodeURIComponent(u), o).then(function (r) { return r.text().then(function (t) { return { html: t, status: r.status }; }); }); } },
+    { id: 'allorigins-json', label: 'AllOrigins (JSON)', run: function (u, o) { return fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(u), o).then(function (r) { return r.json().then(function (j) { return { html: j.contents || '', status: (j.status && j.status.http_code) || 200 }; }); }); } }
+  ];
+
+  function relayUsable(res) {
+    var s = String(res.html || '');
+    if (CHALLENGE_RE.test(s.slice(0, 8000))) return false;
+    if (res.status >= 400 && res.status !== 403 && res.status !== 429) return false;
+    var looksHtml = /<(!doctype\s*html|html|head|body|title|meta|div|span|p\b|a\b|img|script|link|style|main|section|article)/i.test(s);
+    if (looksHtml && s.length >= 60) return true;
+    if (s.length >= 200) return true;
+    return false;
+  }
+
+  function relayFetch(url, signal, onProgress) {
     var i = 0;
-    function attempt() {
+    function one(rl, tries) {
       if (signal && signal.aborted) return Promise.reject(Object.assign(new Error('Cancelled.'), { code: 'cancelled' }));
-      if (i >= relays.length) return Promise.reject(Object.assign(new Error('Could not fetch the page through any public relay.'), { code: 'unreachable' }));
-      return relays[i++]().catch(attempt);
+      if (onProgress) onProgress('Trying relay ' + (i + 1) + '/' + BROWSER_RELAYS.length + ' (' + rl.label + ')…');
+      return rl.run(url, { signal: signal }).then(function (res) {
+        if (relayUsable(res)) return { html: res.html, status: res.status, relay: rl.id, label: rl.label };
+        if (tries > 0) return one(rl, tries - 1);
+        return null; // this relay produced junk — move on
+      }, function () {
+        if (tries > 0) return one(rl, tries - 1);
+        return null;
+      });
     }
-    return attempt();
+    function next() {
+      if (signal && signal.aborted) return Promise.reject(Object.assign(new Error('Cancelled.'), { code: 'cancelled' }));
+      if (i >= BROWSER_RELAYS.length) {
+        return Promise.reject(Object.assign(new Error('No public relay returned a readable page (' + BROWSER_RELAYS.length + ' relays tried).'), { code: 'unreachable' }));
+      }
+      var rl = BROWSER_RELAYS[i++];
+      return one(rl, 1).then(function (res) {
+        if (res) return res;
+        return next();
+      });
+    }
+    return next();
   }
 
   function buildSrcdoc(html, url, profile, nonce, measureOpts) {
@@ -257,20 +286,25 @@
       payload.meta.htmlBytes = ctx.serverInfo.htmlBytes;
       payload.meta.htmlTruncated = !!ctx.serverInfo.truncated;
       payload.meta.protocolDoc = ctx.serverInfo.protocol;
+      payload.meta.relay = ctx.serverInfo.relay || null;
       payload.meta.redirects = (ctx.serverInfo.redirects || []).map(function (h) { return { from: h.from, status: h.status, to: h.to }; });
       payload.docHeaders = ctx.serverInfo.headers || {};
       payload.docPhases = ctx.serverInfo.phases || null;
+      if (Array.isArray(ctx.serverInfo.notes) && ctx.serverInfo.notes.length) {
+        payload.meta.notes = payload.meta.notes || [];
+        ctx.serverInfo.notes.forEach(function (n) { payload.meta.notes.push(n); });
+      }
     }
     if (ctx.relayInfo) {
       payload.meta.requestedUrl = ctx.relayInfo.requestedUrl;
       payload.meta.finalUrl = ctx.relayInfo.finalUrl || ctx.relayInfo.requestedUrl;
       payload.meta.htmlStatus = ctx.relayInfo.status;
       payload.meta.htmlBytes = ctx.relayInfo.bytes;
-      payload.meta.relay = ctx.relayInfo.relay;
+      payload.meta.relay = ctx.relayInfo.label || ctx.relayInfo.relay;
       payload.docHeaders = {};
       payload.docPhases = { relayMs: ctx.relayInfo.ms };
       payload.meta.notes = payload.meta.notes || [];
-      payload.meta.notes.push('HTML fetched through the public relay ' + ctx.relayInfo.relay + ' in ' + Math.round(ctx.relayInfo.ms) + ' ms (relay timing — not a TTFB measurement). Subresources loaded cross-origin; timing/sizes hidden by timing-allow-origin are marked unavailable.');
+      payload.meta.notes.push('HTML fetched through the public relay ' + (ctx.relayInfo.label || ctx.relayInfo.relay) + ' in ' + Math.round(ctx.relayInfo.ms) + ' ms (relay timing — not a TTFB measurement). Subresources loaded cross-origin; timing/sizes hidden by timing-allow-origin are marked unavailable.');
     }
     if (ctx.sessionMeta) {
       payload.resourceMeta = { mode: 'server-proxy', items: ctx.sessionMeta.resources || [] };
@@ -324,15 +358,10 @@
   // Browser-direct measurement through public relays (used when the server
   // transport is unavailable).
   function relayRun(url, profile, measureOpts, serverErr) {
-    progressMsg('The server could not reach the site — switching to browser-direct measurement…');
+    progressMsg('The server could not reach the site — trying public relays from your browser…');
     var t0 = performance.now();
-    return relayFetch(url, abortCtl ? abortCtl.signal : null).then(function (res) {
+    return relayFetch(url, abortCtl ? abortCtl.signal : null, function (msg) { progressMsg(msg); }).then(function (res) {
       if (abortCtl && abortCtl.signal.aborted) throw Object.assign(new Error('Cancelled.'), { code: 'cancelled' });
-      var head = String(res.html || '').slice(0, 8000);
-      if (CHALLENGE_RE.test(head)) {
-        throw Object.assign(new Error('The site is protected by a bot challenge and could not be measured in this environment.'), { code: 'challenge' });
-      }
-      if (String(res.html || '').length < 200) throw Object.assign(new Error('The relay returned no readable HTML.'), { code: 'unreachable' });
       return measurePage(null, profile, {
         srcdocBuilder: function (nonce) { return buildSrcdoc(res.html, url, profile, nonce, measureOpts); },
         onStage: mapStages, timeout: 80000
@@ -344,7 +373,7 @@
         }
         return analyzeBundle(payload, {
           profile: profile,
-          relayInfo: { requestedUrl: url, finalUrl: url, status: res.status, bytes: res.html.length, relay: res.relay, ms: performance.now() - t0 }
+          relayInfo: { requestedUrl: url, finalUrl: url, status: res.status, bytes: res.html.length, relay: res.relay, label: res.label, ms: performance.now() - t0 }
         });
       });
     }).catch(function (e) {
@@ -352,9 +381,81 @@
         throw Object.assign(new Error('Cancelled.'), { code: 'cancelled' });
       }
       if (e.code === 'challenge') throw e;
-      var msg = (e.message || 'Could not fetch the page through any public relay.');
-      if (serverErr && serverErr.code !== 'no_egress') msg += ' (The server transport also failed: ' + (serverErr.message || serverErr.code || 'unknown') + '.)';
-      throw Object.assign(new Error(msg), { code: e.code || 'unreachable' });
+      // FINAL RESORT: direct iframe load (limited — cross-origin pages cannot
+      // be instrumented, but the load itself is a real measurement).
+      progressMsg('All relays failed — trying a direct (limited) page load…');
+      return directLimitedRun(url, profile).then(function (payload) {
+        if (payload.internalLinks && payload.internalLinks.length && !CWV._internalLinks) CWV._internalLinks = payload.internalLinks;
+        payload.profile = {
+          id: profile.id, label: profile.label,
+          viewport: { w: profile.viewport.w, h: profile.viewport.h }, dpr: profile.dpr || null,
+          network: profile.network || null, note: profile.note || null
+        };
+        payload.meta.notes = payload.meta.notes || [];
+        if (serverErr) payload.meta.notes.push('Server transport failed: ' + (serverErr.message || serverErr.code || 'unknown') + '. All public relays also failed (' + BROWSER_RELAYS.length + ' tried).');
+        return analyzeBundle(payload, { profile: profile, relayInfo: null });
+      }, function (e2) {
+        var msg = 'The page could not be loaded directly in an iframe either — the site may be unreachable or may block framing entirely.';
+        throw Object.assign(new Error(msg), { code: e2.code || 'unreachable' });
+      });
+    });
+  }
+
+  // Direct cross-origin iframe load: no page internals are accessible, so
+  // the only real measurement is the iframe load event time. Everything else
+  // is honestly reported as Not Available.
+  function directLimitedRun(url, profile) {
+    return new Promise(function (resolve, reject) {
+      var t0 = performance.now();
+      var iframe = document.createElement('iframe');
+      iframe.setAttribute('aria-hidden', 'true');
+      iframe.setAttribute('tabindex', '-1');
+      iframe.style.cssText = 'position:fixed;left:0;top:0;width:' + (profile.viewport.w || 1000) + 'px;height:' + (profile.viewport.h || 800) + 'px;border:0;opacity:0;pointer-events:none;z-index:-1;';
+      iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals');
+      var settled = false;
+      var timer = setTimeout(function () { finish(true); }, 30000);
+      function finish(timedOut) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        var ms = Math.round(performance.now() - t0);
+        try { iframe.remove(); } catch (e) {}
+        if (timedOut) {
+          reject(Object.assign(new Error('The page did not finish loading within 30 s.'), { code: 'timeout' }));
+          return;
+        }
+        resolve({
+          v: 1,
+          meta: {
+            requestedUrl: url, finalUrl: url, transport: 'direct-iframe', relay: null,
+            htmlStatus: null, htmlContentType: 'text/html', htmlBytes: null, htmlTruncated: false,
+            challenge: false, challengeGuard: null, redirects: [], protocolDoc: null,
+            userAgent: navigator.userAgent, startedAt: Date.now(), completedAt: Date.now(), sid: null,
+            notes: [
+              'Limited measurement mode: the page was loaded directly in a cross-origin iframe. Browsers block access to page internals, so no Core Web Vitals, interactions or resources can be measured from this transport.',
+              'The iframe load event fired ' + ms + ' ms after navigation started (real measurement). If the site blocks framing, an error page may have loaded instead.'
+            ]
+          },
+          docPhases: null, docHeaders: {},
+          nav: { ttfb: null, domInteractive: null, domContentLoaded: null, load: ms },
+          vitals: {
+            lcp: { status: 'unavailable', value: null, entry: null, candidates: [], reason: 'Cross-origin page — cannot be instrumented from a direct iframe load.' },
+            fcp: { status: 'unavailable', value: null, reason: 'Cross-origin page — first paint cannot be observed from a direct iframe load.' },
+            cls: { status: 'unavailable', value: null, entries: [], excluded: [], reason: 'Cross-origin page — layout shifts cannot be observed from a direct iframe load.' },
+            inp: { status: 'unavailable', value: null, interactions: [], reason: 'Cross-origin page — interactions cannot be tested from a direct iframe load.' },
+            tbt: { status: 'unavailable', value: null, reason: 'Cross-origin page — main-thread tasks cannot be observed from a direct iframe load.' },
+            si: { status: 'unavailable', reason: 'Not measurable without screenshot/video capture.' }
+          },
+          longTasks: null, resources: [], dom: null, images: [], fonts: [], cssFiles: [], jsFiles: [],
+          linkHints: { preload: [], preconnect: [], dnsPrefetch: [], modulepreload: [] },
+          internalLinks: [], interactives: { tested: [], excluded: [] }, loafs: [],
+          hardening: { storage: true, serviceWorker: true, cookies: true, windowOpen: true },
+          warnings: [], notes: [], resourceMeta: null
+        });
+      }
+      iframe.addEventListener('load', function () { finish(false); });
+      document.body.appendChild(iframe);
+      iframe.src = url;
     });
   }
 

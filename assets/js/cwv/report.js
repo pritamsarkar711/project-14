@@ -249,7 +249,9 @@
     var lt = report.lab.longTasks;
     if (!lt) return '';
     var html = '';
-    if (!lt.total) {
+    if (lt.status === 'unavailable') {
+      html += '<div class="cwv-na-box"><span class="material-icons" aria-hidden="true">hourglass_top</span><b>Not Available</b><p>' + esc(lt.note || 'Unable to measure long tasks.') + '</p></div>';
+    } else if (!lt.total) {
       html += '<div class="dc-na-box"><span class="material-icons" aria-hidden="true">check_circle</span><b>No long tasks observed</b><p>No main-thread task exceeded ' + lt.thresholdMs + ' ms during the measurement window.</p></div>';
     } else {
       html += '<div class="ad-summary-grid cwv-overview-grid">' +
@@ -584,6 +586,7 @@
     html += kv('HTML size', m.htmlBytes != null ? bytes(m.htmlBytes) + (m.htmlTruncated ? ' (truncated at cap)' : '') : 'n/a');
     html += kv('Browser', esc(t.measurement.browser));
     if (t.measurement.proxyHop) html += '<p class="muted">' + esc(t.measurement.proxyHop) + '</p>';
+    (m.notes || []).forEach(function (n) { html += '<p class="muted">' + esc(n) + '</p>'; });
     html += '<h6 class="cwv-subhead">Measurement limitations</h6><ul class="cwv-limits">' + t.limitations.map(function (l) { return '<li>' + esc(l) + '</li>'; }).join('') + '</ul>';
     html += '<h6 class="cwv-subhead">Privacy &amp; safety</h6><p class="muted">' + esc(t.privacy) + '</p>';
     html += '<h6 class="cwv-subhead">Reproducibility</h6><p class="muted">' + esc(t.reproducibility) + '</p>';
@@ -594,6 +597,10 @@
   /* ================= assembly ================= */
   CWV.Report.render = function (container, report) {
     var html = '';
+    if (report.meta && report.meta.transport === 'direct-iframe') {
+      html += '<div class="cwv-field-box"><span class="material-icons" aria-hidden="true">info</span><div><b>Limited measurement mode — direct page load</b>' +
+        '<p>All fetch transports (server proxy and public relays) were unavailable, so the page was loaded directly in a cross-origin iframe. Browsers block access to page internals — Core Web Vitals, interactions and resources cannot be measured from this transport and are shown as Not Available. Only the iframe load time is real. This is a sandboxed-preview limitation; on a normally hosted server the full pipeline runs.</p></div></div>';
+    }
     html += '<div class="cwv-report-head">' +
       '<div class="cwv-head-row"><h2 class="cwv-report-title">' + esc(report.meta && report.meta.finalUrl ? shortUrl(report.meta.finalUrl) : '') + '</h2></div>' +
       '<div class="cwv-meta-row">' +
