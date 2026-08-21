@@ -1,7 +1,7 @@
 {
   "scripts": {
     "dev": "node server.js",
-    "test": "node lib/wptheme/selftest.js && node lib/wptheme/uitest.js && node lib/domaincheck/selftest.js && node lib/domaincheck/uitest.js && node lib/llmstxt/selftest.js && node lib/llmstxt/uitest.js && node lib/botblocker/selftest.js && node lib/botblocker/uitest.js && node lib/cwv/selftest.js && node lib/cwv/uitest.js && node lib/cwv/measuretest.js"
+    "test": "node lib/wptheme/selftest.js && node lib/wptheme/uitest.js && node lib/domaincheck/selftest.js && node lib/domaincheck/uitest.js && node lib/llmstxt/selftest.js && node lib/llmstxt/uitest.js && node lib/botblocker/selftest.js && node lib/botblocker/uitest.js && node lib/cwv/selftest.js && node lib/cwv/uitest.js && node lib/cwv/measuretest.js && node lib/rss/selftest.js && node lib/rss/uitest.js"
   },
   "dependencies": {},
   "devDependencies": {}
