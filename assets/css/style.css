@@ -181,3 +181,41 @@ button.btn .material-icons{font-size:18px}
 .wptheme-report .audit-panel{margin-bottom:0}
 @media(max-width:800px){.wptheme-home h1{font-size:2.2rem!important}.wp-card{grid-template-columns:1fr}.wp-preview{max-width:280px}.wp-field-value{font-size:.98rem}}
 @media print{.wptheme-home{display:none!important}.wp-preview img{max-height:180px}}
+
+/* WordPress Theme Detector — result section hardening: no overflow/overlap at any width.
+   Scoped to .wptheme-results only; the shared design system is untouched. */
+.wptheme-results{overflow-x:clip;min-width:0}
+.wptheme-results .score-card>*{min-width:0}
+.wptheme-results .score-summary{min-width:0}
+.wptheme-results .verdict{max-width:100%;flex-wrap:wrap}
+.wptheme-results .source-chip{display:inline-block;max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.45}
+.wptheme-results .ad-summary-grid{grid-template-columns:repeat(auto-fit,minmax(min(150px,100%),1fr))}
+.wptheme-results .ad-summary-grid>*{min-width:0}
+.wptheme-results .ad-stat{min-width:0}
+.wptheme-results .ad-stat b,.wptheme-results .ad-stat span,.wptheme-results .ad-stat a,.wptheme-results .ad-stat code{overflow-wrap:anywhere;word-break:break-word;max-width:100%}
+.wptheme-results .ad-stat a{color:var(--primary);text-decoration:none}
+.wp-card{min-width:0}
+.wp-card>*{min-width:0}
+.wp-field-value{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0;max-width:100%;overflow-wrap:anywhere;line-height:1.4}
+.wp-field-value .row-detail{flex:0 0 auto}
+.wptheme-report .calc-line,.wptheme-report .prog-line{align-items:flex-start}
+.wptheme-report .calc-line span,.wptheme-report .prog-line span{min-width:0;overflow-wrap:anywhere}
+.wptheme-report .calc-line b,.wptheme-report .prog-line b{flex:0 0 auto;white-space:nowrap}
+.wptheme-report .audit-fold summary{flex-wrap:wrap;gap:6px 10px}
+.wptheme-report .audit-fold summary b{white-space:nowrap}
+.wptheme-report .issue{min-width:0}
+.wptheme-report .issue>div:last-child{min-width:0}
+.wptheme-report .issue p,.wptheme-report .issue h6{overflow-wrap:anywhere}
+.wptheme-report .issue .issue-icon{flex:0 0 32px}
+.wp-details-table td{overflow-wrap:anywhere}
+.wptheme-results img{max-width:100%}
+.wptheme-error .ad-summary-grid{text-align:left}
+@media(max-width:600px){
+  .wptheme-results .ad-summary-grid{grid-template-columns:1fr 1fr}
+  .wptheme-results .ad-stat b{font-size:1rem}
+  .wp-preview{max-width:280px}
+  .wptheme-results .score-card{padding:16px}
+}
+@media(max-width:400px){
+  .wptheme-results .ad-summary-grid{grid-template-columns:1fr}
+}
