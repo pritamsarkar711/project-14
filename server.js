@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const ezoicApi = require('./lib/ezoic/api');
 const mediavineApi = require('./lib/mediavine/api');
+const raptiveApi = require('./lib/raptive/api');
 
 const criticalCss = fs.readFileSync('assets/css/style.css', 'utf8');
 const esc = s => String(s ?? '').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
@@ -15,6 +16,7 @@ function otherToolsMenu(active) {
       <a href="/adsense-eligibility-checker" role="menuitem" class="${active==='adsense'?'is-active':''}">${icon('monetization_on')}<span><b>AdSense Eligibility Checker</b><small>Website readiness for AdSense</small></span></a>
       <a href="/ezoic-eligibility-checker" role="menuitem" class="${active==='ezoic'?'is-active':''}">${icon('insights')}<span><b>Ezoic Eligibility Checker</b><small>Website readiness for Ezoic</small></span></a>
       <a href="/mediavine-eligibility-checker" role="menuitem" class="${active==='mediavine'?'is-active':''}">${icon('trending_up')}<span><b>Mediavine Eligibility Checker</b><small>Website readiness for Mediavine</small></span></a>
+      <a href="/raptive-eligibility-checker" role="menuitem" class="${active==='raptive'?'is-active':''}">${icon('campaign')}<span><b>Raptive Eligibility Checker</b><small>Website readiness for Raptive</small></span></a>
     </div></details>`;
 }
 
@@ -134,7 +136,54 @@ function mediavinePage() {
   });
 }
 
-function page(name) { return layout(name, `<div class="container page"><h1 class="page-title">${esc(name)}</h1><div class="paper paper-padded"><p>huvanti provides free, no-account website tools including an SEO audit, an AdSense eligibility checker, an Ezoic eligibility checker, and a Mediavine eligibility checker.</p></div></div>`); }
+function raptivePage() {
+  const meta = `<meta name="description" content="Free Raptive Eligibility Checker. Enter a URL for an evidence-based Raptive Readiness Score from a deep public crawl — no account, no AI. Current 25,000 pageview minimum. Not an official Raptive score."><meta name="robots" content="index,follow">
+<meta property="og:title" content="Raptive Eligibility Checker — huvanti"><meta property="og:description" content="Deep, deterministic Raptive website readiness check. 25,000 pageview minimum. No account required. Final eligibility belongs to Raptive."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
+  const jsonLd = {'@context':'https://schema.org','@graph':[
+    {'@type':'WebSite',name:'huvanti',url:'https://huvanti.com/'},
+    {'@type':'WebApplication',name:'Raptive Eligibility Checker',applicationCategory:'BusinessApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',featureList:'Raptive readiness score, official requirement checks, originality audit, long-form coverage, human-involvement signals, Google Analytics detection, domain age, brand safety, ad readiness, traffic verification',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free, deterministic Raptive eligibility checker that scores publicly observable website signals. Not affiliated with Raptive.'}
+  ]};
+  const body = `<section class="hero audit-home raptive-home"><span class="material-icons hero-icon" aria-hidden="true">campaign</span><h1>Raptive Eligibility Checker</h1><p class="hero-subtitle">Evidence-based Raptive website readiness — no account, no AI.</p>
+<form id="raptive-form" class="search-field audit-search" role="search" aria-label="Raptive eligibility checker"><span class="material-icons" aria-hidden="true">link</span><input id="raptive-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL"><select id="raptive-limit" class="crawl-select" aria-label="Crawl limit"><option value="10">10 pages</option><option value="25">25 pages</option><option value="50" selected>50 pages</option><option value="100">100 pages</option><option value="250">250 pages</option></select><button class="btn" type="submit">Check Eligibility</button></form>
+<div class="audit-trust"><span>Official requirements</span><span>Original content</span><span>Long-form</span><span>Human involvement</span><span>Google Analytics</span><span>Domain age</span><span>Brand safety</span><span>Ad readiness</span></div>
+<details class="raptive-optional container"><summary>Optional: enter verified Analytics figures (user-provided)</summary>
+<div class="raptive-optional-grid">
+<label>Monthly pageviews <input id="raptive-pageviews" class="text-input" type="number" min="0" step="1" placeholder="e.g. 32000" inputmode="numeric"></label>
+<label>US % <input id="raptive-us" class="text-input" type="number" min="0" max="100" step="0.1" placeholder="%"></label>
+<label>UK % <input id="raptive-uk" class="text-input" type="number" min="0" max="100" step="0.1" placeholder="%"></label>
+<label>Canada % <input id="raptive-ca" class="text-input" type="number" min="0" max="100" step="0.1" placeholder="%"></label>
+<label>Australia % <input id="raptive-au" class="text-input" type="number" min="0" max="100" step="0.1" placeholder="%"></label>
+<label>New Zealand % <input id="raptive-nz" class="text-input" type="number" min="0" max="100" step="0.1" placeholder="%"></label>
+</div>
+<p class="muted">These are labelled <b>User-provided value</b> and are never presented as independently verified. Combined US+UK+CA+AU+NZ is compared with Raptive’s current 50% (25k–99,999 PV) or 40% (100,000+ PV) thresholds. Leave blank if you do not have Analytics access.</p>
+</details></section>
+<div id="raptive-results" class="audit-results raptive-results"></div>
+<div class="container section">
+  <div class="section-heading-row">${icon('rule_folder')}<h4 style="margin:0;">What this checker actually does</h4></div>
+  <div class="grid feature-grid">
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('verified')} Current Raptive requirements</h6><p>Minimum <b>25,000</b> monthly pageviews (not the old 100,000). 50% key-country traffic at 25k–99,999 PV; 40% at 100,000+. GA4, 6-month domain, original content, human involvement, long-form on the majority of pages (25k–99,999), ad-ready build. Private items are labelled Manual Verification Required — never guessed.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('article')} Originality &amp; long-form</h6><p>Unique body text after boilerplate removal, duplicates, near-duplicates, n-grams, Jaccard, TF-IDF cosine, SimHash. Long-form coverage on eligible content pages — utility pages excluded. Not a copyright or AI-authorship proof.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('person')} Human-involvement signals</h6><p>Author bios, first-hand detail, sources, editorial identity vs. repetitive templates. Never labelled “AI-generated content detected.” Uses <b>Potential low-human-involvement pattern</b> with evidence.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('analytics')} Google Analytics &amp; domain age</h6><p>Detects GA4 Measurement IDs, gtag, GTM, duplicate installs. Distinguishes tracking code detected from configuration verified. RDAP domain age when available; otherwise Unable to Verify.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('gpp_bad')} Brand safety &amp; reader experience</h6><p>Contextual scanner for adult, drugs, gambling, weapons, hate, piracy, malware, scam and more. UX: viewport, overlays, autoplay, sticky chrome, navigation.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('account_tree')} Deep public crawl</h6><p>Up to 250 internal pages from homepage, links, sitemap, robots.txt, nav and footer. Default 50. SSRF-protected. No account, no LLM, no paid SEO API.</p></div></div></div>
+  </div>
+</div>
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('help')}<h4 style="margin:0;">FAQ</h4></div><div class="faq-accordion">
+<details><summary>Does this guarantee Raptive approval?</summary><p>No. It produces a transparent internal <b>Raptive Readiness Score</b> from public signals. Application eligibility is shown separately and is usually <b>Cannot Be Fully Verified</b> until you provide Analytics pageviews and country share. Raptive makes the final decision.</p></details>
+<details><summary>Is 100,000 monthly pageviews still the minimum?</summary><p>No. Raptive currently lists a minimum of <b>25,000 monthly pageviews</b> (last 30 days, via Google Analytics). 100,000+ is a higher traffic tier with a 40% key-country requirement, not the general entry bar.</p></details>
+<details><summary>Can it verify my pageviews or country mix?</summary><p>No. Those are private Analytics data. The report has a dedicated <b>Manual Verification Required</b> section. You may optionally enter verified figures; they are labelled user-provided and are not independently verified.</p></details>
+<details><summary>Does detecting Google Analytics mean it is correctly configured?</summary><p>No. The tool distinguishes <b>tracking code detected</b> from <b>Analytics configuration verified</b>. The latter requires actual Analytics access, which Raptive also requires at application (read-only GA4 authorization).</p></details>
+<details><summary>Does it use AI or an LLM?</summary><p>No. The engine is a crawler plus HTML parsing, similarity statistics and a weighted Raptive rule registry. No OpenAI, Gemini, Claude, Semrush, Ahrefs, or Google Analytics API.</p></details>
+<details><summary>Is this affiliated with Raptive?</summary><p>No. Findings cite Raptive Support where a check maps to a documented requirement, and are otherwise labelled Quality Signal or Heuristic.</p></details>
+</div></div>`;
+  return layout('Raptive Eligibility Checker — Free Website Readiness Score | huvanti', body, {
+    active: 'raptive', canonical: 'https://huvanti.com/raptive-eligibility-checker', meta, jsonLd,
+    scripts: ['/assets/js/common.js', '/assets/js/raptive/crawler.js', '/assets/js/raptive/ui.js']
+  });
+}
+
+function page(name) { return layout(name, `<div class="container page"><h1 class="page-title">${esc(name)}</h1><div class="paper paper-padded"><p>huvanti provides free, no-account website tools including an SEO audit, an AdSense eligibility checker, an Ezoic eligibility checker, a Mediavine eligibility checker, and a Raptive eligibility checker.</p></div></div>`); }
 
 function readJson(req){ return new Promise(resolve=>{let b=''; req.on('data',d=>b+=d); req.on('end',()=>{try{resolve(JSON.parse(b||'{}'))}catch{resolve({})}});}); }
 
@@ -168,6 +217,16 @@ http.createServer(async (req,res)=>{
     await mediavineApi.handleAnalyze(req, res, body);
     return;
   }
+  if (p === '/api/raptive-audit' && req.method === 'POST') {
+    const body = await readJson(req);
+    await raptiveApi.handle(req, res, body);
+    return;
+  }
+  if (p === '/api/raptive-analyze' && req.method === 'POST') {
+    const body = await readJson(req);
+    await raptiveApi.handleAnalyze(req, res, body);
+    return;
+  }
   if (p.startsWith('/assets/')) {
     const safe = path.normalize(p).replace(/^([.][.][/\\])+/, '');
     const f = path.join(process.cwd(), safe);
@@ -183,6 +242,7 @@ http.createServer(async (req,res)=>{
   else if (p === '/adsense-eligibility-checker') html = adsensePage();
   else if (p === '/ezoic-eligibility-checker') html = ezoicPage();
   else if (p === '/mediavine-eligibility-checker') html = mediavinePage();
+  else if (p === '/raptive-eligibility-checker') html = raptivePage();
   else if (['/about','/contact','/privacy','/terms'].includes(p)) html = page(p.slice(1).replace(/^./,c=>c.toUpperCase()));
   else html = layout('Not found', `<div class="container notfound"><h1>404</h1><p>Page not found.</p><a class="btn" href="/">Back home</a></div>`);
   res.setHeader('content-type','text/html; charset=utf-8'); res.setHeader('cache-control','no-store'); res.end(html);
