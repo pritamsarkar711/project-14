@@ -10,6 +10,7 @@ const domaincheckApi = require('./lib/domaincheck/api');
 const brokenlinkApi = require('./lib/brokenlink/api');
 const llmstxtApi = require('./lib/llmstxt/api');
 const botblockerApi = require('./lib/botblocker/api');
+const cwvApi = require('./lib/cwv/api');
 
 const criticalCss = fs.readFileSync('assets/css/style.css', 'utf8');
 const esc = s => String(s ?? '').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
@@ -29,6 +30,7 @@ function otherToolsMenu(active) {
       <a href="/broken-link-checker" role="menuitem" class="${active==='brokenlink'?'is-active':''}">${icon('link_off')}<span><b>Broken Link Checker</b><small>Find &amp; classify broken links accurately</small></span></a>
       <a href="/llms-txt-generator" role="menuitem" class="${active==='llmstxt'?'is-active':''}">${icon('auto_stories')}<span><b>LLMs.txt Generator</b><small>Generate &amp; validate an llms.txt file</small></span></a>
       <a href="/ai-crawler-blocker" role="menuitem" class="${active==='botblocker'?'is-active':''}">${icon('security')}<span><b>AI Crawler &amp; LLM Bot Blocker</b><small>Control AI bots via robots.txt + server rules</small></span></a>
+      <a href="/core-web-vitals-auditor" role="menuitem" class="${active==='cwv'?'is-active':''}">${icon('speed')}<span><b>Core Web Vitals &amp; INP Auditor</b><small>Real LCP / INP / CLS / FCP / TTFB measurement</small></span></a>
     </div></details>`;
 }
 
@@ -38,7 +40,7 @@ function layout(title, body, opts) {
   const scripts = opts.scripts || ['/assets/js/common.js','/assets/js/audit.js'];
   const meta = opts.meta || '';
   const jsonLd = opts.jsonLd ? `<script type="application/ld+json">${JSON.stringify(opts.jsonLd)}</script>` : '';
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">${meta}<title>${esc(title)}</title><link rel="canonical" href="${opts.canonical||'https://huvanti.com/'}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Icons&display=swap" rel="stylesheet"><style>${criticalCss}</style>${jsonLd}</head><body><a class="skip-link" href="#main">Skip to content</a><div class="app"><header class="appbar"><div class="toolbar"><a class="brand" href="/">${icon('travel_explore')}<span class="brand-name">huvanti</span></a><nav class="desktop-nav" aria-label="Primary"><a href="/">${icon('home')}<span>Home</span></a>${otherToolsMenu(active)}<a href="/about">${icon('info')}<span>About</span></a><a href="/contact">${icon('mail')}<span>Contact</span></a></nav><button type="button" class="icon-button theme-toggle" aria-label="toggle theme" id="theme-toggle"><span class="material-icons">brightness_4</span></button></div></header><main id="main">${body}</main><footer class="footer"><div class="container footer-grid"><div><div class="footer-brand">huvanti</div><p class="footer-tagline">Free, no-account website tools.</p></div><div><div class="footer-heading">Tools</div><div class="footer-links"><a href="/">SEO Audit</a><a href="/adsense-eligibility-checker">AdSense Eligibility Checker</a><a href="/ezoic-eligibility-checker">Ezoic Eligibility Checker</a><a href="/mediavine-eligibility-checker">Mediavine Eligibility Checker</a><a href="/raptive-eligibility-checker">Raptive Eligibility Checker</a><a href="/wordpress-theme-detector">WordPress Theme Detector</a><a href="/domain-information-checker">Domain Information Checker</a><a href="/xml-sitemap-generator">XML Sitemap Generator</a><a href="/broken-link-checker">Broken Link Checker</a><a href="/llms-txt-generator">LLMs.txt Generator</a><a href="/ai-crawler-blocker">AI Crawler &amp; LLM Bot Blocker</a></div></div><div><div class="footer-heading">Pages</div><div class="footer-links"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div></div></div><div class="container footer-copyright">&copy; 2026 huvanti. All rights reserved. Not affiliated with Google, Ezoic or Mediavine.</div></footer></div>${scripts.map(s=>`<script src="${s}"></script>`).join('')}</body></html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">${meta}<title>${esc(title)}</title><link rel="canonical" href="${opts.canonical||'https://huvanti.com/'}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Icons&display=swap" rel="stylesheet"><style>${criticalCss}</style>${jsonLd}</head><body><a class="skip-link" href="#main">Skip to content</a><div class="app"><header class="appbar"><div class="toolbar"><a class="brand" href="/">${icon('travel_explore')}<span class="brand-name">huvanti</span></a><nav class="desktop-nav" aria-label="Primary"><a href="/">${icon('home')}<span>Home</span></a>${otherToolsMenu(active)}<a href="/about">${icon('info')}<span>About</span></a><a href="/contact">${icon('mail')}<span>Contact</span></a></nav><button type="button" class="icon-button theme-toggle" aria-label="toggle theme" id="theme-toggle"><span class="material-icons">brightness_4</span></button></div></header><main id="main">${body}</main><footer class="footer"><div class="container footer-grid"><div><div class="footer-brand">huvanti</div><p class="footer-tagline">Free, no-account website tools.</p></div><div><div class="footer-heading">Tools</div><div class="footer-links"><a href="/">SEO Audit</a><a href="/adsense-eligibility-checker">AdSense Eligibility Checker</a><a href="/ezoic-eligibility-checker">Ezoic Eligibility Checker</a><a href="/mediavine-eligibility-checker">Mediavine Eligibility Checker</a><a href="/raptive-eligibility-checker">Raptive Eligibility Checker</a><a href="/wordpress-theme-detector">WordPress Theme Detector</a><a href="/domain-information-checker">Domain Information Checker</a><a href="/xml-sitemap-generator">XML Sitemap Generator</a><a href="/broken-link-checker">Broken Link Checker</a><a href="/llms-txt-generator">LLMs.txt Generator</a><a href="/ai-crawler-blocker">AI Crawler &amp; LLM Bot Blocker</a><a href="/core-web-vitals-auditor">Core Web Vitals &amp; INP Auditor</a></div></div><div><div class="footer-heading">Pages</div><div class="footer-links"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div></div></div><div class="container footer-copyright">&copy; 2026 huvanti. All rights reserved. Not affiliated with Google, Ezoic or Mediavine.</div></footer></div>${scripts.map(s=>`<script src="${s}"></script>`).join('')}</body></html>`;
 }
 
 function home() {
@@ -539,6 +541,70 @@ function brokenlinkPage() {
   return layout('Broken Link Checker — Accurate, No False Positives | huvanti', body, { active:'brokenlink', canonical:'https://huvanti.com/broken-link-checker', meta, jsonLd, scripts:['/assets/js/common.js','/assets/js/brokenlink/crawler.js','/assets/js/brokenlink/ui.js'] });
 }
 
+function cwvPage() {
+  const meta = `<meta name="description" content="Free Core Web Vitals &amp; INP Auditor. Real lab measurement of LCP, INP, CLS, FCP and TTFB with interaction-level INP analysis, long tasks, waterfall, render-blocking resources, caching and evidence-based recommendations — no account, no AI, no PageSpeed API key."><meta name="robots" content="index,follow">
+<meta property="og:title" content="Core Web Vitals &amp; INP Auditor — huvanti"><meta property="og:description" content="Deep technical website performance audit: LCP, INP, CLS, FCP, TTFB, long tasks, waterfall, dependency chains and evidence-based fixes. Lab measurements only — no fabricated field data."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
+  const jsonLd = {'@context':'https://schema.org','@graph':[
+    {'@type':'WebSite',name:'huvanti',url:'https://huvanti.com/'},
+    {'@type':'WebApplication',name:'Core Web Vitals & INP Auditor',applicationCategory:'DeveloperApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',featureList:'LCP measurement and element attribution, synthetic INP interaction testing with input/processing/presentation breakdown, CLS session-window analysis, FCP, TTFB phase breakdown, long task detection, network waterfall, dependency tree, render-blocking resources, JavaScript/CSS/image/font/caching/third-party audits, evidence-based recommendations, transparent tool performance score',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free, deterministic Core Web Vitals and interaction performance auditor with real browser measurements. No account, no AI, no paid performance API.'}
+  ]};
+  const body = `<section class="hero audit-home cwv-home"><span class="material-icons hero-icon" aria-hidden="true">speed</span><h1>Core Web Vitals &amp; INP Auditor</h1><p class="hero-subtitle">Real lab measurement of LCP, INP, CLS, FCP &amp; TTFB — with interaction-level INP analysis, long tasks and evidence-based fixes. No API keys.</p>
+<form id="cwv-form" class="cwv-form" aria-label="Core Web Vitals &amp; INP Auditor">
+  <div class="search-field audit-search"><span class="material-icons" aria-hidden="true">link</span><input id="cwv-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL"><button class="btn" type="submit">Analyze Website</button></div>
+  <div class="cwv-formrow">
+    <label for="cwv-profile">Device profile
+      <select id="cwv-profile" class="select">
+        <option value="mobile" selected>Mobile — 412×823, Slow 4G</option>
+        <option value="desktop">Desktop — 1350×940, no throttle</option>
+        <option value="custom">Custom</option>
+      </select>
+    </label>
+    <label class="cwv-check"><input type="checkbox" id="cwv-both" checked> Measure <b>Mobile</b> and <b>Desktop</b> as two separate lab runs</label>
+  </div>
+  <div id="cwv-custom-fields" hidden class="cwv-formrow">
+    <label>Viewport width <input id="cwv-cw" class="cwv-num" type="number" min="320" max="2560" value="1280"></label>
+    <label>Viewport height <input id="cwv-ch" class="cwv-num" type="number" min="320" max="1800" value="800"></label>
+    <label>Network
+      <select id="cwv-net" class="select">
+        <option value="none" selected>No throttle</option>
+        <option value="slow4g">Slow 4G (150 ms RTT, 1.6 Mbps)</option>
+        <option value="fast3g">Fast 3G (563 ms RTT, 1.44 Mbps)</option>
+      </select>
+    </label>
+  </div>
+</form>
+<div class="audit-trust"><span>Real measurements</span><span>INP interaction tests</span><span>LCP element &amp; phases</span><span>CLS session windows</span><span>Long tasks</span><span>Waterfall</span><span>Evidence-based fixes</span><span>No API keys</span></div></section>
+<div id="cwv-results" class="audit-results cwv-results"></div>
+<div class="container section">
+  <div class="section-heading-row">${icon('rule_folder')}<h4 style="margin:0;">What this auditor actually measures</h4></div>
+  <div class="grid feature-grid">
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('touch_app')} INP — interaction-level detail</h6><p>Synthetic but safe interactions (menus, tabs, accordions, search controls, modal triggers — never forms, never destructive actions) with an input-delay / processing / presentation-delay breakdown, long-task correlation and root-cause analysis. Lab INP is never presented as field data.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('image')} LCP element &amp; phase breakdown</h6><p>The actual LCP element (tag, selector, resource, size) with TTFB → resource load delay → load duration → render delay phases, plus LCP-image checks: lazy-loading, fetchpriority, dimensions and format.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('swap_vert')} CLS with session windows</h6><p>Every layout shift with element, previous/new position and likely cause. Shifts are grouped into session windows per the current CLS model — never summed indefinitely; recent-input shifts are excluded per spec.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('timer')} FCP &amp; TTFB phases</h6><p>First Contentful Paint against the advisory web.dev target, and a TTFB breakdown (DNS / connection / TLS / server response) measured with a pinned direct connection. TTFB alone never claims a specific backend fault.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('waterfall_chart')} Network waterfall &amp; dependency tree</h6><p>Every request with start time, duration, transfer size, type, status, initiator and observed protocol, plus reconstructed dependency chains (HTML → CSS → fonts / JS → API) with long-chain highlighting.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('code')} JS, CSS, images, fonts, caching</h6><p>Long tasks with script attribution, render-blocking and parser-blocking resources, @import chains, image size/format/lazy-loading issues, font-display and FOIT risks, and cache headers read from real responses.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('priority_high')} Evidence-based recommendations</h6><p>Every issue carries the measured evidence, the affected resource, the impacted metric and a concrete fix. Savings are only numeric when computed from measurements — otherwise “Potentially reducible”. No fabricated “improves LCP by X” claims.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('grading')} Transparent score</h6><p>A 0–100 <b>Tool Performance Score</b> with a published component breakdown (LCP, INP, CLS, TTFB, FCP, TBT, resources, network, rendering). Unmeasured components are excluded and shown — never padded. Not Google’s score.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('security')} Safe by design</h6><p>The URL is untrusted: private/loopback/metadata targets are refused, DNS is pinned per request, every redirect is re-validated, responses are size-capped, and the page runs in a sandboxed iframe with isolated storage — no service workers, no cookies.</p></div></div></div>
+  </div>
+</div>
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('help')}<h4 style="margin:0;">FAQ</h4></div><div class="faq-accordion">
+<details><summary>Are these Google / PageSpeed Insights scores?</summary><p>No. This is a lab measurement run by this tool in your browser (optionally through the auditor proxy). The <b>Tool Performance Score</b> is this tool’s own transparent score — it is never presented as Google’s score, a Lighthouse score or a PageSpeed Insights score.</p></details>
+<details><summary>Is the INP real field data?</summary><p>No. The INP shown is a <b>lab value</b> from synthetic interactions the auditor dispatches (menus, tabs, accordions, search controls). Synthetic testing can surface responsiveness problems, but field INP reflects real users and real interaction patterns. If a metric cannot be measured, the report says <b>Not Available</b> — it is never replaced with 0 or invented.</p></details>
+<details><summary>What is field data, and why is it unavailable?</summary><p>The legitimate public source of field Core Web Vitals is the Chrome UX Report, which requires a CrUX API key or BigQuery access. This tool uses no API keys, so the report shows <b>Field data unavailable for this URL</b> instead of fabricating field metrics. Lab and field data are kept strictly separate.</p></details>
+<details><summary>How are LCP, CLS and INP measured without a headless browser?</summary><p>The measurement runs in a real browser — yours. The page is loaded into a sandboxed same-origin iframe (via a server proxy when the server can reach the site, otherwise via a browser-direct relay fallback) with a measurement script injected before first paint, capturing the browser’s own PerformanceObserver entries for LCP, CLS, FCP, long tasks and interactions.</p></details>
+<details><summary>Do the mobile/desktop runs throttle CPU?</summary><p>Viewport is emulated and (in proxy mode) network throttling is applied by the auditor proxy. CPU throttling is <b>not</b> applied — that requires DevTools protocol access, which this sandbox measurement does not have. Results are honest about this and do not claim to represent every real device.</p></details>
+<details><summary>Can it audit more than one page?</summary><p>Single-page by default (clearly labelled “One page”). After the first audit you can explicitly start an optional <b>Crawl Website</b> run (10/25/50/100 discovered internal pages) with per-page metrics, worst URLs and a page comparison view. It never crawls a site unless you start it.</p></details>
+<details><summary>Does it use an LLM or a paid API?</summary><p>No. No OpenAI, Gemini, Claude, PageSpeed API key or any paid performance API. The entire pipeline — measurement, analysis, scoring and recommendations — is deterministic code in this repository.</p></details>
+<details><summary>What about sites behind bot protection?</summary><p>Some sites block proxies or challenges (Cloudflare, DataDome…). The report then states exactly what blocked the measurement and which metrics are unavailable — it never substitutes guesses.</p></details>
+</div></div>`;
+  return layout('Core Web Vitals & INP Auditor — Real LCP, INP, CLS, FCP & TTFB Measurement | huvanti', body, {
+    active: 'cwv', canonical: 'https://huvanti.com/core-web-vitals-auditor', meta, jsonLd,
+    scripts: ['/assets/js/common.js', '/lib/cwv/rewriter.js', '/assets/js/cwv/report.js', '/assets/js/cwv/ui.js']
+  });
+}
+
 function page(name) { return layout(name, `<div class="container page"><h1 class="page-title">${esc(name)}</h1><div class="paper paper-padded"><p>huvanti provides free, no-account website tools including an SEO audit, AdSense/Ezoic/Mediavine/Raptive eligibility checkers, a WordPress theme detector, a domain information checker, and an XML sitemap generator and a broken link checker.</p></div></div>`); }
 
 function readJson(req){ return new Promise(resolve=>{let b=''; req.on('data',d=>b+=d); req.on('end',()=>{try{resolve(JSON.parse(b||'{}'))}catch{resolve({})}});}); }
@@ -633,9 +699,32 @@ http.createServer(async (req,res)=>{
     await botblockerApi.handle(req, res, body);
     return;
   }
-  if (p.startsWith('/assets/') || p.startsWith('/lib/botblocker/')) {
+  if (p === '/api/cwv-fetch' && req.method === 'POST') {
+    const body = await readJson(req);
+    await cwvApi.handleFetch(req, res, body);
+    return;
+  }
+  if (p === '/api/cwv-page' && req.method === 'GET') {
+    cwvApi.handlePage(req, res, u.searchParams);
+    return;
+  }
+  if (p === '/api/cwv-proxy' && req.method === 'GET') {
+    await cwvApi.handleProxy(req, res, u.searchParams);
+    return;
+  }
+  if (p === '/api/cwv-meta' && req.method === 'GET') {
+    cwvApi.handleMeta(req, res, u.searchParams);
+    return;
+  }
+  if (p === '/api/cwv-analyze' && req.method === 'POST') {
+    const body = await readJson(req);
+    await cwvApi.handleAnalyze(req, res, body);
+    return;
+  }
+  if (p.startsWith('/assets/') || p.startsWith('/lib/botblocker/') || p.startsWith('/lib/cwv/')) {
     // Only expose the browser engine modules, not server-only or test files.
     if (p.startsWith('/lib/botblocker/') && /(selftest|uitest|api)\.js$/.test(p)) { res.statusCode = 404; res.end('Not found'); return; }
+    if (p.startsWith('/lib/cwv/') && p !== '/lib/cwv/rewriter.js') { res.statusCode = 404; res.end('Not found'); return; }
     const safe = path.normalize(p).replace(/^([.][.][/\\])+/, '');
     const f = path.join(process.cwd(), safe);
     if (fs.existsSync(f) && fs.statSync(f).isFile()) {
@@ -657,6 +746,7 @@ http.createServer(async (req,res)=>{
   else if (p === '/broken-link-checker') html = brokenlinkPage();
   else if (p === '/llms-txt-generator') html = llmstxtPage();
   else if (p === '/ai-crawler-blocker') html = botblockerPage();
+  else if (p === '/core-web-vitals-auditor') html = cwvPage();
   else if (['/about','/contact','/privacy','/terms'].includes(p)) html = page(p.slice(1).replace(/^./,c=>c.toUpperCase()));
   else html = layout('Not found', `<div class="container notfound"><h1>404</h1><p>Page not found.</p><a class="btn" href="/">Back home</a></div>`);
   res.setHeader('content-type','text/html; charset=utf-8'); res.setHeader('cache-control','no-store'); res.end(html);
