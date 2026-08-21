@@ -233,7 +233,7 @@
     var scanScope = body.scanScope || 'internal+external';
     var checkExternal = body.checkExternal !== false;
     var checkImages = !!body.checkImages;
-    var checkDocs = !!body.checkDocuments;
+    var checkDocs = !!(body.checkDocs || body.checkDocuments);
     var checkAnchors = !!body.checkAnchors;
 
     onProgress({ stage: 'url_validated', message: 'URL validated (browser): ' + root.toString() });
@@ -377,7 +377,7 @@
     var filtered = allLinks;
     if (scanScope === 'internal' || !checkExternal) filtered = allLinks.filter(function (l) { return internal(l.url, finalUrl); });
     if (!checkImages) filtered = filtered.filter(function (l) { return l.type !== 'image'; });
-    if (!checkDocuments) filtered = filtered.filter(function (l) { return l.type !== 'file'; });
+    if (!checkDocs) filtered = filtered.filter(function (l) { return l.type !== 'file'; });
 
     var map = {}, dupRefs = 0;
     filtered.forEach(function (l) {
@@ -493,7 +493,7 @@
     var report = {
       inputUrl: root.toString(),
       finalUrl: finalUrl,
-      settings: { maxPages: maxPages, maxDepth: maxDepth === 10 ? 'Unlimited' : maxDepth, checkExternal: checkExternal, checkImages: checkImages, checkDocuments: checkDocs, checkAnchors: checkAnchors, scanScope: scanScope, respectRobots: true },
+      settings: { maxPages: maxPages, maxDepth: maxDepth === 10 ? 'Unlimited' : maxDepth, checkExternal: checkExternal, checkImages: checkImages, checkDocs: checkDocs, checkAnchors: checkAnchors, scanScope: scanScope, respectRobots: true },
       stats: stats,
       issues: issues,
       byCategory: {},
