@@ -107,3 +107,22 @@ button.btn .material-icons{font-size:18px}
 @media(max-width:800px){.tools-menu-panel{left:auto;right:-40px;min-width:280px}.adsense-home h1{font-size:2.2rem!important}.cat-row>summary{flex-wrap:wrap}.cat-row .cat-meta{flex-basis:calc(100% - 70px)}}
 @media print{.appbar,.footer,.report-actions,.filter-row,.adsense-home,.crumbs,.tabs,#issue-search{display:none!important}.audit-results{margin:0}.audit-panel,.score-card,.insight-card,.cat-row{box-shadow:none!important;border:1px solid #ddd!important}}
 .calc-note{display:flex;gap:8px;align-items:flex-start;background:rgba(25,118,210,.08);border-left:3px solid var(--primary);border-radius:0 6px 6px 0;padding:8px 10px;font-size:.82rem;color:var(--text-secondary);margin-top:6px}.calc-note .material-icons{font-size:18px;color:var(--primary);flex-shrink:0}
+
+/* Ezoic Eligibility Checker — reuses existing cards/chips; no new color system */
+.ezoic-home{background:var(--appbar-bg)!important}
+.verdict.unverifiable{background:rgba(96,125,139,.18);color:#37474f}
+.dark .verdict.unverifiable{background:rgba(96,125,139,.35);color:#eceff1}
+.ez-source{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:999px;font-size:.7rem;font-weight:700;letter-spacing:.02em;vertical-align:middle}
+.ez-official{background:rgba(25,118,210,.12);color:var(--primary)}
+.ez-best_practice{background:rgba(46,125,50,.12);color:#1b5e20}
+.ez-heuristic{background:var(--chip-bg);color:var(--text-secondary)}
+.ezoic-progress .progress-list{margin-top:8px}
+.badge.manual{background:rgba(96,125,139,.18);color:#37474f}
+.issue.sev-manual .issue-icon{background:#607d8b}
+@media(max-width:800px){.ezoic-home h1{font-size:2.2rem!important}#ez-issue-search,#ez-page-search{max-width:100%;margin-bottom:10px}.ezoic-results .page-table{min-width:520px}}
+@media print{.ezoic-home{display:none!important}}
+@media(max-width:899.98px){
+  .desktop-nav{display:flex;flex-wrap:wrap;gap:8px 12px}
+  .toolbar{flex-wrap:wrap;height:auto;min-height:56px;padding-top:8px;padding-bottom:8px}
+  .tools-menu-panel{left:8px;right:8px;min-width:0}
+}
