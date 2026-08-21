@@ -336,3 +336,58 @@ button.btn .material-icons{font-size:18px}
   .dc-tl-date{grid-column:2;text-align:left}
 }
 @media print{.domaincheck-home{display:none!important}.dc-report .audit-panel{box-shadow:none!important;border:1px solid #ddd!important}}
+
+/* Broken Link Checker — reuses existing design system, scoped to .brokenlink- */
+.brokenlink-home{background:var(--appbar-bg)!important}
+.brokenlink-home .audit-trust{margin-top:14px}
+.brokenlink-form{max-width:900px;margin:0 auto}
+.brokenlink-form .search-field{max-width:900px!important}
+.brokenlink-results{overflow-x:clip;min-width:0}
+.bl-progress .progress-list{margin-top:8px}
+.bl-progress h3{font-size:1.7rem;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+.bl-url{overflow-wrap:anywhere;word-break:break-word;white-space:normal;max-width:100%;display:inline-block;font-family:"Roboto Mono",ui-monospace,monospace;font-size:.85rem;color:var(--text-primary)}
+.bl-table{min-width:900px}
+.bl-table .url-cell{max-width:280px;word-break:break-all;white-space:normal;line-height:1.35}
+.bl-table .bl-row:hover{background:var(--chip-bg)}
+.bl-detail-box{display:grid;gap:8px;padding:12px;background:var(--chip-bg);border-radius:8px;margin:6px 0}
+.bl-detail-box .calc-line{align-items:flex-start}
+.bl-detail-box .calc-line span{min-width:120px;flex-shrink:0}
+.bl-detail-box .calc-line b{flex:1;min-width:0;overflow-wrap:anywhere;text-align:left;max-width:100%}
+.bl-sources{display:grid;gap:4px;max-height:200px;overflow:auto;background:var(--paper);border-radius:6px;padding:8px;margin-top:6px}
+.bl-redirects{display:grid;gap:6px;margin:8px 0}
+.bl-evidence{display:grid;gap:4px;font-size:.82rem;background:var(--paper);border-radius:6px;padding:8px;margin-top:6px;max-height:200px;overflow:auto}
+.bl-cards{display:none;grid-template-columns:1fr;gap:12px;margin-top:12px}
+.bl-card .card-content{display:grid;gap:8px}
+.bl-card-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.bl-card .calc-line{padding:4px 0;border-bottom:1px dashed var(--divider)}
+.bl-card .calc-line:last-child{border-bottom:0}
+.bl-card .bl-url{font-size:.82rem}
+.brokenlink-results .audit-panel.wide{overflow-x:auto}
+.brokenlink-results .page-table-wrap{overflow-x:auto}
+.brokenlink-results .report-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.brokenlink-results .report-actions .btn{flex:0 0 auto}
+.brokenlink-results .audit-stats{margin-bottom:16px}
+.brokenlink-results .score-card{margin-bottom:16px}
+.brokenlink-results .audit-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px}
+.brokenlink-results .audit-grid .audit-panel{margin-bottom:0}
+.bl-sitemap-issues{display:grid;gap:6px}
+@media(max-width:900px){
+  .bl-table{display:none}
+  .bl-cards{display:grid}
+  .brokenlink-home h1{font-size:2.2rem!important}
+  .brokenlink-form .sitemap-options{padding:12px}
+  .brokenlink-form .sitemap-option-row{grid-template-columns:1fr}
+}
+@media(max-width:600px){
+  .brokenlink-results .audit-grid{grid-template-columns:1fr}
+  .brokenlink-results .audit-stats{grid-template-columns:1fr 1fr}
+  .bl-card .card-content{padding:12px}
+}
+@media(max-width:400px){
+  .brokenlink-results .audit-stats{grid-template-columns:1fr}
+}
+@media print{
+  .brokenlink-home{display:none!important}
+  .brokenlink-results .report-actions,.brokenlink-results .tabs,#bl-search{display:none!important}
+  .brokenlink-results .audit-panel,.brokenlink-results .score-card{box-shadow:none!important;border:1px solid #ddd!important}
+}

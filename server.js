@@ -7,6 +7,7 @@ const raptiveApi = require('./lib/raptive/api');
 const wpthemeApi = require('./lib/wptheme/api');
 const sitemapApi = require('./lib/sitemap/api');
 const domaincheckApi = require('./lib/domaincheck/api');
+const brokenlinkApi = require('./lib/brokenlink/api');
 
 const criticalCss = fs.readFileSync('assets/css/style.css', 'utf8');
 const esc = s => String(s ?? '').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
@@ -23,6 +24,7 @@ function otherToolsMenu(active) {
       <a href="/wordpress-theme-detector" role="menuitem" class="${active==='wptheme'?'is-active':''}">${icon('palette')}<span><b>WordPress Theme Detector</b><small>Detect the active WP theme</small></span></a>
       <a href="/domain-information-checker" role="menuitem" class="${active==='domaincheck'?'is-active':''}">${icon('dns')}<span><b>Domain Information Checker</b><small>DNS, WHOIS, SSL &amp; hosting intelligence</small></span></a>
       <a href="/xml-sitemap-generator" role="menuitem" class="${active==='sitemap'?'is-active':''}">${icon('account_tree')}<span><b>XML Sitemap Generator</b><small>Crawl, validate &amp; export XML sitemaps</small></span></a>
+      <a href="/broken-link-checker" role="menuitem" class="${active==='brokenlink'?'is-active':''}">${icon('link_off')}<span><b>Broken Link Checker</b><small>Find &amp; classify broken links accurately</small></span></a>
     </div></details>`;
 }
 
@@ -32,7 +34,7 @@ function layout(title, body, opts) {
   const scripts = opts.scripts || ['/assets/js/common.js','/assets/js/audit.js'];
   const meta = opts.meta || '';
   const jsonLd = opts.jsonLd ? `<script type="application/ld+json">${JSON.stringify(opts.jsonLd)}</script>` : '';
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">${meta}<title>${esc(title)}</title><link rel="canonical" href="${opts.canonical||'https://huvanti.com/'}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Icons&display=swap" rel="stylesheet"><style>${criticalCss}</style>${jsonLd}</head><body><a class="skip-link" href="#main">Skip to content</a><div class="app"><header class="appbar"><div class="toolbar"><a class="brand" href="/">${icon('travel_explore')}<span class="brand-name">huvanti</span></a><nav class="desktop-nav" aria-label="Primary"><a href="/">${icon('home')}<span>Home</span></a>${otherToolsMenu(active)}<a href="/about">${icon('info')}<span>About</span></a><a href="/contact">${icon('mail')}<span>Contact</span></a></nav><button type="button" class="icon-button theme-toggle" aria-label="toggle theme" id="theme-toggle"><span class="material-icons">brightness_4</span></button></div></header><main id="main">${body}</main><footer class="footer"><div class="container footer-grid"><div><div class="footer-brand">huvanti</div><p class="footer-tagline">Free, no-account website tools.</p></div><div><div class="footer-heading">Tools</div><div class="footer-links"><a href="/">SEO Audit</a><a href="/adsense-eligibility-checker">AdSense Eligibility Checker</a><a href="/ezoic-eligibility-checker">Ezoic Eligibility Checker</a><a href="/mediavine-eligibility-checker">Mediavine Eligibility Checker</a><a href="/raptive-eligibility-checker">Raptive Eligibility Checker</a><a href="/wordpress-theme-detector">WordPress Theme Detector</a><a href="/domain-information-checker">Domain Information Checker</a><a href="/xml-sitemap-generator">XML Sitemap Generator</a></div></div><div><div class="footer-heading">Pages</div><div class="footer-links"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div></div></div><div class="container footer-copyright">&copy; 2026 huvanti. All rights reserved. Not affiliated with Google, Ezoic or Mediavine.</div></footer></div>${scripts.map(s=>`<script src="${s}"></script>`).join('')}</body></html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">${meta}<title>${esc(title)}</title><link rel="canonical" href="${opts.canonical||'https://huvanti.com/'}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Icons&display=swap" rel="stylesheet"><style>${criticalCss}</style>${jsonLd}</head><body><a class="skip-link" href="#main">Skip to content</a><div class="app"><header class="appbar"><div class="toolbar"><a class="brand" href="/">${icon('travel_explore')}<span class="brand-name">huvanti</span></a><nav class="desktop-nav" aria-label="Primary"><a href="/">${icon('home')}<span>Home</span></a>${otherToolsMenu(active)}<a href="/about">${icon('info')}<span>About</span></a><a href="/contact">${icon('mail')}<span>Contact</span></a></nav><button type="button" class="icon-button theme-toggle" aria-label="toggle theme" id="theme-toggle"><span class="material-icons">brightness_4</span></button></div></header><main id="main">${body}</main><footer class="footer"><div class="container footer-grid"><div><div class="footer-brand">huvanti</div><p class="footer-tagline">Free, no-account website tools.</p></div><div><div class="footer-heading">Tools</div><div class="footer-links"><a href="/">SEO Audit</a><a href="/adsense-eligibility-checker">AdSense Eligibility Checker</a><a href="/ezoic-eligibility-checker">Ezoic Eligibility Checker</a><a href="/mediavine-eligibility-checker">Mediavine Eligibility Checker</a><a href="/raptive-eligibility-checker">Raptive Eligibility Checker</a><a href="/wordpress-theme-detector">WordPress Theme Detector</a><a href="/domain-information-checker">Domain Information Checker</a><a href="/xml-sitemap-generator">XML Sitemap Generator</a><a href="/broken-link-checker">Broken Link Checker</a></div></div><div><div class="footer-heading">Pages</div><div class="footer-links"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div></div></div><div class="container footer-copyright">&copy; 2026 huvanti. All rights reserved. Not affiliated with Google, Ezoic or Mediavine.</div></footer></div>${scripts.map(s=>`<script src="${s}"></script>`).join('')}</body></html>`;
 }
 
 function home() {
@@ -217,7 +219,8 @@ function wpthemePage() {
 <div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('help')}<h4 style="margin:0;">FAQ</h4></div>
   <div class="faq-accordion">
 <details><summary>Is this accurate?</summary><p>Accuracy is prioritised over producing a result for every site. Detection combines nine independent methods, shows every signal and weight, and labels results Detected, Likely, Unable to Verify or Not Detected. It never names a theme it could not evidence.</p></details>
-<details><summary>Does it work on any WordPress site?</summary><p>No tool can. Sites can hide or rename theme paths, block scanners, serve assets from rewritten CDNs, or be behind bot protection. In those cases this tool reports exactly what blocked the scan and what partial evidence exists, instead of guessing.</p></details><details><summary>What happens if the scanner server can’t reach a site?</summary><p>The server first tries a direct, SSRF-protected connection. If that is impossible (firewall, TLS reset, blocked egress — for example on this preview sandbox), the same small set of resources is collected through your own browser and analysed by the identical engine. The report always states which transport was used, and a blocked or unreadable site is reported as Unable to determine — never as “not WordPress”.</p></details>
+<details><summary>Does it work on any WordPress site?</summary><p>No tool can. Sites can hide or rename theme paths, block scanners, serve assets from rewritten CDNs, or be behind bot protection. In those cases this tool reports exactly what blocked the scan and what partial evidence exists, instead of guessing.</p></details>
+<details><summary>What happens if the scanner server can’t reach a site?</summary><p>The server first tries a direct, SSRF-protected connection. If that is impossible (firewall, TLS reset, blocked egress — for example on this preview sandbox), the same small set of resources is collected through your own browser and analysed by the identical engine. The report always states which transport was used, and a blocked or unreadable site is reported as Unable to determine — never as “not WordPress”.</p></details>
 <details><summary>Does it need an account, API key or AI?</summary><p>No. Detection is deterministic: direct HTTP requests, HTML/CSS parsing, WordPress fingerprints and a weighted evidence engine. No OpenAI, Gemini, Claude, or paid third-party detection APIs.</p></details>
 <details><summary>Can it detect premium or custom themes?</summary><p>Premium themes are identified when multiple fingerprint markers match a known commercial theme or its marketplace URI. Custom themes are flagged as “Possible custom theme” with confidence from several weak signals — never stated as certainty.</p></details>
 <details><summary>Does it check security?</summary><p>It only reports publicly observable theme information (exposure). It does not attempt exploitation, does not test for vulnerabilities, and never claims a version is vulnerable. Version age is compared against a bundled dataset that may lag reality.</p></details>
@@ -308,7 +311,82 @@ function sitemapPage() {
   return layout('XML Sitemap Generator — Free Crawl, Validate & Download | huvanti', body, { active:'sitemap', canonical:'https://huvanti.com/xml-sitemap-generator', meta, jsonLd, scripts:['/assets/js/common.js','/assets/js/sitemap/browser.js','/assets/js/sitemap/ui.js'] });
 }
 
-function page(name) { return layout(name, `<div class="container page"><h1 class="page-title">${esc(name)}</h1><div class="paper paper-padded"><p>huvanti provides free, no-account website tools including an SEO audit, AdSense/Ezoic/Mediavine/Raptive eligibility checkers, a WordPress theme detector, a domain information checker, and an XML sitemap generator.</p></div></div>`); }
+function brokenlinkPage() {
+  const meta = `<meta name="description" content="Free Broken Link Checker. Crawl any public website, find confirmed broken links (404,410,5xx,DNS,SSL), detect redirect chains & loops, bot protection, anchor errors — accurate classification, no false positives. No account, no AI."><meta name="robots" content="index,follow">
+<meta property="og:title" content="Broken Link Checker — huvanti"><meta property="og:description" content="Production-grade broken link checker with accurate classification, retry verification, redirect loop detection, DNS/TLS analysis, and transparent health score. No account required."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
+  const jsonLd = {'@context':'https://schema.org','@graph':[
+    {'@type':'WebSite',name:'huvanti',url:'https://huvanti.com/'},
+    {'@type':'WebApplication',name:'Broken Link Checker',applicationCategory:'DeveloperApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',featureList:'Broken link detection, 404/410 detection, 5xx verification, DNS analysis, TLS analysis, redirect chain and loop detection, bot protection detection, anchor validation, canonical analysis, sitemap discovery, robots.txt respect, health score, CSV/JSON export',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free, deterministic broken link checker with multi-stage verification and accurate classification. No login, no account, no AI, no paid SEO API.'}
+  ]};
+  const body = `<section class="hero audit-home brokenlink-home"><span class="material-icons hero-icon" aria-hidden="true">link_off</span><h1>Broken Link Checker</h1><p class="hero-subtitle">Production-grade crawling and link auditing — accurate classification, no false positives.</p>
+<form id="brokenlink-form" class="brokenlink-form" aria-label="Broken link checker">
+  <div class="search-field audit-search" style="flex-wrap:wrap;gap:8px;padding:10px;max-width:900px">
+    <span class="material-icons" aria-hidden="true">link</span>
+    <input id="bl-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL" style="flex:1;min-width:200px">
+    <button class="btn" type="submit">Start Scan</button>
+  </div>
+  <details class="sitemap-options sitemap-advanced" open style="max-width:900px;margin:18px auto 0"><summary>${icon('tune')} Scan configuration</summary>
+    <div class="sitemap-option-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+      <label>Maximum Pages
+        <select id="bl-max-pages" class="select">
+          <option value="100" selected>100</option>
+          <option value="500">500</option>
+          <option value="1000">1,000</option>
+          <option value="5000">5,000</option>
+          <option value="10000">10,000</option>
+          <option value="custom">Custom</option>
+        </select>
+        <input id="bl-max-pages-custom" type="number" min="1" max="10000" placeholder="Custom max" class="text-input" style="display:none;margin-top:6px">
+      </label>
+      <label>Maximum Crawl Depth
+        <select id="bl-max-depth" class="select">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3" selected>3</option>
+          <option value="5">5</option>
+          <option value="10">10</option>
+          <option value="unlimited">Unlimited</option>
+        </select>
+      </label>
+      <label>Scan Scope
+        <select id="bl-scan-scope" class="select">
+          <option value="internal+external" selected>Internal + external</option>
+          <option value="internal">Internal only</option>
+        </select>
+      </label>
+    </div>
+    <div class="sitemap-option-row" style="display:flex;flex-wrap:wrap;gap:16px;margin-top:12px">
+      <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="bl-check-external" checked> Check External Links</label>
+      <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="bl-check-images"> Check Images</label>
+      <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="bl-check-docs"> Check Documents (PDF,DOC,etc)</label>
+      <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="bl-check-anchors"> Check Anchor Links</label>
+      <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="bl-respect-robots" checked> Respect robots.txt (ON by default)</label>
+    </div>
+    <p class="muted" style="margin-top:10px">Accuracy first: 401/403/429, CAPTCHA, Cloudflare challenge, timeouts, HEAD failures, robots.txt blocks are never classified as permanently broken. Only confirmed evidence → Confirmed Broken.</p>
+  </details>
+</form>
+<div class="audit-trust"><span>No account</span><span>SSRF-safe</span><span>Robots.txt respected</span><span>Sitemap discovery</span><span>Retry verification</span><span>Redirect loops</span><span>DNS &amp; TLS analysis</span><span>Bot protection aware</span></div></section>
+<div id="brokenlink-results" class="audit-results brokenlink-results"></div>
+<div class="container section"><div class="section-heading-row">${icon('verified')}<h4 style="margin:0;">Built for accuracy — not for the largest number of broken links</h4></div><div class="grid feature-grid">
+  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('security')} Secure crawler</h6><p>SSRF protection, localhost/private/metadata blocking, DNS rebinding prevention, redirect validation, infinite-loop detection, response-size limits, decompression-bomb protection, concurrency control.</p></div></div></div>
+  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('rule')} Robots &amp; sitemap intelligence</h6><p>Fetches /robots.txt, parses Allow/Disallow/Sitemap/Crawl-delay, respects rules, discovers /sitemap.xml, /sitemap_index.xml, /sitemap-index.xml plus sitemaps from robots.txt, parses indexes recursively.</p></div></div></div>
+  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('fact_check')} Accurate classification</h6><p>Healthy (200,204), Redirect (301,302,303,307,308), Confirmed Broken (404,410,persistent 5xx,DNS,connection), Restricted (401,403), Rate Limited (429), Timeout, Bot Protection, Unknown — never false positives.</p></div></div></div>
+  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('loop')} Retry &amp; redirect analysis</h6><p>Exponential backoff, 3 attempts to confirm 404, 503→503→200 = Working, full redirect chain recorded, loop A→B→A detection, cross-domain, HTTP→HTTPS, www↔non-www.</p></div></div></div>
+  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('dns')} DNS &amp; TLS &amp; bot protection</h6><p>NXDOMAIN/SERVFAIL/timeout detection, expired/hostname-mismatch/invalid TLS, Cloudflare/Imperva/Sucuri/Akamai/CAPTCHA challenge detection → Bot Protection / Unable to Verify.</p></div></div></div>
+  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('anchor')} Anchor &amp; canonical &amp; health score</h6><p>Checks id=\"pricing\" existence for #pricing links, canonical points to 404/redirect detection, noindex detection, transparent 0–100 health score that does not penalize normal 301 or blocked external links.</p></div></div></div>
+</div></div>
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('help')}<h4 style="margin:0;">FAQ</h4></div><div class="faq-accordion">
+<details><summary>What counts as Confirmed Broken?</summary><p>Only when evidence supports it: 404→404→404 after retries, 410, persistent 5xx after retries, DNS NXDOMAIN, persistent connection failure, invalid destination. 401/403/429, CAPTCHA, Cloudflare challenge, timeouts, HEAD failures, robots.txt blocks are classified as Restricted, Rate Limited, Bot Protection, Timeout, Blocked by robots.txt — never as Confirmed Broken.</p></details>
+<details><summary>Does it check external links?</summary><p>Yes by default (Internal + external). External servers may block crawlers or require auth — those are shown as Bot Protection / Unable to Verify, not as broken. You can toggle to Internal only.</p></details>
+<details><summary>How does duplicate handling work?</summary><p>Before requesting, URLs are deduplicated by trailing slash, fragments, case, tracking params (utm_source,gclid,fbclid...), encoded equivalents, and redirects. If 100 pages reference /contact, one network check is performed and the report shows “Found on 100 pages”.</p></details>
+<details><summary>Does it support images, PDFs, anchors?</summary><p>Optional toggles: Check Images (404 images, redirected, inaccessible), Check Documents (PDF,DOC,XLS,ZIP,TXT via HEAD/Range), Check Anchor Links (validates id=\"section\" targets).</p></details>
+<details><summary>What about large sites?</summary><p>Concurrency control (4 crawl + 6 check workers), connection reuse, visited set, result cache, duplicate suppression, retry queue, timeout management, response-size limits, crawl-depth tracking — protects both scanner and target.</p></details>
+<details><summary>Is this a Google score?</summary><p>No. Broken Link Health Score is an internal diagnostic 0–100 based on confirmed internal 404s, persistent 5xx, DNS, broken anchors, redirect loops, long chains. Normal 301, 403, 429, bot protection, temporary failures are not heavily penalized. How the score was calculated is shown.</p></details>
+</div></div>`;
+  return layout('Broken Link Checker — Accurate, No False Positives | huvanti', body, { active:'brokenlink', canonical:'https://huvanti.com/broken-link-checker', meta, jsonLd, scripts:['/assets/js/common.js','/assets/js/brokenlink/crawler.js','/assets/js/brokenlink/ui.js'] });
+}
+
+function page(name) { return layout(name, `<div class="container page"><h1 class="page-title">${esc(name)}</h1><div class="paper paper-padded"><p>huvanti provides free, no-account website tools including an SEO audit, AdSense/Ezoic/Mediavine/Raptive eligibility checkers, a WordPress theme detector, a domain information checker, and an XML sitemap generator and a broken link checker.</p></div></div>`); }
 
 function readJson(req){ return new Promise(resolve=>{let b=''; req.on('data',d=>b+=d); req.on('end',()=>{try{resolve(JSON.parse(b||'{}'))}catch{resolve({})}});}); }
 
@@ -377,6 +455,11 @@ http.createServer(async (req,res)=>{
     await domaincheckApi.handleAnalyze(req, res, body);
     return;
   }
+  if (p === '/api/brokenlink' && req.method === 'POST') {
+    const body = await readJson(req);
+    await brokenlinkApi.handle(req, res, body);
+    return;
+  }
   if (p.startsWith('/assets/')) {
     const safe = path.normalize(p).replace(/^([.][.][/\\])+/, '');
     const f = path.join(process.cwd(), safe);
@@ -396,6 +479,7 @@ http.createServer(async (req,res)=>{
   else if (p === '/wordpress-theme-detector') html = wpthemePage();
   else if (p === '/domain-information-checker') html = domainInfoPage();
   else if (p === '/xml-sitemap-generator') html = sitemapPage();
+  else if (p === '/broken-link-checker') html = brokenlinkPage();
   else if (['/about','/contact','/privacy','/terms'].includes(p)) html = page(p.slice(1).replace(/^./,c=>c.toUpperCase()));
   else html = layout('Not found', `<div class="container notfound"><h1>404</h1><p>Page not found.</p><a class="btn" href="/">Back home</a></div>`);
   res.setHeader('content-type','text/html; charset=utf-8'); res.setHeader('cache-control','no-store'); res.end(html);
