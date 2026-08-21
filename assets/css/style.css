@@ -164,3 +164,20 @@ button.btn .material-icons{font-size:18px}
 #rp-issue-search,#rp-page-search{max-width:420px;margin-bottom:10px}
 @media(max-width:800px){.raptive-home h1{font-size:2.2rem!important}.raptive-results .page-table{min-width:640px}.raptive-optional-grid{grid-template-columns:1fr 1fr}}
 @media print{.raptive-home,.raptive-optional{display:none!important}}
+
+/* WordPress Theme Detector — reuses the existing design system; no new color scheme */
+.wptheme-home{background:var(--appbar-bg)!important}
+.wptheme-progress .progress-list{margin-top:8px}
+.wptheme-error{text-align:center}
+.wp-card{display:grid;grid-template-columns:180px 1fr;gap:16px;align-items:start}
+.wp-preview{aspect-ratio:4/3;border-radius:8px;overflow:hidden;background:var(--chip-bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;padding:8px}
+.wp-preview img{width:100%;height:100%;object-fit:cover;display:block;border-radius:6px}
+.wp-preview .material-icons{font-size:34px;color:var(--text-secondary)}
+.wp-preview small{color:var(--text-secondary);font-size:.78rem}
+.wp-preview-missing img{display:none}
+.wp-field-value{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:1.05rem}
+.wp-field-value .row-detail{flex:0 0 auto}
+.wp-details-table td{vertical-align:top;word-break:break-word}
+.wptheme-report .audit-panel{margin-bottom:0}
+@media(max-width:800px){.wptheme-home h1{font-size:2.2rem!important}.wp-card{grid-template-columns:1fr}.wp-preview{max-width:280px}.wp-field-value{font-size:.98rem}}
+@media print{.wptheme-home{display:none!important}.wp-preview img{max-height:180px}}
