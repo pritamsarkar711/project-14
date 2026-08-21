@@ -150,3 +150,17 @@ button.btn .material-icons{font-size:18px}
 .mediavine-results .page-table{min-width:820px}
 @media(max-width:800px){.mediavine-home h1{font-size:2.2rem!important}.mediavine-results .page-table{min-width:640px}}
 @media print{.mediavine-home{display:none!important}}
+
+/* Raptive Eligibility Checker — reuses the existing design system; no new color scheme */
+.raptive-home{background:var(--appbar-bg)!important}
+.raptive-progress .progress-list{margin-top:8px}
+.raptive-optional{max-width:960px;margin:20px auto 0;background:rgba(255,255,255,.12);border-radius:12px;padding:8px 16px;text-align:left;color:#fff}
+.raptive-optional summary{cursor:pointer;font-weight:600;padding:8px 0}
+.raptive-optional-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;padding:8px 0 12px}
+.raptive-optional label{display:flex;flex-direction:column;gap:4px;font-size:.82rem}
+.raptive-optional .text-input{background:#fff;color:#222;border:0;height:40px}
+.raptive-optional .muted{color:rgba(255,255,255,.88)}
+.raptive-results .page-table{min-width:860px}
+#rp-issue-search,#rp-page-search{max-width:420px;margin-bottom:10px}
+@media(max-width:800px){.raptive-home h1{font-size:2.2rem!important}.raptive-results .page-table{min-width:640px}.raptive-optional-grid{grid-template-columns:1fr 1fr}}
+@media print{.raptive-home,.raptive-optional{display:none!important}}
