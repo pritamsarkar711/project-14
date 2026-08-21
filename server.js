@@ -2,6 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const ezoicApi = require('./lib/ezoic/api');
+const mediavineApi = require('./lib/mediavine/api');
 
 const criticalCss = fs.readFileSync('assets/css/style.css', 'utf8');
 const esc = s => String(s ?? '').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
@@ -13,6 +14,7 @@ function otherToolsMenu(active) {
       <a href="/" role="menuitem" class="${active==='seo'?'is-active':''}">${icon('travel_explore')}<span><b>SEO Audit</b><small>Technical, content &amp; performance audit</small></span></a>
       <a href="/adsense-eligibility-checker" role="menuitem" class="${active==='adsense'?'is-active':''}">${icon('monetization_on')}<span><b>AdSense Eligibility Checker</b><small>Website readiness for AdSense</small></span></a>
       <a href="/ezoic-eligibility-checker" role="menuitem" class="${active==='ezoic'?'is-active':''}">${icon('insights')}<span><b>Ezoic Eligibility Checker</b><small>Website readiness for Ezoic</small></span></a>
+      <a href="/mediavine-eligibility-checker" role="menuitem" class="${active==='mediavine'?'is-active':''}">${icon('trending_up')}<span><b>Mediavine Eligibility Checker</b><small>Website readiness for Mediavine</small></span></a>
     </div></details>`;
 }
 
@@ -22,7 +24,7 @@ function layout(title, body, opts) {
   const scripts = opts.scripts || ['/assets/js/common.js','/assets/js/audit.js'];
   const meta = opts.meta || '';
   const jsonLd = opts.jsonLd ? `<script type="application/ld+json">${JSON.stringify(opts.jsonLd)}</script>` : '';
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">${meta}<title>${esc(title)}</title><link rel="canonical" href="${opts.canonical||'https://huvanti.com/'}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Icons&display=swap" rel="stylesheet"><style>${criticalCss}</style>${jsonLd}</head><body><a class="skip-link" href="#main">Skip to content</a><div class="app"><header class="appbar"><div class="toolbar"><a class="brand" href="/">${icon('travel_explore')}<span class="brand-name">huvanti</span></a><nav class="desktop-nav" aria-label="Primary"><a href="/">${icon('home')}<span>Home</span></a>${otherToolsMenu(active)}<a href="/about">${icon('info')}<span>About</span></a><a href="/contact">${icon('mail')}<span>Contact</span></a></nav><button type="button" class="icon-button theme-toggle" aria-label="toggle theme" id="theme-toggle"><span class="material-icons">brightness_4</span></button></div></header><main id="main">${body}</main><footer class="footer"><div class="container footer-grid"><div><div class="footer-brand">huvanti</div><p class="footer-tagline">Free, no-account website tools.</p></div><div><div class="footer-heading">Tools</div><div class="footer-links"><a href="/">SEO Audit</a><a href="/adsense-eligibility-checker">AdSense Eligibility Checker</a><a href="/ezoic-eligibility-checker">Ezoic Eligibility Checker</a></div></div><div><div class="footer-heading">Pages</div><div class="footer-links"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div></div></div><div class="container footer-copyright">&copy; 2026 huvanti. All rights reserved. Not affiliated with Google or Ezoic.</div></footer></div>${scripts.map(s=>`<script src="${s}"></script>`).join('')}</body></html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">${meta}<title>${esc(title)}</title><link rel="canonical" href="${opts.canonical||'https://huvanti.com/'}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Icons&display=swap" rel="stylesheet"><style>${criticalCss}</style>${jsonLd}</head><body><a class="skip-link" href="#main">Skip to content</a><div class="app"><header class="appbar"><div class="toolbar"><a class="brand" href="/">${icon('travel_explore')}<span class="brand-name">huvanti</span></a><nav class="desktop-nav" aria-label="Primary"><a href="/">${icon('home')}<span>Home</span></a>${otherToolsMenu(active)}<a href="/about">${icon('info')}<span>About</span></a><a href="/contact">${icon('mail')}<span>Contact</span></a></nav><button type="button" class="icon-button theme-toggle" aria-label="toggle theme" id="theme-toggle"><span class="material-icons">brightness_4</span></button></div></header><main id="main">${body}</main><footer class="footer"><div class="container footer-grid"><div><div class="footer-brand">huvanti</div><p class="footer-tagline">Free, no-account website tools.</p></div><div><div class="footer-heading">Tools</div><div class="footer-links"><a href="/">SEO Audit</a><a href="/adsense-eligibility-checker">AdSense Eligibility Checker</a><a href="/ezoic-eligibility-checker">Ezoic Eligibility Checker</a><a href="/mediavine-eligibility-checker">Mediavine Eligibility Checker</a></div></div><div><div class="footer-heading">Pages</div><div class="footer-links"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div></div></div><div class="container footer-copyright">&copy; 2026 huvanti. All rights reserved. Not affiliated with Google, Ezoic or Mediavine.</div></footer></div>${scripts.map(s=>`<script src="${s}"></script>`).join('')}</body></html>`;
 }
 
 function home() {
@@ -96,7 +98,43 @@ function ezoicPage() {
   });
 }
 
-function page(name) { return layout(name, `<div class="container page"><h1 class="page-title">${esc(name)}</h1><div class="paper paper-padded"><p>huvanti provides free, no-account website tools including an SEO audit, an AdSense eligibility checker, and an Ezoic eligibility checker.</p></div></div>`); }
+function mediavinePage() {
+  const meta = `<meta name="description" content="Free Mediavine Eligibility Checker. Enter a URL for an evidence-based Mediavine Website Readiness Score from a deep public crawl — no account, no AI. Official vs Journey applied separately. Not an official Mediavine score."><meta name="robots" content="index,follow">
+<meta property="og:title" content="Mediavine Eligibility Checker — huvanti"><meta property="og:description" content="Deep, deterministic Mediavine website readiness check. Official &amp; Journey applied separately. No account required. Final eligibility belongs to Mediavine."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
+  const jsonLd = {'@context':'https://schema.org','@graph':[
+    {'@type':'WebSite',name:'huvanti',url:'https://huvanti.com/'},
+    {'@type':'WebApplication',name:'Mediavine Eligibility Checker',applicationCategory:'BusinessApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',featureList:'Mediavine Website Readiness score, Official vs Journey requirements, original content audit, duplicate detection, brand-safety screen, reader experience, advertising readiness, technical SEO, trust pages, traffic verification',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free, deterministic Mediavine eligibility checker that scores publicly observable website signals. Not affiliated with Mediavine.'}
+  ]};
+  const body = `<section class="hero audit-home mediavine-home"><span class="material-icons hero-icon" aria-hidden="true">trending_up</span><h1>Mediavine Eligibility Checker</h1><p class="hero-subtitle">Evidence-based Mediavine website readiness — no account, no AI.</p>
+<form id="mediavine-form" class="search-field audit-search" role="search" aria-label="Mediavine eligibility checker"><span class="material-icons" aria-hidden="true">link</span><input id="mediavine-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL"><select id="mediavine-program" class="crawl-select" aria-label="Program focus"><option value="both" selected>Both programs</option><option value="official">Mediavine Official</option><option value="journey">Journey by Mediavine</option></select><select id="mediavine-limit" class="crawl-select" aria-label="Crawl limit"><option value="10">10 pages</option><option value="25">25 pages</option><option value="50" selected>50 pages</option><option value="100">100 pages</option><option value="250">250 pages</option></select><button class="btn" type="submit">Check Eligibility</button></form>
+<div class="audit-trust"><span>Official &amp; Journey</span><span>Original content</span><span>Duplicates</span><span>Brand safety</span><span>Reader experience</span><span>Advertising</span><span>Technical</span><span>Trust pages</span></div></section>
+<div id="mediavine-results" class="audit-results mediavine-results"></div>
+<div class="container section">
+  <div class="section-heading-row">${icon('rule_folder')}<h4 style="margin:0;">What this checker actually does</h4></div>
+  <div class="grid feature-grid">
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('verified')} Official &amp; Journey, applied separately</h6><p>Mediavine Official requires $5,000+ annual ad revenue; Journey starts at 1,000 sessions. Revenue and sessions are private data, so they are shown as <b>Unable to verify automatically</b> — never guessed. Old 50,000-session advice is not presented as current.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('article')} Original, audience-first content</h6><p>Unique words after boilerplate removal, thin/empty ratios, sentence fingerprints, n-grams, Jaccard, TF-IDF cosine and SimHash near-duplicates, plus a Potential Search-First Content Pattern label (not a definitive Google classification).</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('gpp_bad')} Brand-safety screening</h6><p>Deterministic contextual scanner for adult, drugs, gambling, weapons, hate, extremism, piracy, malware, phishing, fraud, scam and more — with low/medium/high confidence. Isolated keywords are never a high finding.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('smartphone')} Reader experience &amp; ads</h6><p>Viewport, navigation, overlays, popups, autoplay, sticky/fixed elements, horizontal overflow, content obstruction and ad density. Existing ads are not automatically penalized.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('account_tree')} Deep architecture crawl</h6><p>Up to 250 internal pages from homepage, links, sitemap, robots.txt, nav, footer, breadcrumbs, categories and canonicals. Orphans, dead-ends, depth, broken internal links. Default 50 pages.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('verified_user')} Honest about what a URL cannot verify</h6><p>Annual revenue, monthly sessions, traffic sources/countries, demographics and Google account standing are private data. They appear in a dedicated <b>Requires Your Verification</b> panel and are excluded from the score, not invented.</p></div></div></div>
+  </div>
+</div>
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('help')}<h4 style="margin:0;">FAQ</h4></div><div class="faq-accordion">
+<details><summary>Does this guarantee Mediavine approval?</summary><p>No. It produces a transparent internal <b>Mediavine Website Readiness Score</b> from public signals. The final eligibility decision belongs to Mediavine. Status labels are Strong Readiness, Needs Improvement, Significant Issues, or Unable to Determine.</p></details>
+<details><summary>Can it verify the $5,000 revenue or 1,000 sessions?</summary><p>No. Annual ad revenue and monthly sessions are private data. They are listed as <b>Unable to verify automatically</b> and never guessed. The Official $5,000+ and Journey 1,000+ thresholds are current (2026) and applied separately.</p></details>
+<details><summary>Is the old 50,000-session requirement still used?</summary><p>No. As of 2026, Mediavine Official is revenue-based ($5,000+ annual ad revenue) and Journey starts at 1,000 sessions. This tool uses the current program structure and does not present outdated 50k-session advice as current.</p></details>
+<details><summary>Does it use AI or an LLM?</summary><p>No. The engine is a crawler plus HTML parsing, similarity statistics and a weighted rule registry. No paid AI APIs.</p></details>
+<details><summary>Are tool or ecommerce sites treated like blogs?</summary><p>No. Pages are classified by type, and article-content rules are not applied to utility, product, tool, or legal pages. Content portfolio balance is weighed site-wide, not page-by-page.</p></details>
+<details><summary>Is this affiliated with Mediavine?</summary><p>No. Findings cite Mediavine Help Center sources where a check maps to a documented requirement, and are otherwise labelled Quality Signal or Heuristic.</p></details>
+</div></div>`;
+  return layout('Mediavine Eligibility Checker — Free Website Readiness Score | huvanti', body, {
+    active: 'mediavine', canonical: 'https://huvanti.com/mediavine-eligibility-checker', meta, jsonLd,
+    scripts: ['/assets/js/common.js', '/assets/js/mediavine/crawler.js', '/assets/js/mediavine/ui.js']
+  });
+}
+
+function page(name) { return layout(name, `<div class="container page"><h1 class="page-title">${esc(name)}</h1><div class="paper paper-padded"><p>huvanti provides free, no-account website tools including an SEO audit, an AdSense eligibility checker, an Ezoic eligibility checker, and a Mediavine eligibility checker.</p></div></div>`); }
 
 function readJson(req){ return new Promise(resolve=>{let b=''; req.on('data',d=>b+=d); req.on('end',()=>{try{resolve(JSON.parse(b||'{}'))}catch{resolve({})}});}); }
 
@@ -120,6 +158,16 @@ http.createServer(async (req,res)=>{
     await ezoicApi.handleAnalyze(req, res, body);
     return;
   }
+  if (p === '/api/mediavine-audit' && req.method === 'POST') {
+    const body = await readJson(req);
+    await mediavineApi.handle(req, res, body);
+    return;
+  }
+  if (p === '/api/mediavine-analyze' && req.method === 'POST') {
+    const body = await readJson(req);
+    await mediavineApi.handleAnalyze(req, res, body);
+    return;
+  }
   if (p.startsWith('/assets/')) {
     const safe = path.normalize(p).replace(/^([.][.][/\\])+/, '');
     const f = path.join(process.cwd(), safe);
@@ -134,6 +182,7 @@ http.createServer(async (req,res)=>{
   if (p === '/') html = home();
   else if (p === '/adsense-eligibility-checker') html = adsensePage();
   else if (p === '/ezoic-eligibility-checker') html = ezoicPage();
+  else if (p === '/mediavine-eligibility-checker') html = mediavinePage();
   else if (['/about','/contact','/privacy','/terms'].includes(p)) html = page(p.slice(1).replace(/^./,c=>c.toUpperCase()));
   else html = layout('Not found', `<div class="container notfound"><h1>404</h1><p>Page not found.</p><a class="btn" href="/">Back home</a></div>`);
   res.setHeader('content-type','text/html; charset=utf-8'); res.setHeader('cache-control','no-store'); res.end(html);
