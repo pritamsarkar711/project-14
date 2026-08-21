@@ -126,3 +126,27 @@ button.btn .material-icons{font-size:18px}
   .toolbar{flex-wrap:wrap;height:auto;min-height:56px;padding-top:8px;padding-bottom:8px}
   .tools-menu-panel{left:8px;right:8px;min-width:0}
 }
+
+/* Mediavine Eligibility Checker — reuses the existing design system; no new color scheme */
+.mediavine-home{background:var(--appbar-bg)!important}
+.ez-quality_signal{background:rgba(46,125,50,.12);color:#1b5e20}
+.mediavine-progress .progress-list{margin-top:8px}
+.prog-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.prog-card{border-left:4px solid var(--primary)}
+.prog-line{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px dashed var(--divider);font-size:.92rem}
+.prog-line.small{font-size:.84rem;color:var(--text-secondary)}
+.prog-line b.cannot-confirm{color:var(--secondary);font-weight:700}
+.google-standing{margin-top:16px;padding:12px;border-radius:8px;background:var(--chip-bg)}
+.traffic-subhead{margin:16px 0 6px;font-weight:700;font-size:.95rem;color:var(--primary)}
+.row-detail{border:1px solid var(--outline);background:var(--paper);color:var(--primary);border-radius:6px;padding:2px 10px;cursor:pointer;font:inherit;font-size:.78rem}
+.row-detail:hover{background:var(--chip-bg)}
+.page-detail{display:none;margin-top:12px;padding:12px;border-radius:8px;background:var(--paper);box-shadow:var(--card-shadow)}
+.page-detail h5{margin:0 0 6px}
+.priority.manual{background:rgba(96,125,139,.12)}
+.priority.fail{background:rgba(211,47,47,.12)}
+.priority.warn{background:rgba(237,108,2,.12)}
+#mv-issue-search,#mv-page-search{max-width:420px;margin-bottom:10px}
+#mv-page-type-filter{margin-top:0}
+.mediavine-results .page-table{min-width:820px}
+@media(max-width:800px){.mediavine-home h1{font-size:2.2rem!important}.mediavine-results .page-table{min-width:640px}}
+@media print{.mediavine-home{display:none!important}}
