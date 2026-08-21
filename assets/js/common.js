@@ -11,6 +11,12 @@
   toggle?.addEventListener('click',()=>{drawer.classList.add('open');drawer.setAttribute('aria-hidden','false');overlay.hidden=false}); overlay?.addEventListener('click',closeDrawer);
   const scroll=$('#scroll-top'); window.addEventListener('scroll',()=>{if(scroll) scroll.hidden=window.scrollY<300}); scroll?.addEventListener('click',()=>window.scrollTo({top:0,behavior:'smooth'}));
   const s=$('#toolSearch')||$('#tool-search'); if(s) s.addEventListener('input',()=>{const q=s.value.toLowerCase();$$('.tool,[data-name]', $('#tool-grid')||document).forEach(c=>{const n=(c.dataset.name||c.textContent).toLowerCase();c.style.display=n.includes(q)?'':'none'})});
+  // Other Tools dropdown: close on outside click and Escape
+  const toolsMenu=document.querySelector('.tools-menu');
+  if(toolsMenu){
+    document.addEventListener('click',e=>{if(toolsMenu.open&&!toolsMenu.contains(e.target))toolsMenu.open=false;});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&toolsMenu.open)toolsMenu.open=false;});
+  }
   window.sumly={engines:{}, esc:v=>String(v??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])), copy:t=>navigator.clipboard?.writeText(t)};
   window.addEventListener('DOMContentLoaded',()=>{const tool=window.SUMLY_TOOL, el=$('#tool-app'); if(tool&&el){(sumly.engines[tool.type]||sumly.engines.basic)(el,tool)}});
 })();
