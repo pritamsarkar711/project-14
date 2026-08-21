@@ -5,7 +5,15 @@ https://gitea.com/alistairfox.london/toolsite
 
 This workspace contains a local runnable huvanti tools website with the same structure and routes as the source project: PHP-style pages, `/tools/<slug>`, `/category/<key>`, `/all-tools`, informational pages, assets, generated catalogue data, and JavaScript tool engines.
 
-Tools served by the Node server: SEO Audit (`/`), AdSense/Ezoic/Mediavine/Raptive eligibility checkers, the WordPress Theme Detector (`/wordpress-theme-detector`), the Domain Information Checker (`/domain-information-checker`), and the XML Sitemap Generator — all under **Other Tools** in the header.
+Tools served by the Node server: SEO Audit (`/`), AdSense/Ezoic/Mediavine/Raptive eligibility checkers, the WordPress Theme Detector (`/wordpress-theme-detector`), the Domain Information Checker (`/domain-information-checker`), the XML Sitemap Generator, and the LLMs.txt Generator (`/llms-txt-generator`) — all under **Other Tools** in the header.
+
+## LLMs.txt Generator
+
+`/llms-txt-generator` — a deterministic, spec-compliant `llms.txt` generator and validator. Enter a public URL and it runs the full pipeline: SSRF-safe URL validation → robots.txt parsing → sitemap discovery (recursive indexes) → bounded concurrent crawl → metadata extraction (title, meta/OG description, H1/H2, canonical, noindex, dates, breadcrumbs, word count, JSON-LD types) → canonical/noindex/duplicate/tracking-parameter handling → deterministic page classification → internal relevance scoring → deterministic description generation (no LLM) → llms.txt generation → validation → internal quality score → coverage report → editable page table → download. No account, no AI, no LLM API, no paid SEO API.
+
+The engine is modular in `lib/llmstxt/` (urlValidator, safeFetcher, robotsParser, sitemapDiscovery, crawler, urlNormalizer, duplicateAnalyzer, pageParser, canonicalAnalyzer, indexabilityAnalyzer, pageClassifier, importanceScorer, descriptionGenerator, suitabilityFilter, llmsTxtGenerator, llmsTxtValidator, qualityScorer, reportEngine, api). The generated file follows the current llmstxt.org structure — a required H1, an optional blockquote summary, then H2 "file list" sections of `- [name](url): notes`, with `## Optional` for secondary resources. No unsupported fields are emitted. The quality score is the tool's own internal assessment — never a Google or official OpenAI score, and never a visibility/ranking guarantee.
+
+When the server has no direct outbound access (e.g. this sandbox), the tool falls back to a visitor-browser crawl (`/assets/js/llmstxt/browser.js`) that fetches pages through public read-only relays and POSTs the collected data to `/api/llmstxt-browser`, which runs the identical server-side analysis.
 
 The theme detector is a server-side, multi-signal engine in `lib/wptheme/` (SSRF-protected crawl → WordPress detection → theme discovery → style.css analysis → fingerprints → evidence/confidence) with an offline self-test covering the required detection scenarios. If the server has no direct outbound access (e.g. this sandbox), the tool automatically collects the same resources through the visitor's browser and runs the identical analysis at `/api/wptheme-analyze`.
 

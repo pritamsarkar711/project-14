@@ -391,3 +391,84 @@ button.btn .material-icons{font-size:18px}
   .brokenlink-results .report-actions,.brokenlink-results .tabs,#bl-search{display:none!important}
   .brokenlink-results .audit-panel,.brokenlink-results .score-card{box-shadow:none!important;border:1px solid #ddd!important}
 }
+
+/* LLMs.txt Generator — reuses existing design system, scoped to .llmstxt- */
+.llmstxt-home{background:var(--appbar-bg)!important}
+.llmstxt-home .audit-trust{margin-top:14px}
+.llmstxt-home code{font-family:"Roboto Mono",ui-monospace,monospace;font-size:.95em;background:rgba(255,255,255,.18);padding:1px 6px;border-radius:6px}
+.llmstxt-form{max-width:900px;margin:0 auto}
+.llmstxt-form .search-field{max-width:900px!important}
+.llmstxt-results{overflow-x:clip;min-width:0}
+.llmstxt-results .audit-panel{margin-bottom:16px}
+.llmstxt-results .audit-stats{margin-bottom:16px}
+.llmstxt-results .score-card{margin-bottom:16px}
+.llmstxt-desc-input{background:#fff;color:#222;border:0;height:40px;border-radius:8px;padding:0 10px}
+.llmstxt-progress h3{font-size:1.7rem;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+.llmstxt-warnings{display:grid;gap:10px;margin-bottom:16px}
+.llmstxt-warn{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;background:rgba(237,108,2,.08);border-left:4px solid #ed6c02;border-radius:0 8px 8px 0;font-size:.92rem}
+.llmstxt-warn .material-icons{color:#ed6c02;flex:0 0 auto}
+.llmstxt-mono{font-family:"Roboto Mono",ui-monospace,monospace;font-size:.85rem;word-break:break-all}
+.llmstxt-preview-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.llmstxt-preview-head h3{display:flex;align-items:center;gap:8px;margin:0}
+.llmstxt-preview-head .report-actions{margin-bottom:0}
+.llmstxt-edit-fields{display:grid;grid-template-columns:1fr 2fr;gap:12px;margin-bottom:12px}
+.llmstxt-edit-fields label{display:flex;flex-direction:column;gap:6px;font-size:.85rem;color:var(--text-secondary)}
+.llmstxt-preview{max-height:520px;overflow:auto;background:var(--chip-bg);border-radius:8px;padding:16px;font:13px/1.55 "Roboto Mono",ui-monospace,monospace;white-space:pre-wrap;word-break:break-word;tab-size:2}
+.llmstxt-valid-ok,.llmstxt-valid-bad{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;font-weight:700;font-size:.9rem;margin-bottom:10px}
+.llmstxt-valid-ok{background:rgba(46,125,50,.14);color:#1b5e20}
+.llmstxt-valid-bad{background:rgba(211,47,47,.14);color:#b71c1c}
+.llmstxt-valid-ok .material-icons,.llmstxt-valid-bad .material-icons{font-size:20px}
+.llmstxt-reasons{display:flex;flex-wrap:wrap;gap:8px}
+.llmstxt-reasons .chip{height:auto;min-height:26px;padding:4px 10px;white-space:normal}
+.llmstxt-reasons .chip b{margin-left:4px}
+.llmstxt-install{margin:0;padding-left:22px;display:grid;gap:8px}
+.llmstxt-install code{font-family:"Roboto Mono",ui-monospace,monospace;background:var(--chip-bg);padding:1px 6px;border-radius:6px;word-break:break-all}
+.llmstxt-table-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.llmstxt-table-head h3{display:flex;align-items:center;gap:8px;margin:0}
+.llmstxt-table{min-width:1000px}
+.llmstxt-table .url-cell{max-width:280px;word-break:break-word;white-space:normal;line-height:1.4;vertical-align:top}
+.llmstxt-table td{vertical-align:top}
+.llmstxt-row-out td{opacity:.62}
+.llmstxt-link{color:var(--primary);text-decoration:none;word-break:break-all;font-family:"Roboto Mono",ui-monospace,monospace;font-size:.82rem}
+.llmstxt-inline{height:34px;font-size:.85rem;margin:4px 0;padding:0 8px}
+.llmstxt-cat{height:36px;font-size:.85rem;min-width:130px;background:var(--paper);color:var(--text-primary)}
+.llmstxt-row-actions{display:flex;gap:4px;white-space:nowrap}
+.llmstxt-mini{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:0;border-radius:6px;background:var(--chip-bg);color:var(--text-primary);cursor:pointer;padding:0}
+.llmstxt-mini:hover{background:var(--primary);color:#fff}
+.llmstxt-mini .material-icons{font-size:16px}
+.llmstxt-switch{position:relative;display:inline-block;width:40px;height:22px}
+.llmstxt-switch input{opacity:0;width:0;height:0}
+.llmstxt-switch span{position:absolute;inset:0;background:var(--chip-bg);border-radius:999px;transition:.2s;cursor:pointer}
+.llmstxt-switch span:before{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:.2s}
+.llmstxt-switch input:checked+span{background:var(--primary)}
+.llmstxt-switch input:checked+span:before{transform:translateX(18px)}
+.llmstxt-add-form{display:grid;grid-template-columns:2fr 1fr 1.4fr 150px auto auto;gap:8px;margin:10px 0;padding:12px;background:var(--chip-bg);border-radius:8px}
+.llmstxt-add-form .text-input,.llmstxt-add-form .select{background:var(--paper);color:var(--text-primary)}
+.llmstxt-noindex-warning{color:#ed6c02}
+@media(max-width:900px){
+  .llmstxt-edit-fields{grid-template-columns:1fr}
+  .llmstxt-add-form{grid-template-columns:1fr 1fr;grid-auto-rows:auto}
+  .llmstxt-home h1{font-size:2.2rem!important}
+}
+@media(max-width:600px){
+  .llmstxt-add-form{grid-template-columns:1fr}
+  .llmstxt-preview{max-height:380px;font-size:12px;padding:12px}
+  .llmstxt-preview-head{flex-direction:column;align-items:stretch}
+  .llmstxt-results .audit-stats{grid-template-columns:1fr 1fr}
+  .llmstxt-table-head{flex-direction:column;align-items:stretch}
+}
+@media(max-width:400px){
+  .llmstxt-results .audit-stats{grid-template-columns:1fr}
+}
+@media print{
+  .llmstxt-home{display:none!important}
+  .llmstxt-results .report-actions,.llmstxt-results .llmstxt-row-actions,.llmstxt-results .llmstxt-switch,.llmstxt-results #llmstxt-search,.llmstxt-results #llmstxt-filter{display:none!important}
+  .llmstxt-results .audit-panel,.llmstxt-results .score-card{box-shadow:none!important;border:1px solid #ddd!important}
+}
+
+/* LLMs.txt Generator — advanced options sub-group inside the hero form */
+.llmstxt-advanced-sub{margin-top:10px;border-top:1px dashed rgba(255,255,255,.25);padding-top:10px}
+.llmstxt-advanced-sub>summary{display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;font-size:.9rem;color:#fff;list-style:none;opacity:.95}
+.llmstxt-advanced-sub>summary::-webkit-details-marker{display:none}
+.llmstxt-advanced-sub>summary .material-icons{font-size:18px}
+.llmstxt-advanced-sub .sitemap-option-row{margin-top:10px}

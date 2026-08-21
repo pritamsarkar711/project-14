@@ -8,6 +8,7 @@ const wpthemeApi = require('./lib/wptheme/api');
 const sitemapApi = require('./lib/sitemap/api');
 const domaincheckApi = require('./lib/domaincheck/api');
 const brokenlinkApi = require('./lib/brokenlink/api');
+const llmstxtApi = require('./lib/llmstxt/api');
 
 const criticalCss = fs.readFileSync('assets/css/style.css', 'utf8');
 const esc = s => String(s ?? '').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
@@ -25,6 +26,7 @@ function otherToolsMenu(active) {
       <a href="/domain-information-checker" role="menuitem" class="${active==='domaincheck'?'is-active':''}">${icon('dns')}<span><b>Domain Information Checker</b><small>DNS, WHOIS, SSL &amp; hosting intelligence</small></span></a>
       <a href="/xml-sitemap-generator" role="menuitem" class="${active==='sitemap'?'is-active':''}">${icon('account_tree')}<span><b>XML Sitemap Generator</b><small>Crawl, validate &amp; export XML sitemaps</small></span></a>
       <a href="/broken-link-checker" role="menuitem" class="${active==='brokenlink'?'is-active':''}">${icon('link_off')}<span><b>Broken Link Checker</b><small>Find &amp; classify broken links accurately</small></span></a>
+      <a href="/llms-txt-generator" role="menuitem" class="${active==='llmstxt'?'is-active':''}">${icon('auto_stories')}<span><b>LLMs.txt Generator</b><small>Generate &amp; validate an llms.txt file</small></span></a>
     </div></details>`;
 }
 
@@ -34,7 +36,7 @@ function layout(title, body, opts) {
   const scripts = opts.scripts || ['/assets/js/common.js','/assets/js/audit.js'];
   const meta = opts.meta || '';
   const jsonLd = opts.jsonLd ? `<script type="application/ld+json">${JSON.stringify(opts.jsonLd)}</script>` : '';
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">${meta}<title>${esc(title)}</title><link rel="canonical" href="${opts.canonical||'https://huvanti.com/'}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Icons&display=swap" rel="stylesheet"><style>${criticalCss}</style>${jsonLd}</head><body><a class="skip-link" href="#main">Skip to content</a><div class="app"><header class="appbar"><div class="toolbar"><a class="brand" href="/">${icon('travel_explore')}<span class="brand-name">huvanti</span></a><nav class="desktop-nav" aria-label="Primary"><a href="/">${icon('home')}<span>Home</span></a>${otherToolsMenu(active)}<a href="/about">${icon('info')}<span>About</span></a><a href="/contact">${icon('mail')}<span>Contact</span></a></nav><button type="button" class="icon-button theme-toggle" aria-label="toggle theme" id="theme-toggle"><span class="material-icons">brightness_4</span></button></div></header><main id="main">${body}</main><footer class="footer"><div class="container footer-grid"><div><div class="footer-brand">huvanti</div><p class="footer-tagline">Free, no-account website tools.</p></div><div><div class="footer-heading">Tools</div><div class="footer-links"><a href="/">SEO Audit</a><a href="/adsense-eligibility-checker">AdSense Eligibility Checker</a><a href="/ezoic-eligibility-checker">Ezoic Eligibility Checker</a><a href="/mediavine-eligibility-checker">Mediavine Eligibility Checker</a><a href="/raptive-eligibility-checker">Raptive Eligibility Checker</a><a href="/wordpress-theme-detector">WordPress Theme Detector</a><a href="/domain-information-checker">Domain Information Checker</a><a href="/xml-sitemap-generator">XML Sitemap Generator</a><a href="/broken-link-checker">Broken Link Checker</a></div></div><div><div class="footer-heading">Pages</div><div class="footer-links"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div></div></div><div class="container footer-copyright">&copy; 2026 huvanti. All rights reserved. Not affiliated with Google, Ezoic or Mediavine.</div></footer></div>${scripts.map(s=>`<script src="${s}"></script>`).join('')}</body></html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">${meta}<title>${esc(title)}</title><link rel="canonical" href="${opts.canonical||'https://huvanti.com/'}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Icons&display=swap" rel="stylesheet"><style>${criticalCss}</style>${jsonLd}</head><body><a class="skip-link" href="#main">Skip to content</a><div class="app"><header class="appbar"><div class="toolbar"><a class="brand" href="/">${icon('travel_explore')}<span class="brand-name">huvanti</span></a><nav class="desktop-nav" aria-label="Primary"><a href="/">${icon('home')}<span>Home</span></a>${otherToolsMenu(active)}<a href="/about">${icon('info')}<span>About</span></a><a href="/contact">${icon('mail')}<span>Contact</span></a></nav><button type="button" class="icon-button theme-toggle" aria-label="toggle theme" id="theme-toggle"><span class="material-icons">brightness_4</span></button></div></header><main id="main">${body}</main><footer class="footer"><div class="container footer-grid"><div><div class="footer-brand">huvanti</div><p class="footer-tagline">Free, no-account website tools.</p></div><div><div class="footer-heading">Tools</div><div class="footer-links"><a href="/">SEO Audit</a><a href="/adsense-eligibility-checker">AdSense Eligibility Checker</a><a href="/ezoic-eligibility-checker">Ezoic Eligibility Checker</a><a href="/mediavine-eligibility-checker">Mediavine Eligibility Checker</a><a href="/raptive-eligibility-checker">Raptive Eligibility Checker</a><a href="/wordpress-theme-detector">WordPress Theme Detector</a><a href="/domain-information-checker">Domain Information Checker</a><a href="/xml-sitemap-generator">XML Sitemap Generator</a><a href="/broken-link-checker">Broken Link Checker</a><a href="/llms-txt-generator">LLMs.txt Generator</a></div></div><div><div class="footer-heading">Pages</div><div class="footer-links"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div></div></div><div class="container footer-copyright">&copy; 2026 huvanti. All rights reserved. Not affiliated with Google, Ezoic or Mediavine.</div></footer></div>${scripts.map(s=>`<script src="${s}"></script>`).join('')}</body></html>`;
 }
 
 function home() {
@@ -311,6 +313,47 @@ function sitemapPage() {
   return layout('XML Sitemap Generator — Free Crawl, Validate & Download | huvanti', body, { active:'sitemap', canonical:'https://huvanti.com/xml-sitemap-generator', meta, jsonLd, scripts:['/assets/js/common.js','/assets/js/sitemap/browser.js','/assets/js/sitemap/ui.js'] });
 }
 
+function llmstxtPage() {
+  const meta = `<meta name="description" content="Free LLMs.txt Generator. Crawl a public website, extract metadata, prioritise genuinely useful pages and generate a spec-compliant llms.txt — no account, no AI, no paid SEO APIs."><meta name="robots" content="index,follow">
+<meta property="og:title" content="LLMs.txt Generator — huvanti"><meta property="og:description" content="Generate, validate and download a clean llms.txt from real crawlable pages with deterministic relevance scoring and robots.txt respect."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
+  const jsonLd = {'@context':'https://schema.org','@graph':[
+    {'@type':'WebSite',name:'huvanti',url:'https://huvanti.com/'},
+    {'@type':'WebApplication',name:'LLMs.txt Generator',applicationCategory:'DeveloperApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',featureList:'URL validation, SSRF-safe crawling, robots.txt parsing, sitemap discovery, metadata extraction, canonical and noindex handling, duplicate removal, page classification, deterministic relevance scoring, llms.txt generation and validation, download',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free deterministic llms.txt generator and validator. No login, no account, no AI, no paid SEO API.'}
+  ]};
+  const body = `<section class="hero audit-home llmstxt-home"><span class="material-icons hero-icon" aria-hidden="true">auto_stories</span><h1>LLMs.txt Generator</h1><p class="hero-subtitle">Generate a clean, spec-compliant <code>llms.txt</code> from a real public crawl — no AI, no paid APIs.</p>
+<form id="llmstxt-form" class="llmstxt-form" aria-label="LLMs.txt generator">
+  <div class="search-field audit-search"><span class="material-icons" aria-hidden="true">link</span><input name="url" id="llmstxt-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL"><button class="btn" type="submit">Generate llms.txt</button></div>
+  <details class="sitemap-options sitemap-advanced"><summary>${icon('tune')} Crawl settings</summary>
+    <div class="sitemap-option-row"><label>Maximum Pages <select name="maxPages" class="select"><option value="100">100</option><option value="500" selected>500</option><option value="1000">1,000</option><option value="5000">5,000</option><option value="10000">10,000</option></select></label><label>Crawl Depth <select name="maxDepth" class="select"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="5">5</option><option value="10">10</option></select></label></div>
+    <div class="sitemap-option-row"><label><input type="checkbox" name="includePdfs" checked> Include PDFs</label><label><input type="checkbox" name="includeBlog" checked> Include Blog Posts</label><label><input type="checkbox" name="includeDocs" checked> Include Documentation</label></div>
+    <details class="llmstxt-advanced-sub"><summary>${icon('tune')} Advanced options</summary>
+      <div class="sitemap-option-row"><label><input type="checkbox" name="includeExternal"> Include External URLs <small>(candidates only)</small></label><label><input type="checkbox" name="includeCategories"> Include Category Pages</label><label><input type="checkbox" name="includeAuthors"> Include Author Pages</label><label><input type="checkbox" name="includeNoindex" id="llmstxt-noindex-toggle"> Include noindex pages <small class="llmstxt-noindex-warning" hidden>(not recommended)</small></label></div>
+      <div class="sitemap-option-row"><label>Maximum Blog URLs <select name="maxBlogUrls" class="select"><option value="10">10</option><option value="25" selected>25</option><option value="50">50</option><option value="100">100</option><option value="250">250</option><option value="all">All</option></select></label><label>Maximum Product URLs <select name="maxProducts" class="select"><option value="10">10</option><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option><option value="250">250</option><option value="all">All</option></select></label></div>
+      <div class="sitemap-option-row"><label style="flex:1 1 100%;align-items:flex-start;flex-direction:column;gap:4px">Website description <small class="muted">Optional — leave blank to auto-detect from the homepage</small><input type="text" name="websiteDescription" class="text-input llmstxt-desc-input" placeholder="e.g. Practical guides on home organization" style="max-width:520px"></label></div>
+    </details>
+  </details>
+</form>
+<div class="audit-trust"><span>No account</span><span>No AI API</span><span>Robots.txt respected</span><span>Deterministic scoring</span><span>Canonicals handled</span><span>Output validated</span><span>Download ready</span></div></section>
+<div id="llmstxt-results" class="audit-results llmstxt-results"></div>
+<div class="container section"><div class="section-heading-row">${icon('verified')}<h4 style="margin:0;">A real discovery → analysis → generation pipeline</h4></div><div class="grid feature-grid">
+  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('security')} Safe, SSRF-protected crawler</h6><p>Only public HTTP/HTTPS URLs are accepted. Private IPs, localhost, cloud metadata endpoints, unsafe redirects, oversized responses and request flooding are blocked.</p></div></div></div>
+  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('rule')} robots.txt + sitemap discovery</h6><p>robots.txt Allow/Disallow/Sitemap/Crawl-delay are respected, and sitemaps (including recursive sitemap indexes) are used to improve discovery.</p></div></div></div>
+  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('auto_awesome')} Deterministic selection</h6><p>Every page gets an internal relevance score from homepage proximity, depth, links, navigation, sitemap presence, title, content, headings and metadata — never an LLM.</p></div></div></div>
+  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('description')} Real descriptions</h6><p>Descriptions come only from meta description, Open Graph, the page's own introductory text, or its title — nothing is fabricated.</p></div></div></div>
+  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('fact_check')} Canonical, noindex, duplicates</h6><p>Non-canonical URLs, noindex pages, tracking parameters, query-parameter duplicates, redirects and broken URLs are detected and excluded with precise reasons.</p></div></div></div>
+  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('edit')} Manual editing</h6><p>Include or exclude any page, change its category, title and description, reorder it, or add a custom URL — then regenerate instantly. No account required.</p></div></div></div>
+</div></div>
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('help')}<h4 style="margin:0;">FAQ</h4></div><div class="faq-accordion">
+<details><summary>What is llms.txt?</summary><p>It is a Markdown file (proposed by Jeremy Howard / Answer.AI, documented at llmstxt.org) placed at <code>/llms.txt</code> that gives LLMs and AI agents a concise, curated overview of a site's most important content. The only required element is an H1 title.</p></details>
+<details><summary>Does this tool use an LLM or AI?</summary><p>No. Discovery, metadata extraction, categorisation, relevance scoring, descriptions, generation and validation are all deterministic code. It does not call OpenAI, Gemini, Claude or any other AI/LLM API.</p></details>
+<details><summary>Why are some pages excluded?</summary><p>Pages are excluded for concrete reasons — duplicates, noindex, non-canonical URLs, tracking parameters, login/cart/account pages, tag archives, broken URLs, robots.txt restrictions, or low relevance. The coverage report lists the exact reasons.</p></details>
+<details><summary>Does an llms.txt guarantee AI visibility or rankings?</summary><p>No. Publishing an llms.txt file never guarantees AI search visibility, citations, rankings, indexing or traffic. It is a best-effort, standard-compliant aid for AI systems.</p></details>
+<details><summary>Does this work with WordPress, WooCommerce, Next.js and others?</summary><p>Yes. It detects common WordPress/WooCommerce sitemap structures, posts, pages, categories and products, and works with any public HTML website — static sites, Next.js, Laravel, Shopify, Webflow, Drupal, Joomla and more — without framework-specific plugins.</p></details>
+<details><summary>Is this an official Google or OpenAI score?</summary><p>No. The quality score shown is this tool's own internal diagnostic score. It is not a Google score, not an official OpenAI score, and it is not a ranking or visibility guarantee.</p></details>
+</div></div>`;
+  return layout('LLMs.txt Generator — Free Crawl, Validate & Download | huvanti', body, { active:'llmstxt', canonical:'https://huvanti.com/llms-txt-generator', meta, jsonLd, scripts:['/assets/js/common.js','/assets/js/llmstxt/browser.js','/assets/js/llmstxt/ui.js'] });
+}
+
 function brokenlinkPage() {
   const meta = `<meta name="description" content="Free Broken Link Checker. Crawl any public website, find confirmed broken links (404,410,5xx,DNS,SSL), detect redirect chains & loops, bot protection, anchor errors — accurate classification, no false positives. No account, no AI."><meta name="robots" content="index,follow">
 <meta property="og:title" content="Broken Link Checker — huvanti"><meta property="og:description" content="Production-grade broken link checker with accurate classification, retry verification, redirect loop detection, DNS/TLS analysis, and transparent health score. No account required."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
@@ -460,6 +503,21 @@ http.createServer(async (req,res)=>{
     await brokenlinkApi.handle(req, res, body);
     return;
   }
+  if (p === '/api/llmstxt' && req.method === 'POST') {
+    const body = await readJson(req);
+    await llmstxtApi.handle(req, res, body);
+    return;
+  }
+  if (p === '/api/llmstxt-finalize' && req.method === 'POST') {
+    const body = await readJson(req);
+    await llmstxtApi.handleFinalize(req, res, body);
+    return;
+  }
+  if (p === '/api/llmstxt-browser' && req.method === 'POST') {
+    const body = await readJson(req);
+    await llmstxtApi.handleBrowser(req, res, body);
+    return;
+  }
   if (p.startsWith('/assets/')) {
     const safe = path.normalize(p).replace(/^([.][.][/\\])+/, '');
     const f = path.join(process.cwd(), safe);
@@ -480,6 +538,7 @@ http.createServer(async (req,res)=>{
   else if (p === '/domain-information-checker') html = domainInfoPage();
   else if (p === '/xml-sitemap-generator') html = sitemapPage();
   else if (p === '/broken-link-checker') html = brokenlinkPage();
+  else if (p === '/llms-txt-generator') html = llmstxtPage();
   else if (['/about','/contact','/privacy','/terms'].includes(p)) html = page(p.slice(1).replace(/^./,c=>c.toUpperCase()));
   else html = layout('Not found', `<div class="container notfound"><h1>404</h1><p>Page not found.</p><a class="btn" href="/">Back home</a></div>`);
   res.setHeader('content-type','text/html; charset=utf-8'); res.setHeader('cache-control','no-store'); res.end(html);
