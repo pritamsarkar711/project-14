@@ -73,11 +73,11 @@
       tls_blocked: 'The scanner server could not open a secure connection to the site (the TLS handshake was reset). This can be the site refusing server-side scanners — or the scanner server having no direct outbound access. Retrying through your browser usually resolves it.',
       timeout: 'The website took too long to respond.',
       unreachable: 'The website could not be reached. It may be offline or blocking this scanner.',
-      blocked: 'The website blocked this scanner (403/401) — access was denied, so WordPress status cannot be determined.',
+      blocked: 'The website refused every automated reader we tried — the direct connection, your browser, and three public relays (403/401). Some sites block all server-side traffic with their firewall. WordPress status cannot be honestly determined from here — this is an access failure, not a “not WordPress” result.',
       rate_limited_target: 'The website rate-limited this scanner (429).',
       server_error: 'The website returned a server error (5xx).',
       not_found: 'The page returned 404 — check the URL.',
-      challenge: 'The site is protected by a Cloudflare/bot challenge and cannot be read automatically. Status: Unable to Verify — not “not WordPress”.',
+      challenge: 'The site is behind a bot challenge (e.g. Cloudflare) that defeats automated readers, including public relays. Status: Unable to Verify — not “not WordPress”.',
       js_only: 'The page renders via JavaScript with almost no server HTML, so WordPress could not be verified from the initial response.',
       empty: 'The server returned an empty or non-HTML page.',
       redirect: 'Too many redirects or an unsafe redirect.',
@@ -146,6 +146,8 @@
       + '<h2>WordPress ' + (isDetected ? 'Detected' : r.status === 'likely' ? 'Likely' : r.status === 'not_detected' ? 'Not Detected' : 'Unverifiable') + '</h2>'
       + '<p>' + esc(summary) + '</p>'
       + '<div class="source-chip">Confidence ' + ring + '% · every verdict is evidence-based · no AI, no third-party detection API' + (r.via === 'browser' ? ' · collected through your browser (server could not reach the site directly)' : '') + '</div>'
+      + (r.homeBlocked ? '<p class="calc-note"><span class="material-icons">block</span>The live homepage refused automated readers (' + esc(r.homeBlocked.code === 'challenge' ? 'bot challenge' : 'HTTP ' + r.homeBlocked.status) + '). This verdict is based on other public endpoints, and the active theme could not be identified without the homepage HTML.</p>' : '')
+      + (r.homeArchived ? '<p class="calc-note"><span class="material-icons">history</span>Theme discovery used an archived snapshot of the homepage (Wayback Machine' + (r.homeArchived.timestamp ? ', ' + esc(r.homeArchived.timestamp.slice(0, 8)) : '') + ') because the live site refused readers. Theme details were read from the live site; the discovered folder may lag behind reality.</p>' : '')
       + stats + plat + builders
       + '</div></div>';
   }
@@ -343,7 +345,7 @@
   /* When the scanner server itself cannot reach the site (no outbound access,
      TLS reset, firewall), the same resources are collected through the
      visitor's browser and analysed by the identical server-side engine. */
-  var NETWORK_FALLBACK_CODES = ['tls_blocked', 'ssl', 'unreachable', 'timeout', 'dns', 'fetch_failed', 'network'];
+  var NETWORK_FALLBACK_CODES = ['tls_blocked', 'ssl', 'unreachable', 'timeout', 'dns', 'fetch_failed', 'network', 'blocked', 'challenge', 'rate_limited_target'];
 
   function browserScan() {
     if (!(window.WpThemeCollector && window.WpThemeCollector.collect)) {

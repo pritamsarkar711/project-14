@@ -1,14 +1,21 @@
 /* huvanti WordPress Theme Detector — browser-relay collector.
  *
  * Used when the scanner server cannot reach a website directly (blocked
- * egress, TLS reset, firewall). Collects the same small set of resources the
- * server pipeline would fetch, using the visitor's own connection:
- *   direct fetch first → free public CORS relays as fallback
- *   (identical relay chain to the site's other checkers — no paid APIs).
+ * egress, TLS reset, firewall, or the site refusing datacenter IPs).
+ * Collects the same small set of resources the server pipeline would fetch,
+ * through the visitor's own connection:
+ *
+ *   direct fetch → free public CORS relays (allorigins → corsproxy → codetabs)
+ *
+ * Resilience rules (a 403 from ONE path is never a verdict):
+ *   - a 401/403/429/5xx response from one relay triggers the next relay —
+ *     different relays exit from different IPs and WAF rules differ
+ *   - if the live homepage stays blocked, REST (?rest_route=) and robots.txt
+ *     are still probed — WordPress can be provable without the homepage
+ *   - last resort: a clearly-labelled Wayback Machine snapshot (free, no key)
  *
  * The collected bundle is POSTed to /api/wptheme-analyze where the SAME
- * deterministic detection engine runs. Nothing is detected in the browser
- * beyond URL/path discovery, which needs the raw HTML anyway.
+ * deterministic detection engine runs.
  */
 (function (global) {
   'use strict';
@@ -16,9 +23,10 @@
 
   var TIMEOUT = 15000;
   var MAX_HTML = 400000;
-  var MAX_TEXT = 300000;
-  var MAX_FETCHES = 16;
+  var MAX_FETCHES = 18;
   var PRIVATE = /^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[01])\.|\[?::1\]?$|fc00:|fd[0-9a-f]{2}:|fe80:|metadata\.google\.internal)/i;
+  /* Statuses that mean "this path was refused" — try the next transport. */
+  var RETRY_STATUSES = [401, 403, 429, 500, 502, 503, 504];
 
   var fetchCount = 0;
 
@@ -44,56 +52,112 @@
     return u;
   }
 
-  /* ---- fetch chain: direct → allorigins → corsproxy → codetabs ---- */
-  function fetchOnce(url, opt) {
-    opt = opt || {};
-    if (fetchCount >= MAX_FETCHES) return Promise.reject(makeError('budget', 'Browser collection budget reached.'));
-    fetchCount++;
+  function withTimeout(signal, cb) {
     var ctrl = new AbortController();
     var to = setTimeout(function () { ctrl.abort(); }, TIMEOUT);
-    if (opt.signal) opt.signal.addEventListener('abort', function () { ctrl.abort(); }, { once: true });
-    var bytes = 0;
-    function ok(text, via, extra) {
-      clearTimeout(to);
-      extra = extra || {};
-      if (text && text.length > (opt.cap || MAX_HTML)) text = text.slice(0, opt.cap || MAX_HTML);
-      return { url: url, finalUrl: extra.finalUrl || url, status: extra.status != null ? extra.status : 200, headers: extra.headers || {}, text: text || '', via: via, bytes: (text || '').length };
-    }
-    return fetch(url, { redirect: 'follow', signal: ctrl.signal, headers: { Accept: opt.accept || 'text/html,application/xhtml+xml,*/*;q=0.5' } })
+    if (signal) signal.addEventListener('abort', function () { ctrl.abort(); }, { once: true });
+    var done = function () { clearTimeout(to); };
+    return { ctrl: ctrl, done: done };
+  }
+
+  function relayError(err) {
+    var m = String((err && err.message) || err || '').toLowerCase();
+    if (/abort/.test(m)) return makeError('timeout', 'A resource took too long to fetch.');
+    if (/just a moment|cloudflare|challenge|attention required/.test(m)) return makeError('challenge', 'The site appears to be behind a bot challenge.');
+    return makeError('unreachable', 'Could not fetch the resource.');
+  }
+
+  /* Direct fetch — works when the site sends CORS headers. */
+  function fetchDirect(url, opt, signal) {
+    var t = withTimeout(signal);
+    return fetch(url, { redirect: 'follow', signal: t.ctrl.signal, headers: { Accept: opt.accept || 'text/html,*/*;q=0.5' } })
       .then(function (res) {
-        return res.text().then(function (text) { return ok(text, 'direct', { status: res.status, finalUrl: res.url || url }); });
+        return res.text().then(function (text) { t.done(); return { status: res.status, text: text, via: 'direct', headers: {}, finalUrl: res.url || url, bytes: (text || '').length }; });
       })
-      .catch(function () {
-        if (opt.signal && opt.signal.aborted) { clearTimeout(to); throw makeError('cancelled', 'Scan cancelled.'); }
-        // Free public relays — same chain as the site's other checkers
-        return fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(url), { signal: ctrl.signal })
-          .then(function (r) { return r.json(); })
-          .then(function (j) {
-            var h = {};
-            if (j.status) {
-              if (j.status.content_type) h['content-type'] = j.status.content_type;
-              if (j.status.http_code) h[':status'] = String(j.status.http_code);
-            }
-            return ok(j.contents || '', 'allorigins', { status: (j.status && j.status.http_code) || 200, finalUrl: (j.status && j.status.url) || url, headers: h });
-          })
-          .catch(function () {
-            if (opt.signal && opt.signal.aborted) { clearTimeout(to); throw makeError('cancelled', 'Scan cancelled.'); }
-            return fetch('https://corsproxy.io/?url=' + encodeURIComponent(url), { signal: ctrl.signal })
-              .then(function (r) { return r.text().then(function (t) { return ok(t, 'corsproxy', { status: r.status }); }); })
-              .catch(function () {
-                if (opt.signal && opt.signal.aborted) { clearTimeout(to); throw makeError('cancelled', 'Scan cancelled.'); }
-                return fetch('https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(url), { signal: ctrl.signal })
-                  .then(function (r) { return r.text().then(function (t) { if (/^[A-Za-z ]+Error/i.test(t.slice(0, 80))) throw new Error(t.slice(0, 80)); return ok(t, 'codetabs', { status: r.status }); }); })
-                  .catch(function (err) {
-                    clearTimeout(to);
-                    var m = String((err && err.message) || err || '').toLowerCase();
-                    if (/abort/.test(m)) throw makeError('timeout', 'A resource took too long to fetch.');
-                    if (/just a moment|cloudflare|challenge/.test(m)) throw makeError('challenge', 'The site appears to be behind a bot challenge.');
-                    throw makeError('unreachable', 'Could not fetch ' + url + ' from this browser either.');
-                  });
-              });
-          });
+      .catch(function (e) { t.done(); throw e; });
+  }
+
+  function fetchAllOrigins(url, opt, signal) {
+    var t = withTimeout(signal);
+    return fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(url), { signal: t.ctrl.signal })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        t.done();
+        var code = (j.status && j.status.http_code) || 200;
+        var h = {};
+        if (j.status && j.status.content_type) h['content-type'] = j.status.content_type;
+        return { status: code, text: j.contents || '', via: 'allorigins', headers: h, finalUrl: (j.status && j.status.url) || url, bytes: ((j.contents || '')).length };
+      })
+      .catch(function (e) { t.done(); throw e; });
+  }
+
+  function fetchCorsProxy(url, opt, signal) {
+    var t = withTimeout(signal);
+    return fetch('https://corsproxy.io/?url=' + encodeURIComponent(url), { signal: t.ctrl.signal })
+      .then(function (r) { return r.text().then(function (text) { t.done(); return { status: r.status, text: text, via: 'corsproxy', headers: {}, finalUrl: url, bytes: (text || '').length }; }); })
+      .catch(function (e) { t.done(); throw e; });
+  }
+
+  function fetchCodetabs(url, opt, signal) {
+    var t = withTimeout(signal);
+    return fetch('https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(url), { signal: t.ctrl.signal })
+      .then(function (r) {
+        return r.text().then(function (text) {
+          t.done();
+          if (/^[A-Za-z ]+Error\b/.test(text.slice(0, 60))) throw new Error(text.slice(0, 60));
+          return { status: r.status, text: text, via: 'codetabs', headers: {}, finalUrl: url, bytes: (text || '').length };
+        });
+      })
+      .catch(function (e) { t.done(); throw e; });
+  }
+
+  var TRANSPORTS = [fetchDirect, fetchAllOrigins, fetchCorsProxy, fetchCodetabs];
+
+  /*
+   * Fetch one URL through every transport until one returns a usable
+   * response. "Usable" = not 401/403/429/5xx (those mean the path was
+   * refused, so the next transport/IP is worth trying) and not a challenge
+   * wall. A 404 is a legitimate answer and is returned immediately.
+   */
+  function fetchOnce(url, opt) {
+    opt = opt || {};
+    var cap = opt.cap || MAX_HTML;
+    if (fetchCount >= MAX_FETCHES) return Promise.reject(makeError('budget', 'Browser collection budget reached.'));
+    fetchCount++;
+    var attempts = [];
+    var sawChallenge = false;
+    var idx = 0;
+    function attempt() {
+      if (idx >= TRANSPORTS.length) {
+        if (sawChallenge) return Promise.reject(makeError('challenge', 'The site is protected by a bot challenge that defeats every transport (direct fetch + public relays).'));
+        return Promise.reject(makeError('blocked', 'Every transport was refused (direct fetch + public relays' + (attempts.length ? '; last status ' + attempts[attempts.length - 1].status : '') + ').'));
+      }
+      var fn = TRANSPORTS[idx++];
+      return fn(url, opt, opt.signal).then(function (res) {
+        var text = res.text || '';
+        if (text.length > cap) text = text.slice(0, cap);
+        res.text = text;
+        res.bytes = text.length;
+        // A challenge wall is a challenge wall whatever status it ships with —
+        // remember it and try the next transport/IP.
+        if (looksLikeChallenge(res.status, text)) {
+          sawChallenge = true;
+          attempts.push({ via: res.via, status: res.status });
+          if (idx < TRANSPORTS.length) return attempt();
+          return Promise.reject(makeError('challenge', 'The site is protected by a bot challenge that defeats every transport (direct fetch + public relays).'));
+        }
+        if (RETRY_STATUSES.indexOf(res.status) >= 0) {
+          attempts.push({ via: res.via, status: res.status });
+          return attempt(); // refused on this path → next transport
+        }
+        return res;
+      }, function (err) {
+        if (opt.signal && opt.signal.aborted) return Promise.reject(makeError('cancelled', 'Scan cancelled.'));
+        attempts.push({ via: 'transport', status: 0, err: relayError(err) });
+        return attempt();
       });
+    }
+    return attempt();
   }
 
   function looksLikeChallenge(status, text) {
@@ -113,17 +177,7 @@
       if (!map[slug]) map[slug] = { slug: slug, htmlRefs: 0, stylesheetRef: false, styleCssRef: false, jsRef: false, restRef: 0, firstIndex: 0, examples: [], styleCssHrefVer: null, score: 0 };
       return map[slug];
     }
-    function bumpSlug(raw, patch, example) {
-      var m = String(raw || '').match(/\/wp-content\/themes\/([A-Za-z0-9_.-]+)\//);
-      if (!m) return null;
-      var slug = m[1].toLowerCase();
-      if (!/^[a-z0-9][a-z0-9_.-]{0,78}$/.test(slug) || slug.includes('..')) return null;
-      var c = get(slug);
-      Object.keys(patch).forEach(function (k) { c[k] = patch[k] === true ? true : (c[k] || 0) + patch[k]; });
-      if (example && c.examples.length < 4 && c.examples.indexOf(example) < 0) c.examples.push(example);
-      return c;
-    }
-    var html = doc.documentElement ? doc.documentElement.innerHTML : '';
+    var html = doc && doc.documentElement ? doc.documentElement.innerHTML : '';
     var re = /\/wp-content\/themes\/([A-Za-z0-9_.-]+)\//g, m;
     while ((m = re.exec(html))) {
       var slug = m[1].toLowerCase();
@@ -132,7 +186,7 @@
         if (c.examples.length < 4 && c.examples.indexOf(m[0]) < 0) c.examples.push(m[0]);
       }
     }
-    Array.prototype.forEach.call(doc.querySelectorAll('link[rel~="stylesheet"]'), function (l) {
+    Array.prototype.forEach.call((doc && doc.querySelectorAll ? doc.querySelectorAll('link[rel~="stylesheet"]') : []), function (l) {
       var href = l.getAttribute('href') || '';
       var mm = href.match(/\/wp-content\/themes\/([A-Za-z0-9_.-]+)\//);
       if (!mm) return;
@@ -146,16 +200,16 @@
       if (v && (isStyleCss || !c.styleCssHrefVer)) c.styleCssHrefVer = v;
       if (c.examples.length < 4 && c.examples.indexOf(href) < 0) c.examples.push(href);
     });
-    Array.prototype.forEach.call(doc.querySelectorAll('script[src]'), function (sc) {
+    Array.prototype.forEach.call((doc && doc.querySelectorAll ? doc.querySelectorAll('script[src]') : []), function (sc) {
       var href = sc.getAttribute('src') || '';
       var mm = href.match(/\/wp-content\/themes\/([A-Za-z0-9_.-]+)\//);
-      if (mm) bumpSlug(href, { jsRef: true }, href);
+      if (mm) { var c2 = get(mm[1].toLowerCase()); c2.jsRef = true; }
     });
     (extraTexts || []).forEach(function (txt) {
       var r2 = /\/wp-content\/themes\/([A-Za-z0-9_.-]+)\//g, m2;
       while ((m2 = r2.exec(String(txt || '')))) {
         var s2 = m2[1].toLowerCase();
-        if (/^[a-z0-9][a-z0-9_.-]{0,78}$/.test(s2)) { var cc = get(s2); cc.restRef += 1; }
+        if (/^[a-z0-9][a-z0-9_.-]{0,78}$/.test(s2)) { get(s2).restRef += 1; }
       }
     });
     return Object.keys(map).map(function (k) {
@@ -183,23 +237,18 @@
   }
 
   function parseDoc(text) {
-    var doc = new DOMParser().parseFromString(String(text || ''), 'text/html');
-    // A bot-wall page is not the site
-    if (/parse error/i.test(doc.title)) return null;
-    return doc;
+    try {
+      var doc = new DOMParser().parseFromString(String(text || ''), 'text/html');
+      return doc;
+    } catch (e) { return null; }
   }
 
-  function wpVersionFromHtml(html) {
-    var m = String(html || '').match(/<meta[^>]+name\s*=\s*["']?generator["']?[^>]*>/i);
-    if (!m) return null;
-    var c = m[0].match(/content\s*=\s*["']([^"']*)["']/i);
-    var vm = c && c[1].match(/wordpress\s+([\d.]+)/i);
-    return vm ? vm[1] : null;
+  function emptyDoc() {
+    try { return document.implementation.createHTMLDocument('x'); } catch (e) { return null; }
   }
 
   /*
-   * Collect the full bundle. Returns a promise for the bundle object that
-   * /api/wptheme-analyze understands.
+   * Collect the full bundle for /api/wptheme-analyze.
    */
   WP.collect = function (rawUrl, opt) {
     opt = opt || {};
@@ -216,9 +265,11 @@
       robots: { checked: false, notes: [] }, redirects: [], notes: ['Collected through the browser because the scanner server could not reach the site directly.']
     };
     var methodsUsed = ['URL validation', 'Browser-relayed fetch'];
-    var probes = { rest: null, posts: null, oembed: null };
+    var probes = { rest: null, restRoute: null, posts: null, oembed: null };
     var origin = urlObj.origin;
     var home = null;
+    var homeBlocked = null;   // {status, code} when the live homepage was refused
+    var homeArchived = null;  // {timestamp} when discovery used a Wayback snapshot
 
     function fetchText(u, fo) {
       return fetchOnce(u, Object.assign({ signal: signal }, fo || {})).then(function (res) {
@@ -227,95 +278,130 @@
         return res;
       });
     }
+    function softFetch(u, fo) {
+      return fetchText(u, fo).catch(function (e) {
+        if (e.code === 'cancelled' || e.code === 'budget') throw e;
+        return { url: u, status: 0, text: '', via: 'error', error: e.code, bytes: 0, headers: {} };
+      });
+    }
 
-    function robotsAndHome() {
+    /* ---- homepage (with cross-relay retry inside fetchOnce) ---- */
+    function getHome() {
       onProgress({ stage: 'connect', message: 'Fetching the homepage through your browser…' });
       return fetchText(urlObj.href).then(function (res) {
-        if (looksLikeChallenge(res.status, res.text)) throw makeError('challenge', 'The site is protected by a bot challenge and could not be read.');
-        if (res.status === 404) throw makeError('not_found', 'The page returned 404 Not Found — check the URL.');
-        if (res.status === 401 || res.status === 403) throw makeError('blocked', 'The website blocked the request (HTTP ' + res.status + ').');
-        if (res.status === 429) throw makeError('rate_limited_target', 'The website rate-limited the request (HTTP 429).');
-        if (res.status >= 500) throw makeError('server_error', 'The website returned a server error (HTTP ' + res.status + ').');
-        if (res.status >= 300) throw makeError('unreachable', 'Unexpected HTTP status ' + res.status + '.');
+        if (looksLikeChallenge(res.status, res.text)) {
+          homeBlocked = { status: res.status, code: 'challenge', message: 'bot challenge page' };
+          scanInfo.status = res.status;
+          scanInfo.notes.push('Live homepage serves a bot-challenge wall — continuing with other public endpoints.');
+          onProgress({ stage: 'connect', message: 'Homepage shows a bot challenge — probing other endpoints…' });
+          return null;
+        }
         home = res;
         scanInfo.finalUrl = res.finalUrl || urlObj.href;
         scanInfo.status = res.status;
         try { origin = new URL(scanInfo.finalUrl).origin; } catch (e) {}
         if (res.via !== 'direct') scanInfo.notes.push('Homepage fetched via public relay (' + res.via + ') — exact HTTP headers were not available.');
-        if (res.via === 'direct' && res.finalUrl && res.finalUrl !== urlObj.href) scanInfo.notes.push('Redirected to ' + res.finalUrl);
-        return fetchText(origin + '/robots.txt', { cap: 64000 }).catch(function () { return null; });
-      }).then(function (robotsRes) {
+        else if (res.finalUrl && res.finalUrl !== urlObj.href) scanInfo.notes.push('Redirected to ' + res.finalUrl);
+        return null;
+      }, function (err) {
+        if (['cancelled', 'budget', 'invalid_url', 'ssrf'].indexOf(err.code) >= 0) throw err;
+        // Homepage refused on every transport — do NOT give up yet.
+        homeBlocked = { status: err.code === 'challenge' ? 403 : 403, code: err.code, message: err.message };
+        scanInfo.status = 403;
+        scanInfo.notes.push('Live homepage refused every automated reader (' + err.message + ') — continuing with other public endpoints.');
+        onProgress({ stage: 'connect', message: 'Homepage blocked — probing REST and robots endpoints instead…' });
+        return null;
+      });
+    }
+
+    /* ---- wayback snapshot (clearly-labelled last resort) ---- */
+    function tryWayback() {
+      if (!homeBlocked) return Promise.resolve(null);
+      onProgress({ stage: 'connect', message: 'Trying a public archived snapshot of the homepage…' });
+      return fetch('https://archive.org/wayback/available?url=' + encodeURIComponent(urlObj.href), { signal: signal })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          var snap = j && j.archived_snapshots && j.archived_snapshots.closest;
+          if (!snap || !snap.available || !snap.url) return null;
+          return softFetch(snap.url, { cap: MAX_HTML }).then(function (res) {
+            if (res.status !== 200 || !res.text || looksLikeChallenge(res.status, res.text)) return null;
+            homeArchived = { timestamp: snap.timestamp || '', url: snap.url };
+            home = { url: snap.url, finalUrl: scanInfo.finalUrl || urlObj.href, status: 200, text: res.text, via: 'wayback(' + res.via + ')', bytes: res.bytes };
+            scanInfo.notes.push('Homepage discovery used an archived snapshot (Wayback Machine' + (snap.timestamp ? ', ' + snap.timestamp.slice(0, 8) : '') + ') because the live site refused readers. Theme details were still read from the LIVE site — the discovered folder may lag behind reality.');
+            return home;
+          });
+        })
+        .catch(function () { return null; });
+    }
+
+    function robotsAndRest() {
+      onProgress({ stage: 'wordpress', message: 'Analysing WordPress signals…' });
+      var chain = softFetch(origin + '/robots.txt', { cap: 64000 }).then(function (robotsRes) {
         var robotsText = '';
         if (robotsRes && robotsRes.status === 200 && robotsRes.text && !/^\s*</.test(robotsRes.text)) {
           robotsText = robotsRes.text;
           scanInfo.robots.checked = true;
           var wpPaths = [/wp-admin/i, /wp-content/i, /wp-includes/i].filter(function (re) { return re.test(robotsText); }).length;
           if (wpPaths) scanInfo.robots.notes.push('robots.txt references WordPress paths (' + wpPaths + ' distinct) — supporting signal.');
+        } else if (homeBlocked && robotsRes && robotsRes.status === 403) {
+          scanInfo.robots.notes.push('robots.txt was also blocked (HTTP 403).');
         }
         return robotsText;
       });
+      return chain.then(function (robotsText) {
+        var html = home ? home.text : '';
+        var hasWpRef = /\/wp-(content|includes|json|admin)\//i.test(html) || /<meta[^>]+generator[^>]+wordpress/i.test(html);
+        var doRest = !hasWpRef || opt.alwaysProbeRest !== false;
+        if (!doRest) return robotsText;
+        return fetchText(origin + '/wp-json/', { cap: 262144, accept: 'application/json,*/*;q=0.5' })
+          .then(function (r) {
+            if (r.status === 200 && /"namespaces"/.test(r.text)) { probes.rest = { status: r.status, text: r.text }; methodsUsed.push('WordPress REST API'); return robotsText; }
+            // ?rest_route= works when pretty permalinks are off / wp-json filtered
+            return fetchText(origin + '/?rest_route=', { cap: 262144, accept: 'application/json,*/*;q=0.5' })
+              .then(function (r2) {
+                if (r2.status === 200 && /"namespaces"/.test(r2.text)) { probes.rest = { status: r2.status, text: r2.text }; methodsUsed.push('WordPress REST API'); }
+                return robotsText;
+              })
+              .catch(function () { return robotsText; });
+          })
+          .catch(function () { return robotsText; });
+      });
     }
 
-    function wpSignals(robotsText) {
-      onProgress({ stage: 'wordpress', message: 'Analysing WordPress signals…' });
-      var html = home ? home.text : '';
-      var cands = rankCandidates(parseDoc(html) || document.implementation.createHTMLDocument(''), []);
-      var hasWpRef = /\/wp-(content|includes|json|admin)\//i.test(html) || /<meta[^>]+generator[^>]+wordpress/i.test(html);
-      var doRest = !hasWpRef || !cands.length || (opt.alwaysProbeRest !== false);
-      var p = Promise.resolve(null);
-      if (doRest) {
-        p = fetchText(origin + '/wp-json/', { cap: 262144, accept: 'application/json,*/*;q=0.5' }).then(function (r) {
-          if (r.status === 200 && /"namespaces"/.test(r.text)) { probes.rest = { status: r.status, text: r.text }; methodsUsed.push('WordPress REST API'); }
-          else if (r.status !== 404) probes.rest = { status: r.status, text: r.text };
-          return r;
-        }).catch(function () { return null; });
-      }
-      return p.then(function () { return { robotsText: robotsText, cands0: cands }; });
-    }
-
-    function themePhase(ctx) {
+    function themePhase(robotsText) {
       onProgress({ stage: 'theme', message: 'Locating the active theme…' });
-      var doc = parseDoc(home.text);
-      var cands = ctx.cands0 && ctx.cands0.length ? ctx.cands0 : rankCandidates(doc || document.implementation.createHTMLDocument(''), []);
+      var doc = home ? parseDoc(home.text) : null;
+      var cands = rankCandidates(doc || emptyDoc(), []);
       var chain = Promise.resolve(cands);
       if (!cands.length) {
-        scanInfo.notes.push('No /wp-content/themes/ path in the homepage HTML.');
-        chain = fetchText(origin + '/wp-json/wp/v2/posts?per_page=5&_fields=content,link', { cap: 512000, accept: 'application/json,*/*;q=0.5' })
+        scanInfo.notes.push('No /wp-content/themes/ path in the readable HTML.');
+        chain = softFetch(origin + '/wp-json/wp/v2/posts?per_page=5&_fields=content,link', { cap: 512000, accept: 'application/json,*/*;q=0.5' })
           .then(function (r) {
             if (r.status === 200 && /"content"/.test(r.text.slice(0, 400))) { probes.posts = { status: r.status, text: r.text }; methodsUsed.push('WordPress REST API'); }
-            return null;
-          }).catch(function () { return null; })
-          .then(function () {
             var extra = [];
             if (probes.posts) {
-              try {
-                var j = JSON.parse(probes.posts.text);
-                extra.push((Array.isArray(j) ? j.map(function (p) { return p.content && p.content.rendered || ''; }).join(' ') : ''));
-              } catch (e) { extra.push(probes.posts.text); }
+              try { var j = JSON.parse(probes.posts.text); extra.push(Array.isArray(j) ? j.map(function (p) { return p.content && p.content.rendered || ''; }).join(' ') : ''); } catch (e) { extra.push(probes.posts.text); }
             }
-            var c2 = rankCandidates(doc || document.implementation.createHTMLDocument(''), extra);
+            var c2 = rankCandidates(doc || emptyDoc(), extra);
             if (c2.length) return c2;
-            return fetchText(origin + '/wp-json/oembed/1.0/embed?url=' + encodeURIComponent(scanInfo.finalUrl), { cap: 131072, accept: 'application/json,*/*;q=0.5' })
-              .then(function (r) {
-                if (r.status === 200) { probes.oembed = { status: r.status, text: r.text }; methodsUsed.push('WordPress REST API'); }
+            return softFetch(origin + '/wp-json/oembed/1.0/embed?url=' + encodeURIComponent(scanInfo.finalUrl || urlObj.href), { cap: 131072, accept: 'application/json,*/*;q=0.5' })
+              .then(function (r3) {
+                if (r3.status === 200) { probes.oembed = { status: r3.status, text: r3.text }; methodsUsed.push('WordPress REST API'); }
                 var oeExtra = [];
                 if (probes.oembed) { try { oeExtra.push(JSON.parse(probes.oembed.text).html || ''); } catch (e) {} }
-                return rankCandidates(doc || document.implementation.createHTMLDocument(''), extra.concat(oeExtra));
-              }).catch(function () { return c2; });
+                return rankCandidates(doc || emptyDoc(), extra.concat(oeExtra));
+              });
           });
       }
       return chain.then(function (candidates) {
-        if (!candidates.length) return { candidates: [] };
+        if (!candidates.length) return { candidates: [], robotsText: robotsText };
         var cand = candidates[0];
         methodsUsed.push('HTML source analysis', 'CSS URLs', 'JavaScript URLs', 'Enqueued assets');
-        // style.css
         onProgress({ stage: 'stylesheet', message: 'Reading the theme stylesheet header…' });
-        return fetchText(origin + '/wp-content/themes/' + cand.slug + '/style.css', { cap: 262144, accept: 'text/css,*/*;q=0.1' })
-          .catch(function (e) { return { url: '', status: 0, text: '', via: 'error', error: e.code, bytes: 0 }; })
+        return softFetch(origin + '/wp-content/themes/' + cand.slug + '/style.css', { cap: 262144, accept: 'text/css,*/*;q=0.1' })
           .then(function (styleRes) {
-            var out = { candidates: candidates, cand: cand, themeCssRes: { attempted: true, status: styleRes.status || 0, text: styleRes.text || '', error: styleRes.error } };
             methodsUsed.push('style.css header');
-            return out;
+            return { candidates: candidates, cand: cand, themeCssRes: { attempted: true, status: styleRes.status || 0, text: styleRes.text || '', error: styleRes.error }, robotsText: robotsText };
           });
       });
     }
@@ -324,23 +410,24 @@
       if (!phase.cand) return phase;
       var tmpl = null;
       if (phase.themeCssRes && phase.themeCssRes.status === 200 && phase.themeCssRes.text) {
-        var mm = phase.themeCssRes.text.match(/^\s*\/\*[\s\S]*?\*\//);
-        var tm = mm && mm[0].match(/^\s*Template\ *:\s*(.+)$/mi) || phase.themeCssRes.text.match(/^Template\ *:\s*(.+)$/mi);
+        var block = phase.themeCssRes.text.slice(0, 16384);
+        var open = block.indexOf('/*');
+        var close = open >= 0 ? block.indexOf('*/', open) : -1;
+        var head = close >= 0 ? block.slice(open + 2, close) : '';
+        var tm = head.match(/^\s*Template\s*:\s*(.+)$/mi);
         if (tm) tmpl = tm[1].trim().toLowerCase();
       }
       var chain = Promise.resolve(phase);
       if (tmpl && /^[a-z0-9][a-z0-9 _.-]{0,78}$/.test(tmpl) && tmpl.indexOf('..') < 0) {
         onProgress({ stage: 'parent', message: 'Child theme found — reading the parent theme…' });
         phase.templateSlug = tmpl.replace(/ /g, '-');
-        chain = fetchText(origin + '/wp-content/themes/' + phase.templateSlug + '/style.css', { cap: 262144, accept: 'text/css,*/*;q=0.1' })
-          .then(function (r) { phase.parentCssRes = { attempted: true, status: r.status, text: r.text }; return phase; })
-          .catch(function (e) { phase.parentCssRes = { attempted: true, status: 0, text: '', error: e.code }; return phase; });
+        chain = softFetch(origin + '/wp-content/themes/' + phase.templateSlug + '/style.css', { cap: 262144, accept: 'text/css,*/*;q=0.1' })
+          .then(function (r) { phase.parentCssRes = { attempted: true, status: r.status, text: r.text || '' }; return phase; });
       }
       return chain.then(function (ph) {
-        // main enqueued theme CSS (different from style.css) for fingerprints
-        var doc = parseDoc(home.text);
+        var doc = home ? parseDoc(home.text) : null;
         var mainHref = null;
-        if (doc) {
+        if (doc && doc.querySelectorAll) {
           var links = doc.querySelectorAll('link[rel~="stylesheet"]');
           var slugRe = new RegExp('/wp-content/themes/' + ph.cand.slug.replace(/[^a-z0-9_.-]/gi, '') + '/', 'i');
           for (var i = 0; i < links.length; i++) {
@@ -350,14 +437,14 @@
         }
         if (!mainHref) return ph;
         var abs = mainHref;
-        try { abs = new URL(mainHref, scanInfo.finalUrl).toString(); } catch (e) {}
+        try { abs = new URL(mainHref, scanInfo.finalUrl || urlObj.href).toString(); } catch (e) {}
         if (abs === origin + '/wp-content/themes/' + ph.cand.slug + '/style.css') return ph;
         onProgress({ stage: 'fingerprints', message: 'Matching theme fingerprints…' });
-        return fetchText(abs, { cap: 300000, accept: 'text/css,*/*;q=0.1' })
+        return softFetch(abs, { cap: 300000, accept: 'text/css,*/*;q=0.1' })
           .then(function (r) {
             if (r.status === 200 && r.text) { ph.mainCss = { url: abs, status: 200, text: r.text }; methodsUsed.push('CSS analysis'); }
             return ph;
-          }).catch(function () { return ph; });
+          });
       });
     }
 
@@ -388,10 +475,8 @@
           { key: 'changelog', label: 'Changelog file', url: base + 'changelog.txt', note: 'Changelog that may reveal precise versions.' }
         ];
         return Promise.all(defs.map(function (d) {
-          return fetchText(d.url, { cap: 2048 }).then(function (r) {
-            return { key: d.key, label: d.label, note: d.note, url: d.url, status: r.status, ct: (r.headers && (r.headers['content-type'] || r.headers[':ct'])) || '', text: (r.text || '').slice(0, 2048) };
-          }).catch(function (e) {
-            return { key: d.key, label: d.label, note: d.note, url: d.url, status: 0, ct: '', text: '', error: e.code || 'error' };
+          return softFetch(d.url, { cap: 2048 }).then(function (r) {
+            return { key: d.key, label: d.label, note: d.note, url: d.url, status: r.status, ct: (r.headers && r.headers['content-type']) || '', text: (r.text || '').slice(0, 2048) };
           });
         })).then(function (raw) {
           ph.exposureRaw = raw;
@@ -400,9 +485,10 @@
       });
     }
 
-    return robotsAndHome()
-      .then(wpSignals)
-      .then(function (ctx) { return themePhase(ctx).then(function (phase) { phase.robotsText = ctx.robotsText; return phase; }); })
+    return getHome()
+      .then(tryWayback)
+      .then(robotsAndRest)
+      .then(themePhase)
       .then(parentAndCss)
       .then(screenshotAndExposure)
       .then(function (phase) {
@@ -417,6 +503,8 @@
           headers: {},
           headersAvailable: false,
           homeHtml: home ? home.text : '',
+          homeBlocked: homeBlocked,
+          homeArchived: homeArchived,
           robotsText: phase.robotsText || '',
           probes: probes,
           candidates: phase.candidates || [],
