@@ -11,6 +11,7 @@ const brokenlinkApi = require('./lib/brokenlink/api');
 const llmstxtApi = require('./lib/llmstxt/api');
 const botblockerApi = require('./lib/botblocker/api');
 const cwvApi = require('./lib/cwv/api');
+const rssApi = require('./lib/rss/api');
 
 const criticalCss = fs.readFileSync('assets/css/style.css', 'utf8');
 const esc = s => String(s ?? '').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
@@ -31,6 +32,7 @@ function otherToolsMenu(active) {
       <a href="/llms-txt-generator" role="menuitem" class="${active==='llmstxt'?'is-active':''}">${icon('auto_stories')}<span><b>LLMs.txt Generator</b><small>Generate &amp; validate an llms.txt file</small></span></a>
       <a href="/ai-crawler-blocker" role="menuitem" class="${active==='botblocker'?'is-active':''}">${icon('security')}<span><b>AI Crawler &amp; LLM Bot Blocker</b><small>Control AI bots via robots.txt + server rules</small></span></a>
       <a href="/core-web-vitals-auditor" role="menuitem" class="${active==='cwv'?'is-active':''}">${icon('speed')}<span><b>Core Web Vitals &amp; INP Auditor</b><small>Real LCP / INP / CLS / FCP / TTFB measurement</small></span></a>
+      <a href="/rss-feed-generator" role="menuitem" class="${active==='rss'?'is-active':''}">${icon('rss_feed')}<span><b>RSS Feed Generator</b><small>Discover content, extract metadata &amp; generate valid RSS</small></span></a>
     </div></details>`;
 }
 
@@ -40,7 +42,7 @@ function layout(title, body, opts) {
   const scripts = opts.scripts || ['/assets/js/common.js','/assets/js/audit.js'];
   const meta = opts.meta || '';
   const jsonLd = opts.jsonLd ? `<script type="application/ld+json">${JSON.stringify(opts.jsonLd)}</script>` : '';
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">${meta}<title>${esc(title)}</title><link rel="canonical" href="${opts.canonical||'https://huvanti.com/'}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Icons&display=swap" rel="stylesheet"><style>${criticalCss}</style>${jsonLd}</head><body><a class="skip-link" href="#main">Skip to content</a><div class="app"><header class="appbar"><div class="toolbar"><a class="brand" href="/">${icon('travel_explore')}<span class="brand-name">huvanti</span></a><nav class="desktop-nav" aria-label="Primary"><a href="/">${icon('home')}<span>Home</span></a>${otherToolsMenu(active)}<a href="/about">${icon('info')}<span>About</span></a><a href="/contact">${icon('mail')}<span>Contact</span></a></nav><button type="button" class="icon-button theme-toggle" aria-label="toggle theme" id="theme-toggle"><span class="material-icons">brightness_4</span></button></div></header><main id="main">${body}</main><footer class="footer"><div class="container footer-grid"><div><div class="footer-brand">huvanti</div><p class="footer-tagline">Free, no-account website tools.</p></div><div><div class="footer-heading">Tools</div><div class="footer-links"><a href="/">SEO Audit</a><a href="/adsense-eligibility-checker">AdSense Eligibility Checker</a><a href="/ezoic-eligibility-checker">Ezoic Eligibility Checker</a><a href="/mediavine-eligibility-checker">Mediavine Eligibility Checker</a><a href="/raptive-eligibility-checker">Raptive Eligibility Checker</a><a href="/wordpress-theme-detector">WordPress Theme Detector</a><a href="/domain-information-checker">Domain Information Checker</a><a href="/xml-sitemap-generator">XML Sitemap Generator</a><a href="/broken-link-checker">Broken Link Checker</a><a href="/llms-txt-generator">LLMs.txt Generator</a><a href="/ai-crawler-blocker">AI Crawler &amp; LLM Bot Blocker</a><a href="/core-web-vitals-auditor">Core Web Vitals &amp; INP Auditor</a></div></div><div><div class="footer-heading">Pages</div><div class="footer-links"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div></div></div><div class="container footer-copyright">&copy; 2026 huvanti. All rights reserved. Not affiliated with Google, Ezoic or Mediavine.</div></footer></div>${scripts.map(s=>`<script src="${s}"></script>`).join('')}</body></html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">${meta}<title>${esc(title)}</title><link rel="canonical" href="${opts.canonical||'https://huvanti.com/'}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Icons&display=swap" rel="stylesheet"><style>${criticalCss}</style>${jsonLd}</head><body><a class="skip-link" href="#main">Skip to content</a><div class="app"><header class="appbar"><div class="toolbar"><a class="brand" href="/">${icon('travel_explore')}<span class="brand-name">huvanti</span></a><nav class="desktop-nav" aria-label="Primary"><a href="/">${icon('home')}<span>Home</span></a>${otherToolsMenu(active)}<a href="/about">${icon('info')}<span>About</span></a><a href="/contact">${icon('mail')}<span>Contact</span></a></nav><button type="button" class="icon-button theme-toggle" aria-label="toggle theme" id="theme-toggle"><span class="material-icons">brightness_4</span></button></div></header><main id="main">${body}</main><footer class="footer"><div class="container footer-grid"><div><div class="footer-brand">huvanti</div><p class="footer-tagline">Free, no-account website tools.</p></div><div><div class="footer-heading">Tools</div><div class="footer-links"><a href="/">SEO Audit</a><a href="/adsense-eligibility-checker">AdSense Eligibility Checker</a><a href="/ezoic-eligibility-checker">Ezoic Eligibility Checker</a><a href="/mediavine-eligibility-checker">Mediavine Eligibility Checker</a><a href="/raptive-eligibility-checker">Raptive Eligibility Checker</a><a href="/wordpress-theme-detector">WordPress Theme Detector</a><a href="/domain-information-checker">Domain Information Checker</a><a href="/xml-sitemap-generator">XML Sitemap Generator</a><a href="/broken-link-checker">Broken Link Checker</a><a href="/llms-txt-generator">LLMs.txt Generator</a><a href="/ai-crawler-blocker">AI Crawler &amp; LLM Bot Blocker</a><a href="/core-web-vitals-auditor">Core Web Vitals &amp; INP Auditor</a><a href="/rss-feed-generator">RSS Feed Generator</a></div></div><div><div class="footer-heading">Pages</div><div class="footer-links"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div></div></div><div class="container footer-copyright">&copy; 2026 huvanti. All rights reserved. Not affiliated with Google, Ezoic or Mediavine.</div></footer></div>${scripts.map(s=>`<script src="${s}"></script>`).join('')}</body></html>`;
 }
 
 function home() {
@@ -605,13 +607,59 @@ function cwvPage() {
   });
 }
 
+function rssPage() {
+  const meta = `<meta name="description" content="Free RSS Feed Generator. Enter a website URL and automatically discover content, sitemaps and existing feeds, extract real article metadata, validate URLs, and download a standards-compliant RSS 2.0 feed — no account, no AI, no paid APIs.\"><meta name="robots" content="index,follow">
+<meta property="og:title" content="RSS Feed Generator — huvanti"><meta property="og:description" content="Website discovery, metadata extraction, canonical and duplicate handling, broken-URL checks and a validated RSS 2.0 (or Atom 1.0) feed — deterministic, no fabricated data."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
+  const jsonLd = {'@context': 'https://schema.org', '@graph': [
+    {'@type': 'WebSite', name: 'huvanti', url: 'https://huvanti.com/'},
+    {'@type': 'WebApplication', name: 'RSS Feed Generator', applicationCategory: 'DeveloperApplication', operatingSystem: 'Any', browserRequirements: 'Requires JavaScript', featureList: 'URL validation, SSRF-safe crawling, robots.txt respect, sitemap discovery, existing RSS/Atom detection, article metadata extraction, publication date detection, canonical URL handling, duplicate removal, broken URL validation, content sanitization, RSS 2.0 and Atom 1.0 generation, XML validation, quality score, manual editing, comparison, export', offers: {'@type': 'Offer', price: '0', priceCurrency: 'USD'}, description: 'Free deterministic RSS feed generator that crawls a public website, extracts real article metadata and produces a validated, standards-compliant RSS feed. No account, no AI, no paid APIs.'}
+  ]};
+  const body = `<section class="hero audit-home rss-home"><span class="material-icons hero-icon" aria-hidden="true">rss_feed</span><h1>RSS Feed Generator</h1><p class="hero-subtitle">Discover a site's real content, extract accurate article metadata and generate a validated, standards-compliant RSS feed. No account, no AI, no paid APIs.</p>
+<form id="rss-form" class="rss-form" aria-label="RSS Feed Generator">
+  <div class="mode-tabs" role="radiogroup" aria-label="Mode"><label><input type="radio" name="mode" value="website" checked> Generate from Website</label><label><input type="radio" name="mode" value="sitemap"> Generate from Sitemap</label></div>
+  <div class="search-field audit-search"><span class="material-icons" aria-hidden="true">link</span><input id="rss-url" name="url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL or sitemap URL"><button class="btn" type="submit">Generate RSS Feed</button></div>
+  <details class="sitemap-options rss-options"><summary>${icon('tune')} Feed settings</summary>
+    <div class="sitemap-option-row"><label>Number of items <select name="maxItems" class="select"><option value="10">10</option><option value="20" selected>20</option><option value="25">25</option><option value="50">50</option><option value="100">100</option><option value="250">250</option></select></label><label>Max pages to scan <select name="maxPages" class="select"><option value="25">25</option><option value="60" selected>60</option><option value="100">100</option><option value="200">200</option><option value="400">400</option></select></label><label>Crawl depth <select name="maxDepth" class="select"><option value="2">2</option><option value="3" selected>3</option><option value="5">5</option><option value="10">10</option></select></label></div>
+    <div class="sitemap-option-row"><label>Feed content <select name="contentMode" class="select"><option value="excerpt" selected>Excerpt</option><option value="full">Full Content</option><option value="description">Description Only</option></select></label><label>Feed format <select name="feedMode" class="select"><option value="standard" selected>Standard RSS 2.0</option><option value="news">News Feed Mode</option><option value="podcast">Podcast RSS Mode</option></select></label><label>Sort order <select name="sortOrder" class="select"><option value="newest" selected>Newest First</option><option value="oldest">Oldest First</option><option value="manual">Manual Order</option></select></label></div>
+    <div class="sitemap-option-row"><label><input type="checkbox" name="incImages" checked> Include Images</label><label><input type="checkbox" name="incAuthors" checked> Include Authors</label><label><input type="checkbox" name="incCategories" checked> Include Categories</label><label><input type="checkbox" name="incDates" checked> Include Publication Date</label><label><input type="checkbox" name="excUndated" checked> Exclude items without dates</label><label><input type="checkbox" name="includeSubdomains"> Include subdomains</label></div>
+  </details>
+</form>
+<div class="audit-trust"><span>No account</span><span>No AI API</span><span>Robots.txt respected</span><span>Existing feed detection</span><span>Canonical URLs</span><span>No fabricated data</span><span>XML validated</span><span>Download ready</span></div></section>
+<div id="rss-results" class="audit-results rss-results"></div>
+<div class="container section"><div class="section-heading-row">${icon('verified')}<h4 style="margin:0;">A real discovery → extraction → validation pipeline</h4></div><div class="grid feature-grid">
+  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('search')} Content discovery</h6><p>Homepage, sitemaps (including indexes, with lastmod), robots.txt declarations, internal links, blog navigation, category pages and existing feeds — prioritising real content pages. Not every URL is assumed to be an article.</p></div></div></div>
+  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('data_object')} Accurate metadata</h6><p>Title (JSON-LD headline → Open Graph → title → H1), description (meta → OG → first paragraph), publication date (structured data → article:published_time → time[datetime] → visible line; sitemap lastmod only as a labelled fallback), author, categories and images — with priority rules and no invented values.</p></div></div></div>
+  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('link') } Canonicals, duplicates &amp; broken URLs</h6><p>Tracking parameters, fragments and www variants normalised; canonical URLs preferred; duplicates removed by URL, canonical and identical title; every item URL verified (404/410/5xx/DNS/timeout excluded with the reason).</p></div></div></div>
+  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('rss_feed')} Existing feed detection</h6><p>Checks /feed/, /rss.xml, /rss/, /feed.xml, /atom.xml and rel="alternate" references. If a valid feed exists it is surfaced with Use Existing Feed, Generate New Feed and a full comparison — never silently duplicated.</p></div></div></div>
+  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('code')} Validated XML</h6><p>RSS 2.0 (optional genuine Atom 1.0) with correct escaping, CDATA for HTML content, RFC 822 dates, unique GUIDs, absolute URLs and only the namespaces actually used. The feed is not presented as valid unless validation passes.</p></div></div></div>
+  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('edit')} Manual control &amp; export</h6><p>Editable item table (title, URL, description, date, category, author, include/exclude, order), manual item addition, visual + XML previews, quality score with breakdown, and downloads: rss.xml, atom.xml, JSON article data.</p></div></div></div>
+</div></div>
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('help')}<h4 style="margin:0;">FAQ</h4></div><div class="faq-accordion">
+<details><summary>Does this tool use AI or an API?</summary><p>No. Discovery, classification, metadata extraction, date detection, deduplication, generation and validation are all deterministic code. No OpenAI, Gemini, Claude or paid RSS/SEO APIs, and no account.</p></details>
+<details><summary>What if the website already has a feed?</summary><p>The tool checks the standard locations plus rel="alternate" references. If a valid feed is found it shows <b>Existing RSS feed detected</b> with the URL and lets you Use Existing Feed, Generate New Feed, or Compare — it never modifies or replaces your feed automatically. On WordPress it notes the built-in /feed/ may already be sufficient.</p></details>
+<details><summary>What if a page has no publication date?</summary><p>No date is invented. The item is shown with "Unknown", excluded by default (toggle available), or can be assigned a date manually in the table. Sitemap lastmod is only used as a clearly-labelled fallback, never presented as a publication date.</p></details>
+<details><summary>Will a blocked or JavaScript-only site produce a feed?</summary><p>The tool reports what actually blocked it: robots.txt restrictions, bot protection (Cloudflare, CAPTCHA), 403/429, DNS, SSL or timeouts. A blocked site is never claimed to have "no articles". You can still add items manually.</p></details>
+<details><summary>Is the quality score an official score?</summary><p>No. It is a transparent tool-generated diagnostic computed from XML validity, URL validity, item completeness, date coverage, duplicate rate, broken-URL rate, canonical consistency and content relevance. It is not a Google score and publishing a feed never guarantees indexing or traffic.</p></details>
+<details><summary>Which sites work with this?</summary><p>Any public website — WordPress, WooCommerce, Next.js, React, Laravel, PHP, static HTML, Shopify, Webflow, Drupal, Joomla and more — using public HTTP/HTTPS only. Private IPs, localhost and metadata endpoints are refused, and every redirect is re-validated.</p></details>
+</div></div>`;
+  return layout('RSS Feed Generator — Free Website-to-RSS Tool | huvanti', body, {
+    active: 'rss', canonical: 'https://huvanti.com/rss-feed-generator', meta, jsonLd,
+    scripts: ['/assets/js/common.js', '/assets/js/rss/browser.js', '/assets/js/rss/ui.js']
+  });
+}
+
 function page(name) { return layout(name, `<div class="container page"><h1 class="page-title">${esc(name)}</h1><div class="paper paper-padded"><p>huvanti provides free, no-account website tools including an SEO audit, AdSense/Ezoic/Mediavine/Raptive eligibility checkers, a WordPress theme detector, a domain information checker, and an XML sitemap generator and a broken link checker.</p></div></div>`); }
 
 function readJson(req){ return new Promise(resolve=>{let b=''; req.on('data',d=>b+=d); req.on('end',()=>{try{resolve(JSON.parse(b||'{}'))}catch{resolve({})}});}); }
 
+/* Safety net: one bad request must never take the whole server down. */
+process.on('unhandledRejection', (e) => { console.error('unhandledRejection:', e && e.message); });
+process.on('uncaughtException', (e) => { console.error('uncaughtException:', e && e.message); });
+
 http.createServer(async (req,res)=>{
   const u = new URL(req.url, 'http://local');
   const p = decodeURIComponent(u.pathname).replace(/\/$/, '') || '/';
+  try {
   if (p === '/api/audit' && req.method === 'POST') {
     const body = await readJson(req);
     res.setHeader('content-type','application/json; charset=utf-8');
@@ -699,6 +747,21 @@ http.createServer(async (req,res)=>{
     await botblockerApi.handle(req, res, body);
     return;
   }
+  if (p === '/api/rss' && req.method === 'POST') {
+    const body = await readJson(req);
+    await rssApi.handle(req, res, body);
+    return;
+  }
+  if (p === '/api/rss-finalize' && req.method === 'POST') {
+    const body = await readJson(req);
+    await rssApi.handleFinalize(req, res, body);
+    return;
+  }
+  if (p === '/api/rss-browser' && req.method === 'POST') {
+    const body = await readJson(req);
+    await rssApi.handleBrowser(req, res, body);
+    return;
+  }
   if (p === '/api/cwv-fetch' && req.method === 'POST') {
     const body = await readJson(req);
     await cwvApi.handleFetch(req, res, body);
@@ -747,7 +810,18 @@ http.createServer(async (req,res)=>{
   else if (p === '/llms-txt-generator') html = llmstxtPage();
   else if (p === '/ai-crawler-blocker') html = botblockerPage();
   else if (p === '/core-web-vitals-auditor') html = cwvPage();
+  else if (p === '/rss-feed-generator') html = rssPage();
   else if (['/about','/contact','/privacy','/terms'].includes(p)) html = page(p.slice(1).replace(/^./,c=>c.toUpperCase()));
   else html = layout('Not found', `<div class="container notfound"><h1>404</h1><p>Page not found.</p><a class="btn" href="/">Back home</a></div>`);
   res.setHeader('content-type','text/html; charset=utf-8'); res.setHeader('cache-control','no-store'); res.end(html);
+  } catch (e) {
+    console.error('request error:', p, e && e.message);
+    try {
+      if (!res.headersSent) {
+        res.statusCode = 500;
+        res.setHeader('content-type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ code: 'error', message: 'Internal error.' }));
+      } else { try { res.end(); } catch {} }
+    } catch {}
+  }
 }).listen(process.env.PORT || 3000, '0.0.0.0', () => console.log('huvanti preview running'));
