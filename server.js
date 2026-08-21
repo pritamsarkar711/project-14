@@ -329,8 +329,8 @@ function brokenlinkPage() {
     <div class="sitemap-option-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
       <label>Maximum Pages
         <select id="bl-max-pages" class="select">
-          <option value="100" selected>100</option>
-          <option value="500">500</option>
+          <option value="100">100</option>
+          <option value="500" selected>500</option>
           <option value="1000">1,000</option>
           <option value="5000">5,000</option>
           <option value="10000">10,000</option>
@@ -342,8 +342,8 @@ function brokenlinkPage() {
         <select id="bl-max-depth" class="select">
           <option value="1">1</option>
           <option value="2">2</option>
-          <option value="3" selected>3</option>
-          <option value="5">5</option>
+          <option value="3">3</option>
+          <option value="5" selected>5</option>
           <option value="10">10</option>
           <option value="unlimited">Unlimited</option>
         </select>
