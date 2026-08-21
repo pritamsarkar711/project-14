@@ -1,7 +1,7 @@
 {
   "scripts": {
     "dev": "node server.js",
-    "test": "node lib/wptheme/selftest.js && node lib/wptheme/uitest.js"
+    "test": "node lib/wptheme/selftest.js && node lib/wptheme/uitest.js && node lib/domaincheck/selftest.js && node lib/domaincheck/uitest.js"
   },
   "dependencies": {},
   "devDependencies": {}

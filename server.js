@@ -6,6 +6,7 @@ const mediavineApi = require('./lib/mediavine/api');
 const raptiveApi = require('./lib/raptive/api');
 const wpthemeApi = require('./lib/wptheme/api');
 const sitemapApi = require('./lib/sitemap/api');
+const domaincheckApi = require('./lib/domaincheck/api');
 
 const criticalCss = fs.readFileSync('assets/css/style.css', 'utf8');
 const esc = s => String(s ?? '').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
@@ -20,6 +21,7 @@ function otherToolsMenu(active) {
       <a href="/mediavine-eligibility-checker" role="menuitem" class="${active==='mediavine'?'is-active':''}">${icon('trending_up')}<span><b>Mediavine Eligibility Checker</b><small>Website readiness for Mediavine</small></span></a>
       <a href="/raptive-eligibility-checker" role="menuitem" class="${active==='raptive'?'is-active':''}">${icon('campaign')}<span><b>Raptive Eligibility Checker</b><small>Website readiness for Raptive</small></span></a>
       <a href="/wordpress-theme-detector" role="menuitem" class="${active==='wptheme'?'is-active':''}">${icon('palette')}<span><b>WordPress Theme Detector</b><small>Detect the active WP theme</small></span></a>
+      <a href="/domain-information-checker" role="menuitem" class="${active==='domaincheck'?'is-active':''}">${icon('dns')}<span><b>Domain Information Checker</b><small>DNS, WHOIS, SSL &amp; hosting intelligence</small></span></a>
       <a href="/xml-sitemap-generator" role="menuitem" class="${active==='sitemap'?'is-active':''}">${icon('account_tree')}<span><b>XML Sitemap Generator</b><small>Crawl, validate &amp; export XML sitemaps</small></span></a>
     </div></details>`;
 }
@@ -30,7 +32,7 @@ function layout(title, body, opts) {
   const scripts = opts.scripts || ['/assets/js/common.js','/assets/js/audit.js'];
   const meta = opts.meta || '';
   const jsonLd = opts.jsonLd ? `<script type="application/ld+json">${JSON.stringify(opts.jsonLd)}</script>` : '';
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">${meta}<title>${esc(title)}</title><link rel="canonical" href="${opts.canonical||'https://huvanti.com/'}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Icons&display=swap" rel="stylesheet"><style>${criticalCss}</style>${jsonLd}</head><body><a class="skip-link" href="#main">Skip to content</a><div class="app"><header class="appbar"><div class="toolbar"><a class="brand" href="/">${icon('travel_explore')}<span class="brand-name">huvanti</span></a><nav class="desktop-nav" aria-label="Primary"><a href="/">${icon('home')}<span>Home</span></a>${otherToolsMenu(active)}<a href="/about">${icon('info')}<span>About</span></a><a href="/contact">${icon('mail')}<span>Contact</span></a></nav><button type="button" class="icon-button theme-toggle" aria-label="toggle theme" id="theme-toggle"><span class="material-icons">brightness_4</span></button></div></header><main id="main">${body}</main><footer class="footer"><div class="container footer-grid"><div><div class="footer-brand">huvanti</div><p class="footer-tagline">Free, no-account website tools.</p></div><div><div class="footer-heading">Tools</div><div class="footer-links"><a href="/">SEO Audit</a><a href="/adsense-eligibility-checker">AdSense Eligibility Checker</a><a href="/ezoic-eligibility-checker">Ezoic Eligibility Checker</a><a href="/mediavine-eligibility-checker">Mediavine Eligibility Checker</a><a href="/raptive-eligibility-checker">Raptive Eligibility Checker</a><a href="/wordpress-theme-detector">WordPress Theme Detector</a><a href="/xml-sitemap-generator">XML Sitemap Generator</a></div></div><div><div class="footer-heading">Pages</div><div class="footer-links"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div></div></div><div class="container footer-copyright">&copy; 2026 huvanti. All rights reserved. Not affiliated with Google, Ezoic or Mediavine.</div></footer></div>${scripts.map(s=>`<script src="${s}"></script>`).join('')}</body></html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">${meta}<title>${esc(title)}</title><link rel="canonical" href="${opts.canonical||'https://huvanti.com/'}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Icons&display=swap" rel="stylesheet"><style>${criticalCss}</style>${jsonLd}</head><body><a class="skip-link" href="#main">Skip to content</a><div class="app"><header class="appbar"><div class="toolbar"><a class="brand" href="/">${icon('travel_explore')}<span class="brand-name">huvanti</span></a><nav class="desktop-nav" aria-label="Primary"><a href="/">${icon('home')}<span>Home</span></a>${otherToolsMenu(active)}<a href="/about">${icon('info')}<span>About</span></a><a href="/contact">${icon('mail')}<span>Contact</span></a></nav><button type="button" class="icon-button theme-toggle" aria-label="toggle theme" id="theme-toggle"><span class="material-icons">brightness_4</span></button></div></header><main id="main">${body}</main><footer class="footer"><div class="container footer-grid"><div><div class="footer-brand">huvanti</div><p class="footer-tagline">Free, no-account website tools.</p></div><div><div class="footer-heading">Tools</div><div class="footer-links"><a href="/">SEO Audit</a><a href="/adsense-eligibility-checker">AdSense Eligibility Checker</a><a href="/ezoic-eligibility-checker">Ezoic Eligibility Checker</a><a href="/mediavine-eligibility-checker">Mediavine Eligibility Checker</a><a href="/raptive-eligibility-checker">Raptive Eligibility Checker</a><a href="/wordpress-theme-detector">WordPress Theme Detector</a><a href="/domain-information-checker">Domain Information Checker</a><a href="/xml-sitemap-generator">XML Sitemap Generator</a></div></div><div><div class="footer-heading">Pages</div><div class="footer-links"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div></div></div><div class="container footer-copyright">&copy; 2026 huvanti. All rights reserved. Not affiliated with Google, Ezoic or Mediavine.</div></footer></div>${scripts.map(s=>`<script src="${s}"></script>`).join('')}</body></html>`;
 }
 
 function home() {
@@ -229,6 +231,46 @@ function wpthemePage() {
 }
 
 
+function domainInfoPage() {
+  const meta = `<meta name="description" content="Free Domain Information Checker. Enter a domain or URL for an evidence-based report: registration, WHOIS/RDAP, DNS records, hosting, CDN, SSL/TLS, HTTP, email security, DNSSEC and technology — no account, no AI."><meta name="robots" content="index,follow">
+<meta property="og:title" content="Domain Information Checker — huvanti"><meta property="og:description" content="Evidence-based domain intelligence from RDAP, WHOIS, DNS, TLS and HTTP — with sources and confidence for every value. Never fabricates data. No account required."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
+  const jsonLd = {'@context':'https://schema.org','@graph':[
+    {'@type':'WebSite',name:'huvanti',url:'https://huvanti.com/'},
+    {'@type':'WebApplication',name:'Domain Information Checker',applicationCategory:'DeveloperApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',featureList:'Domain validation, RDAP/WHOIS registration data, domain age, DNS records, DNS health, nameserver analysis, hosting detection, CDN detection, SSL/TLS certificate, HTTP status and redirects, email security, DNSSEC, TLD information, IDN/punycode, technology detection, evidence and confidence',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free, deterministic domain information checker that reports only publicly verifiable data. No login, no account, no AI, no paid SEO API.'}
+  ]};
+  const body = `<section class="hero audit-home domaincheck-home"><span class="material-icons hero-icon" aria-hidden="true">dns</span><h1>Domain Information Checker</h1><p class="hero-subtitle">Publicly verifiable domain intelligence — RDAP, DNS, hosting, SSL, email &amp; more. No account, no AI.</p>
+<form id="domaincheck-form" class="search-field audit-search" role="search" aria-label="Domain information checker"><span class="material-icons" aria-hidden="true">dns</span><input id="domaincheck-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="example.com or https://example.com" required aria-label="Domain name or URL"><button class="btn" type="submit">Check Domain</button></form>
+<div class="audit-trust"><span>RDAP + WHOIS</span><span>DNS &amp; DNSSEC</span><span>Hosting &amp; ASN</span><span>CDN detection</span><span>SSL / TLS</span><span>HTTP &amp; redirects</span><span>Email security</span><span>Evidence-based</span></div></section>
+<div id="domaincheck-results" class="audit-results domaincheck-results"></div>
+<div class="container section">
+  <div class="section-heading-row">${icon('rule_folder')}<h4 style="margin:0;">What this checker actually does</h4></div>
+  <div class="grid feature-grid">
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('assignment')} Registration intelligence (RDAP first)</h6><p>Queries the registry’s official RDAP service, with the IANA-assigned WHOIS server as fallback. Registration/expiration dates, registrar, IANA ID, EPP statuses (explained in plain language) and DNSSEC delegation — only when publicly available.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('storage')} DNS &amp; nameservers</h6><p>A, AAAA, CNAME, MX, NS, TXT, CAA, SOA, SRV, DS and DNSKEY records with a non-alarmist DNS health panel. Nameserver IPs, networks and DNS-provider detection are shown with their signals.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('router')} Hosting vs CDN — kept separate</h6><p>ASN/BGP data, network fingerprints and reverse DNS identify the network. When a CDN proxies the site, the report says <b>CDN/Proxy: Cloudflare</b> and <b>Origin Hosting: Not publicly determinable</b> — the proxy is never claimed as the host.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('lock')} SSL/TLS &amp; HTTP</h6><p>Certificate issuer, validity window, days remaining, SANs, chain status, TLS version and hostname match; HTTP status, response time, redirect chain, HSTS, compression and cache headers. Handshake-only checks — no intrusive testing.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('mail')} Email infrastructure</h6><p>MX servers and provider, SPF and DMARC policies, and DKIM for a small set of common selectors only (never brute-forced). SPF presence is never presented as “fully protected”.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('verified')} Accuracy over completeness</h6><p>Every major value carries its source, confidence and timestamp. Conflicting sources are shown side by side. Anything unavailable is labelled <b>Not publicly available</b> or <b>Unable to Verify</b> — never invented.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('timeline')} Domain age &amp; timeline</h6><p>Age is computed from the official registration date only — years, months, days and total days — with a Registered → Updated → Now → Expires timeline and expiration warnings. No registration date? It says so.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('memory')} Technology fingerprints</h6><p>Heuristic detection of WordPress, Shopify, Wix, Webflow, Drupal, Joomla, Laravel, Next.js, React, Vue, Angular, PHP, Node.js, Google Analytics/GTM and CDNs from public fingerprints — with confidence, never claimed as certain.</p></div></div></div>
+    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('security')} Safe by design</h6><p>Domain input is treated as untrusted: private/loopback/metadata targets are refused, redirects are re-validated, lookups are rate-limited, cached per scan and strictly budgeted. No login, no AI, no paid SEO API.</p></div></div></div>
+  </div>
+</div>
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('help')}<h4 style="margin:0;">FAQ</h4></div><div class="faq-accordion">
+<details><summary>Is this a WHOIS lookup?</summary><p>It is a complete domain intelligence report: RDAP/WHOIS registration data, DNS records and health, nameservers, IP/ASN/hosting, CDN detection, SSL/TLS, HTTP and redirects, email security, DNSSEC, TLD and IDN information, domain age, timeline, and heuristic technology detection.</p></details>
+<details><summary>Where does the data come from?</summary><p>Directly from public sources: the registry’s RDAP/WHOIS services, public DNS resolvers, BGP/ASN data, TLS handshakes and HTTP responses, plus a local fingerprint database. Every major result shows its source, confidence and timestamp in the report.</p></details>
+<details><summary>Does it guess or use AI?</summary><p>No. Nothing is fabricated and no LLM/API is involved. If a value (registration date, registrar, hosting, IP, ASN, SSL issuer…) cannot be verified, the report says <b>Not publicly available</b> or <b>Unable to Verify</b> — and conflicting sources are shown instead of being merged silently.</p></details>
+<details><summary>Why does the report say “Origin Hosting: Not publicly determinable”?</summary><p>When a CDN/reverse proxy (Cloudflare, CloudFront, Fastly…) fronts a domain, public data only reveals the edge network. Claiming the origin host would be a guess, so the tool separates <b>CDN/Proxy</b> from <b>Origin Hosting</b> and says so honestly.</p></details>
+<details><summary>Does it show the domain owner?</summary><p>No. Registrant names, addresses, phone numbers and emails are private data. The tool detects whether registrant data is privacy-protected and reports that — it never displays or bypasses WHOIS privacy.</p></details>
+<details><summary>Why are some sections unavailable?</summary><p>Some registries have no RDAP and some environments block direct HTTPS/WHOIS connections. Those sections are reported as unavailable with the reason — never filled in with guesses. The DNS-based sections always work.</p></details>
+<details><summary>Is availability checking exact?</summary><p>A registry “not found” answer is reported as Available, a registration record as Registered, and anything else as <b>Unable to Verify</b>. Rate limits and registry delays are respected and stated.</p></details>
+</div></div>`;
+  return layout('Domain Information Checker — DNS, WHOIS, SSL & Hosting Intelligence | huvanti', body, {
+    active: 'domaincheck', canonical: 'https://huvanti.com/domain-information-checker', meta, jsonLd,
+    scripts: ['/assets/js/common.js', '/assets/js/domaincheck/ui.js']
+  });
+}
+
 function sitemapPage() {
   const meta = `<meta name="description" content="Free XML Sitemap Generator. Crawl a public website safely, respect robots.txt, analyse existing sitemaps, validate indexable URLs, and download standards-compliant XML."><meta name="robots" content="index,follow">
 <meta property="og:title" content="XML Sitemap Generator — huvanti"><meta property="og:description" content="Production-quality sitemap generator and analyzer with robots.txt, canonical, noindex, redirect and XML validation."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
@@ -266,7 +308,7 @@ function sitemapPage() {
   return layout('XML Sitemap Generator — Free Crawl, Validate & Download | huvanti', body, { active:'sitemap', canonical:'https://huvanti.com/xml-sitemap-generator', meta, jsonLd, scripts:['/assets/js/common.js','/assets/js/sitemap/browser.js','/assets/js/sitemap/ui.js'] });
 }
 
-function page(name) { return layout(name, `<div class="container page"><h1 class="page-title">${esc(name)}</h1><div class="paper paper-padded"><p>huvanti provides free, no-account website tools including an SEO audit, an AdSense eligibility checker, an Ezoic eligibility checker, a Mediavine eligibility checker, a Raptive eligibility checker, and a WordPress theme detector.</p></div></div>`); }
+function page(name) { return layout(name, `<div class="container page"><h1 class="page-title">${esc(name)}</h1><div class="paper paper-padded"><p>huvanti provides free, no-account website tools including an SEO audit, AdSense/Ezoic/Mediavine/Raptive eligibility checkers, a WordPress theme detector, a domain information checker, and an XML sitemap generator.</p></div></div>`); }
 
 function readJson(req){ return new Promise(resolve=>{let b=''; req.on('data',d=>b+=d); req.on('end',()=>{try{resolve(JSON.parse(b||'{}'))}catch{resolve({})}});}); }
 
@@ -325,6 +367,16 @@ http.createServer(async (req,res)=>{
     await sitemapApi.handle(req, res, body);
     return;
   }
+  if (p === '/api/domaincheck' && req.method === 'POST') {
+    const body = await readJson(req);
+    await domaincheckApi.handle(req, res, body);
+    return;
+  }
+  if (p === '/api/domaincheck-analyze' && req.method === 'POST') {
+    const body = await readJson(req);
+    await domaincheckApi.handleAnalyze(req, res, body);
+    return;
+  }
   if (p.startsWith('/assets/')) {
     const safe = path.normalize(p).replace(/^([.][.][/\\])+/, '');
     const f = path.join(process.cwd(), safe);
@@ -342,6 +394,7 @@ http.createServer(async (req,res)=>{
   else if (p === '/mediavine-eligibility-checker') html = mediavinePage();
   else if (p === '/raptive-eligibility-checker') html = raptivePage();
   else if (p === '/wordpress-theme-detector') html = wpthemePage();
+  else if (p === '/domain-information-checker') html = domainInfoPage();
   else if (p === '/xml-sitemap-generator') html = sitemapPage();
   else if (['/about','/contact','/privacy','/terms'].includes(p)) html = page(p.slice(1).replace(/^./,c=>c.toUpperCase()));
   else html = layout('Not found', `<div class="container notfound"><h1>404</h1><p>Page not found.</p><a class="btn" href="/">Back home</a></div>`);

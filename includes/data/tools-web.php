@@ -25,6 +25,14 @@ return [
           'popular' => true
         ],
         [
+          'name' => 'Domain Information Checker',
+          'slug' => 'domain-information-checker',
+          'desc' => 'Evidence-based domain intelligence: registration, DNS, hosting, SSL and email security.',
+          'cat' => 'web',
+          'type' => 'domain-information-checker',
+          'popular' => true
+        ],
+        [
           'name' => 'Sitemap Generator',
           'slug' => 'sitemap-generator',
           'desc' => 'Free online sitemap generator for fast, private browser calculations.',
