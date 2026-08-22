@@ -1,4 +1,4 @@
-/* huvanti AdSense checker — deterministic client-side crawler. */
+/* huvanti AdSense checker, deterministic client-side crawler. */
 (function (global) {
 'use strict';
 var A = global.Adsense = global.Adsense || {};

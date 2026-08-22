@@ -1,4 +1,4 @@
-/* huvanti AdSense checker — site-wide / cross-page forensic analysis. */
+/* huvanti AdSense checker, site-wide / cross-page forensic analysis. */
 (function (global) {
 'use strict';
 var A = global.Adsense = global.Adsense || {};

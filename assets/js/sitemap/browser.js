@@ -4,7 +4,7 @@
 (function(global){'use strict';
 var B = global.SitemapBrowserRunner = {};
 var RETRY=[401,403,429,500,502,503,504], MAX_FETCHES=80, fetches=0;
-var PRIVATE=/^(localhost|127\.|0\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[01])\.|\[?::1\]?|fc00:|fd[0-9a-f]{2}:|fe80:|metadata\.google\.internal)/i;
+var PRIVATE=/^(localhost|127\.|0\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[01])\.|\[?:1\]?|fc00:|fd[0-9a-f]{2}:|fe80:|metadata\.google\.internal)/i;
 function err(code,msg){var e=new Error(msg);e.code=code;return e;}
 function esc(s){return String(s).replace(/[&<>'"]/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&apos;','"':'&quot;'}[m];});}
 function input(raw){var s=String(raw||'').trim().replace(/\s+/g,''); if(!s)throw err('invalid_url','Please enter a website URL.'); if(!/^[a-z][a-z0-9+.-]*:\/\//i.test(s))s='https://'+s; var u; try{u=new URL(s);}catch(e){throw err('invalid_url','Please enter a valid public URL.');} if(!/^https?:$/.test(u.protocol))throw err('invalid_url','Only HTTP and HTTPS URLs are supported.'); if(u.username||u.password)throw err('invalid_url','URLs with credentials are not allowed.'); if(PRIVATE.test(u.hostname)||/\.(local|internal|lan|home|localhost)$/i.test(u.hostname))throw err('ssrf','Private or local addresses cannot be scanned.'); u.hash=''; return u;}
@@ -20,7 +20,26 @@ function codetabs(url,opt){var t=timeout(12000,opt.signal); return fetch('https:
 function jina(url,opt){var t=timeout(16000,opt.signal); return fetch('https://r.jina.ai/'+url,{signal:t.signal,headers:{'X-Return-Format':'markdown'}}).then(function(r){return r.text().then(function(tx){t.done();return {status:r.status,text:tx,finalUrl:url,headers:{'content-type':'text/markdown'},via:'jina'};});}).catch(function(e){t.done();throw e;});}
 var transports=[direct,allorigins,corsproxy,codetabs,jina];
 function challenge(text){return /just a moment|attention required|cf-browser-verification|challenge-platform|cdn-cgi\/challenge|checking your browser|enable javascript and cookies/i.test(String(text||'').slice(0,5000));}
-function get(url,opt){opt=opt||{}; if(fetches++>MAX_FETCHES)return Promise.reject(err('budget','Browser fallback request budget reached.')); var i=0,last=null; function attempt(){ if(i>=transports.length){ if(last&&last.challenge)throw err('challenge','The site is behind bot protection.'); throw err('unreachable','Could not fetch the resource through browser fallback transports.'); } return transports[i++](url,opt).then(function(r){ if(r.text&&r.text.length>(opt.cap||800000))r.text=r.text.slice(0,opt.cap||800000); if(challenge(r.text)){last={challenge:true}; return attempt();} if(RETRY.indexOf(r.status)>=0){last=r; return attempt();} return r;},function(e){last=e; if(opt.signal&&opt.signal.aborted)throw err('cancelled','The crawl was cancelled.'); return attempt();}); } return attempt();}
+function usable(r,opt){ if(!r)return false; if(r.text&&r.text.length>(opt.cap||800000))r.text=r.text.slice(0,opt.cap||800000); if(challenge(r.text))return false; if(RETRY.indexOf(r.status)>=0)return false; return true; }
+function get(url,opt){opt=opt||{}; if(fetches++>MAX_FETCHES)return Promise.reject(err('budget','Browser fallback request budget reached.'));
+  /* Direct first (fast, true status when CORS allows), then the public relays
+     raced in parallel so one slow relay cannot stall the crawl. */
+  function tryRelays(challenged){
+    if(opt.signal&&opt.signal.aborted)return Promise.reject(err('cancelled','The crawl was cancelled.'));
+    var sub=new AbortController(); if(opt.signal)opt.signal.addEventListener('abort',function(){sub.abort();},{once:true});
+    var relays=transports.slice(1), winner=null, remaining=relays.length, SKIP={skip:true};
+    return new Promise(function(resolve,reject){
+      relays.forEach(function(t){
+        Promise.resolve().then(function(){ return t(url,opt); }).then(function(r){
+          if(winner)return;
+          if(!usable(r,opt))throw SKIP;
+          winner=r; sub.abort(); resolve(r);
+        }).catch(function(){ remaining--; if(remaining===0&&!winner){ sub.abort(); reject(challenged?err('challenge','The site is behind bot protection.'):err('unreachable','Could not fetch the resource through the browser fallback relays.')); } });
+      });
+    });
+  }
+  return direct(url,opt).then(function(r){ if(usable(r,opt))return r; return tryRelays(challenge(r&&r.text)); },function(){ return tryRelays(false); });
+}
 function robotsParse(txt){var rules=[],sitemaps=[]; String(txt||'').split(/\r?\n/).forEach(function(raw){var line=raw.replace(/#.*/,'').trim(),m=line.match(/^([^:]+):\s*(.*)$/); if(!m)return; var k=m[1].toLowerCase(),v=m[2].trim(); if(k==='sitemap')sitemaps.push(v); if(k==='disallow'||k==='allow')rules.push({type:k,path:v});}); return {sitemaps:sitemaps,allowed:function(url){var p=new URL(url).pathname+new URL(url).search,b=null; rules.forEach(function(r){if(!r.path)return; var re=new RegExp('^'+r.path.split('*').map(function(x){return x.replace(/[.+?^${}()|[\]\\]/g,'\\$&');}).join('.*')); if(re.test(p)&&(!b||r.path.length>b.path.length))b=r;}); return !b||b.type==='allow';}};}
 function parse(html,base){var raw=String(html||''), doc=new DOMParser().parseFromString(raw,'text/html'), links=[], imgs=[]; doc.querySelectorAll('a[href],link[href]').forEach(function(a){var u=norm(a.getAttribute('href'),base); if(u)links.push(u);}); var can=null, c=doc.querySelector('link[rel~="canonical"][href]'); if(c)can=norm(c.getAttribute('href'),base); var noindex=Array.prototype.some.call(doc.querySelectorAll('meta[name="robots"],meta[name="googlebot"]'),function(m){return /noindex/i.test(m.getAttribute('content')||'');}); doc.querySelectorAll('img[src],meta[property="og:image"][content]').forEach(function(el){var u=norm(el.getAttribute('src')||el.getAttribute('content'),base); if(u&&/\.(png|jpe?g|webp|avif|gif)(\?|$)/i.test(new URL(u).pathname+new URL(u).search))imgs.push(u);}); doc.querySelectorAll('img[srcset],source[srcset]').forEach(function(el){String(el.getAttribute('srcset')||'').split(',').forEach(function(part){var u=norm(part.trim().split(/\s+/)[0],base); if(u&&/\.(png|jpe?g|webp|avif|gif)(\?|$)/i.test(u))imgs.push(u);});}); var md; var mdRe=/\[[^\]]+\]\((https?:[^)\s]+|\/[^)\s]+)\)/g; while((md=mdRe.exec(raw))){var mu=norm(md[1],base); if(mu)links.push(mu);} raw.replace(/https?:\/\/[^\s)'"<>]+/g,function(u){var nu=norm(u,base); if(nu)links.push(nu);}); var text=doc.body?doc.body.textContent.trim():raw.replace(/[#*_`>\-]/g,' ').trim(); return {links:Array.from(new Set(links)),canonical:can,noindex:noindex,images:Array.from(new Set(imgs)).slice(0,50),jsHeavy:text.length<250&&doc.scripts.length>0};}
 function locs(xml,base){return Array.from(String(xml||'').matchAll(/<loc>\s*([\s\S]*?)\s*<\/loc>/gi)).map(function(m){return norm(m[1].replace(/&amp;/g,'&').trim(),base);}).filter(Boolean);}
@@ -42,7 +61,10 @@ B.run = async function(body, onProgress) {
     var structure = /<(urlset|sitemapindex)\b/i.test(sm.text);
     var urls = locs(sm.text, root.toString()).slice(0, max);
     var rows = [], seen = {};
-    for (var ai = 0; ai < urls.length; ai++) {
+    var aIdx = { i: 0 };
+    async function analyzeWorker() {
+      while (aIdx.i < urls.length) {
+      var ai = aIdx.i++;
       var au = urls[ai];
       onProgress({ stage: 'analyze', message: (ai + 1) + ' sitemap URLs checked', discovered: urls.length, crawled: ai + 1 });
       try {
@@ -62,7 +84,9 @@ B.run = async function(body, onProgress) {
       } catch (e) {
         rows.push({ url: au, status: 0, indexable: false, canonical: '', included: false, reason: e.message || 'Fetch failed' });
       }
+      }
     }
+    await Promise.all([analyzeWorker(), analyzeWorker(), analyzeWorker(), analyzeWorker()]);
     var broken = rows.filter(function(r){ return r.status === 404 || r.status >= 500; }).length;
     var redirects = rows.filter(function(r){ return r.status >= 300 && r.status < 400; }).length;
     var dups = rows.filter(function(r){ return /Duplicate/.test(r.reason); }).length;
@@ -85,7 +109,8 @@ B.run = async function(body, onProgress) {
   var q = [{ url: final, depth: 0 }], qs = {}, pages = [], discovered = 1;
   qs[key(final)] = 1;
   sms.forEach(function(s){ s.urls.slice(0, max).forEach(function(u){ if (internal(u, final, subs) && !qs[key(u)]) { qs[key(u)] = 1; q.push({ url: u, depth: 1 }); discovered++; } }); });
-  while (q.length && pages.length < max) {
+  async function crawlWorker() {
+    while (q.length && pages.length < max) {
     var it = q.shift();
     if (!robots.allowed(it.url)) { pages.push({ url: it.url, status: 0, indexable: false, included: false, canonical: '', reason: 'Excluded: robots.txt restriction', depth: it.depth }); continue; }
     try {
@@ -104,7 +129,10 @@ B.run = async function(body, onProgress) {
     } catch (e) {
       pages.push({ url: it.url, status: 0, indexable: false, included: false, canonical: '', reason: e.message || 'Fetch failed', depth: it.depth });
     }
+    }
   }
+  /* Three concurrent workers keep relay latency from adding up page by page. */
+  await Promise.all([crawlWorker(), crawlWorker(), crawlWorker()]);
   var seen2 = {}, included = [];
   pages.forEach(function(p){ var k = key(p.canonical || p.url); if (p.included && seen2[k]) { p.included = false; p.indexable = false; p.reason = 'Excluded: Duplicate URL'; } if (p.included) { seen2[k] = 1; included.push({ url: p.canonical || p.url, loc: p.canonical || p.url, images: p.images }); } });
   var xml = xmlUrlset(included, opt), val = validate(xml);

@@ -1,4 +1,4 @@
-/* huvanti AdSense checker — UI, progress, report rendering, export. */
+/* huvanti AdSense checker: UI, progress, report rendering, export. */
 (function (global) {
 'use strict';
 var A = global.Adsense = global.Adsense || {};
@@ -16,16 +16,22 @@ function stageState(stage,current){var order=['init','robots','sitemap','crawler
 var STAGES=[['robots','Website accessible & robots.txt analyzed'],['sitemap','Sitemap analyzed'],['crawler','Pages discovered & crawled'],['parse','HTML parsed'],['analyze','Content, trust, policy, UX & technical checks'],['score','Readiness score calculated']];
 
 function progressUI(state){
+  var ICONS = {'robots': 'rule', 'sitemap': 'account_tree', 'crawler': 'travel_explore', 'parse': 'code', 'analyze': 'manage_search', 'score': 'grading'};
+  var steps = STAGES.map(function (s) { return { key: s[0], label: s[1], icon: ICONS[s[0]] || 'radio_button_unchecked' }; });
+  var states = {};
+  STAGES.forEach(function (s) { states[s[0]] = stageState(s[0], state.stage); });
   var pct;
-  if(state.stage==='crawler'&&state.crawled) pct=20+Math.round(state.crawled/(state.limit||50)*60);
-  else pct=({init:5,robots:12,sitemap:20,crawler:25,parse:82,analyze:90,score:96,done:100})[state.stage]||30;
-  var items=STAGES.map(function(s){var st=stageState(s[0],state.stage);var icon=st==='done'?'check_circle':st==='active'?'autorenew':'hourglass_empty';return '<li class="pi-'+st+'"><span class="material-icons '+(st==='active'?'pi-active':st==='done'?'pi-done':'pi-wait')+'">'+icon+'</span>'+s[1]+'</li>';}).join('');
-  out.innerHTML='<div class="paper paper-padded adsense-progress"><h3>Checking website…</h3><div class="progress-bar"><i style="width:'+pct+'%"></i></div><ul class="progress-list">'+items+'</ul><p class="muted" id="adsense-progress-msg">'+U.esc(state.message||'Working…')+'</p><button class="btn btn-secondary" id="adsense-cancel">Cancel</button></div>';
-  var msg=document.getElementById('adsense-progress-msg');
-  out._setMsg=function(m){if(msg)msg.textContent=m;};
-  document.getElementById('adsense-cancel').onclick=function(){if(A._ctrl)A._ctrl.abort();};
+  if (state.stage === 'crawler' && state.crawled) pct = 20 + Math.round(state.crawled / (state.limit || 50) * 60);
+  else pct = ({ init: 5, robots: 12, sitemap: 20, crawler: 25, parse: 82, analyze: 90, score: 96, done: 100 })[state.stage] || 30;
+  var p = window.ScanProgress.reuse(out, {
+    title: 'Checking AdSense readiness', target: (urlInput && urlInput.value) || '', icon: 'monetization_on', steps: steps,
+    note: state.message || 'Working\u2026',
+    onCancel: function () { if (A._ctrl) A._ctrl.abort(); }
+  });
+  p.set(states, state.message || 'Working\u2026', pct);
+  if (state.crawled != null) p.label('crawler', state.crawled + (state.limit ? ' of ' + state.limit : '') + ' pages crawled');
 }
-function setMsg(m){if(out._setMsg)out._setMsg(m);}
+function setMsg(m){if(out._scan)out._scan.note(m);}
 
 function errorUI(err){
   var msg=err.message||String(err),code=err.code||'error';
@@ -52,14 +58,14 @@ function verdictBlock(r){
 function ringColor(n){return n>=80?'#2e7d32':n>=65?'#ed6c02':n>=40?'#ef6c00':'#d32f2f';}
 
 function categoryBreakdown(r){
-  return '<div class="cat-breakdown"><h3>Score breakdown — click a category to see exactly how it was calculated</h3>'+
+  return '<div class="cat-breakdown"><h3>Score breakdown, click a category to see exactly how it was calculated</h3>'+
     r.score.categories.map(function(c,idx){
       var neg=c.lines.filter(function(l){return l.delta<0;});
       var pos=c.lines.filter(function(l){return l.delta===0&&l.status==='passed';});
       var rows=c.lines.map(function(l){
         var d=l.delta;
         var cls=l.status==='info'?'neutral':(d<0?'neg':'pos');
-        return '<div class="calc-line '+cls+'"><span>'+sevPill(l.status)+' '+U.esc(l.name)+(l.page!=='Site'?' · '+U.esc(String(l.page).slice(0,40)):'')+'</span><b>'+(d<0?('-'+Math.abs(Math.round(d*10)/10)):(l.status==='info'?'—':'+0'))+' / '+l.weight+'</b></div>';
+        return '<div class="calc-line '+cls+'"><span>'+sevPill(l.status)+' '+U.esc(l.name)+(l.page!=='Site'?' · '+U.esc(String(l.page).slice(0,40)):'')+'</span><b>'+(d<0?('-'+Math.abs(Math.round(d*10)/10)):(l.status==='info'?',':'+0'))+' / '+l.weight+'</b></div>';
       }).join('');
       return '<details class="cat-row" '+(idx<3?'open':'')+'><summary><span class="cat-gauge" style="--s:'+c.pct+';--ad:'+ringColor(c.pct)+'"><b>'+c.score+'</b></span><span class="cat-meta">'+c.label+' <small>'+c.score+'/'+c.max+' points · '+c.pct+'% · '+neg.length+' issue'+(neg.length===1?'':'s')+'</small></span><span class="material-icons cat-arrow">expand_more</span></summary><div class="cat-body"><div class="calc-line total"><span>Category weight</span><b>'+c.max+'</b></div>'+rows+'<div class="calc-line total"><span>Final '+c.label+' score</span><b>'+c.score+'/'+c.max+'</b></div>'+(c.capNote?'<div class="calc-note"><span class="material-icons">info</span>'+c.capNote+'</div>':'')+'</div></details>';
     }).join('')+'</div>';
@@ -96,7 +102,7 @@ function pageTable(r){
     var pa=p.parse,pt=r.ctx.pageType.get(p)||(p.error?'error':'other');
     var issues=r.findings.filter(function(f){return f.page===U.pathOf(p.url);}).length;
     var st=p.error?'err':p.status>=400?'err':p.status>=300?'redir':p.status===0?'unk':'ok';
-    return '<tr data-url="'+U.esc(p.url)+'"><td class="pt-url" title="'+U.esc(p.url)+'">'+U.esc(U.pathOf(p.url))+'</td><td><span class="status-pill s-'+st+'">'+(p.error?'ERR':(p.status||'?'))+'</span></td><td>'+(pa?pa.wordCount:'—')+'</td><td>'+(pa?pa.titleLen?'<span class="badge low">'+pa.titleLen+'</span>':'<span class="badge high">missing</span>':'—')+'</td><td>'+(pa?(pa.h1.length===1?'<span class="badge passed">1</span>':'<span class="badge '+(pa.h1.length===0?'high':'low')+'">'+pa.h1.length+'</span>'):'—')+'</td><td>'+(pa?pa.internalLinks:'—')+'</td><td>'+issues+'</td><td><span class="badge low">'+U.esc(pt)+'</span></td></tr>';
+    return '<tr data-url="'+U.esc(p.url)+'"><td class="pt-url" title="'+U.esc(p.url)+'">'+U.esc(U.pathOf(p.url))+'</td><td><span class="status-pill s-'+st+'">'+(p.error?'ERR':(p.status||'?'))+'</span></td><td>'+(pa?pa.wordCount:',')+'</td><td>'+(pa?pa.titleLen?'<span class="badge low">'+pa.titleLen+'</span>':'<span class="badge high">missing</span>':',')+'</td><td>'+(pa?(pa.h1.length===1?'<span class="badge passed">1</span>':'<span class="badge '+(pa.h1.length===0?'high':'low')+'">'+pa.h1.length+'</span>'):',')+'</td><td>'+(pa?pa.internalLinks:',')+'</td><td>'+issues+'</td><td><span class="badge low">'+U.esc(pt)+'</span></td></tr>';
   }).join('');
   return '<div class="audit-panel wide"><h3>Page-level report</h3><div class="page-table-wrap"><table class="page-table" id="page-table"><thead><tr><th data-k="path">URL</th><th data-k="status">Status</th><th data-k="words">Words</th><th data-k="title">Title</th><th data-k="h1">H1</th><th data-k="links">Int. links</th><th data-k="issues">Issues</th><th data-k="type">Type</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
 }
@@ -106,7 +112,7 @@ function priorityFixes(r){
     .sort(function(a,b){var o={critical:0,high:1,medium:2};return (o[a.status]-o[b.status])||(b.confidence-a.confidence);}).slice(0,12);
   if(!fix.length)return '<div class="priority passed"><b>No critical or high-priority issues detected</b><span>The measurable readiness signals look strong. Continue adding original content and keep trust pages current.</span></div>';
   return fix.map(function(f){
-    var label={critical:'Critical — fix before applying',high:'High — strongly recommended',medium:'Medium — improvement recommended'}[f.status];
+    var label={critical:'Critical, fix before applying',high:'High, strongly recommended',medium:'Medium, improvement recommended'}[f.status];
     return '<div class="priority '+f.status+'" data-status="'+f.status+'"><b>'+U.esc(f.name)+' · '+U.esc(f.page)+'</b><span>'+U.esc(label)+': '+U.esc(f.fix||f.evidence)+'</span></div>';
   }).join('');
 }
@@ -124,7 +130,7 @@ function exportCSV(r){
   var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='adsense-eligibility.csv';a.click();URL.revokeObjectURL(a.href);
 }
 function copySummary(r){
-  var s='AdSense Readiness Score: '+r.score.total+'/100 — '+r.score.verdict+'\n'+r.url+'\n';
+  var s='AdSense Readiness Score: '+r.score.total+'/100, '+r.score.verdict+'\n'+r.url+'\n';
   r.score.categories.forEach(function(c){s+='- '+c.label+': '+c.score+'/'+c.max+'\n';});
   navigator.clipboard&&navigator.clipboard.writeText(s);
   toast('Summary copied');

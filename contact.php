@@ -1,1 +1,0 @@
-<?php $pageTitle=ucfirst('contact'); require __DIR__.'/includes/header.php'; ?><section class="page"><h1><?php echo $pageTitle; ?></h1><p>SumlyTools is a practical collection of browser-based utilities for calculations, conversions, text processing, developer tasks, design work, file helpers and everyday productivity.</p></section><?php require __DIR__.'/includes/footer.php'; ?>

@@ -1,4 +1,4 @@
-/* huvanti Mediavine Eligibility Checker — report UI (independent of AdSense & Ezoic). */
+/* huvanti Mediavine Eligibility Checker, report UI (independent of AdSense & Ezoic). */
 (function () {
   'use strict';
   var form = document.getElementById('mediavine-form');
@@ -49,20 +49,18 @@
     if (b < 0) return a === 0 ? 'active' : 'wait';
     return a < b ? 'done' : a === b ? 'active' : 'wait';
   }
-  function progressUI(state) {
-    var items = STEPS.map(function (s) {
-      var st = stepState(s[0], state.stage);
-      var icon = st === 'done' ? 'check_circle' : st === 'active' ? 'autorenew' : 'hourglass_empty';
-      var label = s[1];
-      if (s[0] === 'crawler' && state.crawled != null) label = state.crawled + ' pages crawled' + (state.limit ? ' (limit ' + state.limit + ')' : '');
-      return '<li class="pi-' + st + '"><span class="material-icons ' + (st === 'active' ? 'pi-active' : st === 'done' ? 'pi-done' : 'pi-wait') + '">' + icon + '</span>' + esc(label) + '</li>';
-    }).join('');
-    var crawlNote = (state.stage === 'crawler' && state.crawled != null) ? '<p class="muted">Real crawl progress: ' + state.crawled + ' of ' + (state.limit || '?') + ' page limit.</p>' : '';
-    out.innerHTML = '<div class="paper paper-padded adsense-progress mediavine-progress"><h3>Checking Mediavine readiness…</h3>' + crawlNote
-      + '<ul class="progress-list">' + items + '</ul><p class="muted" id="mediavine-progress-msg">' + esc(state.message || 'Working…') + '</p>'
-      + '<button class="btn" type="button" id="mediavine-cancel">Cancel</button></div>';
-    var b = document.getElementById('mediavine-cancel');
-    if (b) b.onclick = function () { if (abortCtrl) abortCtrl.abort(); };
+    function progressUI(state) {
+    var ICONS = {'connect': 'power', 'robots': 'rule', 'sitemap': 'account_tree', 'crawler': 'travel_explore', 'important': 'star', 'content': 'article', 'duplicates': 'merge_type', 'technical': 'build', 'ux': 'touch_app', 'brand': 'verified_user', 'traffic': 'trending_up', 'score': 'grading'};
+    var steps = STEPS.map(function (s) { return { key: s[0], label: s[1], icon: ICONS[s[0]] || 'radio_button_unchecked' }; });
+    var states = {};
+    STEPS.forEach(function (s) { states[s[0]] = stepState(s[0], state.stage); });
+    var p = window.ScanProgress.reuse(out, {
+      title: 'Checking Mediavine readiness', target: (urlInput && urlInput.value) || '', icon: 'savings', steps: steps,
+      note: state.message || 'Working\u2026',
+      onCancel: function () { if (abortCtrl) abortCtrl.abort(); }
+    });
+    p.set(states, state.message || 'Working\u2026', 8 + Math.round(Object.keys(states).filter(function (k) { return states[k] === 'done'; }).length / steps.length * 88));
+    if (state.crawled != null) p.label('crawler', state.crawled + (state.limit ? ' of ' + state.limit : '') + ' pages crawled');
   }
 
   function errorUI(err) {
@@ -123,7 +121,7 @@
         + (p.revenueShare ? '<div class="prog-line small"><span>Revenue share</span><b>' + esc(p.revenueShare) + '</b></div>' : '')
         + '<p class="muted">' + esc(p.reason) + '</p></div>';
     }
-    return '<div class="audit-panel wide"><h3>Program Eligibility — Official vs Journey (applied separately)</h3>'
+    return '<div class="audit-panel wide"><h3>Program Eligibility: Official vs Journey (applied separately)</h3>'
       + '<div class="prog-grid">' + progCard(o) + progCard(j) + '</div>'
       + '<p class="muted">A public URL audit cannot verify the private revenue or session data that Mediavine requires. The Website Quality Readiness above reflects only publicly observable signals.</p></div>';
   }
@@ -138,7 +136,7 @@
   }
 
   function categoryBreakdown(r) {
-    return '<div class="cat-breakdown"><h3>Readiness score breakdown — expand a category to see the calculation</h3>'
+    return '<div class="cat-breakdown"><h3>Readiness score breakdown, expand a category to see the calculation</h3>'
       + r.score.categories.map(function (c, idx) {
         var neg = (c.lines || []).filter(function (l) { return l.delta < 0; }).length;
         var rows = (c.lines || []).map(function (l) {
@@ -147,9 +145,9 @@
           return '<div class="calc-line ' + cls + '"><span>' + sevPill(l.status) + ' ' + esc(l.name)
             + (l.page && l.page !== 'Site' ? ' · ' + esc(String(l.page).slice(0, 48)) : '')
             + (l.sourceType ? ' ' + sourceChip(l.sourceType) : '')
-            + '</span><b>' + (d < 0 ? ('−' + Math.abs(Math.round(d * 10) / 10)) : (l.status === 'passed' ? '+0' : '—')) + ' / ' + l.weight + '</b></div>';
+            + '</span><b>' + (d < 0 ? ('−' + Math.abs(Math.round(d * 10) / 10)) : (l.status === 'passed' ? '+0' : ',')) + ' / ' + l.weight + '</b></div>';
         }).join('');
-        var manuals = (c.manuals || []).map(function (m) { return '<div class="calc-line neutral"><span>' + sevPill('manual') + ' ' + esc(m.name) + ' — Unable to verify automatically</span><b>—</b></div>'; }).join('');
+        var manuals = (c.manuals || []).map(function (m) { return '<div class="calc-line neutral"><span>' + sevPill('manual') + ' ' + esc(m.name) + ': Unable to verify automatically</span><b>,</b></div>'; }).join('');
         return '<details class="cat-row" ' + (idx < 2 ? 'open' : '') + '><summary><span class="cat-gauge" style="--s:' + c.pct + ';background:conic-gradient(' + ringColor(c.pct) + ' calc(var(--s)*1%),var(--chip-bg) 0)"><b>' + c.score + '</b></span>'
           + '<span class="cat-meta">' + esc(c.label) + ' <small>' + c.score + '/' + c.max + ' points · ' + c.pct + '% · ' + neg + ' issue' + (neg === 1 ? '' : 's') + '</small></span>'
           + '<span class="material-icons cat-arrow">expand_more</span></summary>'
@@ -210,7 +208,7 @@
       return '<tr data-url="' + esc(p.url) + '"><td class="pt-url" title="' + esc(p.url) + '">' + esc(p.path) + '</td>'
         + '<td><span class="badge low">' + esc(p.type) + '</span></td>'
         + '<td><span class="status-pill s-' + st + '">' + (p.error ? 'ERR' : (p.status || '?')) + '</span></td>'
-        + '<td>' + (p.wordCount || '—') + '</td>'
+        + '<td>' + (p.wordCount || ',') + '</td>'
         + '<td>' + p.content + '</td>'
         + '<td>' + p.brandSafety + '</td>'
         + '<td>' + p.ux + '</td>'
@@ -230,7 +228,7 @@
 
   function manuals(r) {
     if (!r.manualVerification || !r.manualVerification.length) return '';
-    return '<div class="audit-panel wide"><h3>Requires Your Verification</h3><p class="muted">These items cannot be verified from a public URL audit. They are excluded from the automated score rather than guessed — never invented.</p>'
+    return '<div class="audit-panel wide"><h3>Requires Your Verification</h3><p class="muted">These items cannot be verified from a public URL audit. They are excluded from the automated score rather than guessed, never invented.</p>'
       + '<table class="page-table"><thead><tr><th>Metric</th><th>Affects</th><th>Why it cannot be verified</th><th>What evidence to provide</th></tr></thead><tbody>'
       + r.manualVerification.map(function (m) {
         return '<tr><td><b>' + esc(m.metric) + '</b><br><span class="badge manual">' + esc(m.status) + '</span></td><td>' + esc(m.affects) + '</td><td class="muted">' + esc(m.whyCannotVerify) + '</td><td class="muted">' + esc(m.evidenceToProvide) + '</td></tr>';
@@ -244,9 +242,9 @@
       + '<h5 class="traffic-subhead">Automatically Observable</h5><div class="priority-list">'
       + (t.observable && t.observable.length ? t.observable.map(function (f) { return '<div class="priority ' + f.status + '"><b>' + esc(f.name) + '</b><span>' + esc(f.evidence) + '</span></div>'; }).join('') : '<div class="priority passed"><b>No adverse public traffic signals detected</b><span>Obvious bot-like, incentivized or traffic-generation patterns were not found.</span></div>')
       + '</div><h5 class="traffic-subhead">Cannot Be Verified (manual)</h5><div class="priority-list">'
-      + (t.cannotVerify && t.cannotVerify.length ? t.cannotVerify.map(function (f) { return '<div class="priority manual"><b>' + esc(f.name) + ' — Unable to verify automatically</b><span>' + esc(f.evidence) + '</span></div>'; }).join('') : '<div class="priority manual"><b>Unable to verify automatically</b></div>')
+      + (t.cannotVerify && t.cannotVerify.length ? t.cannotVerify.map(function (f) { return '<div class="priority manual"><b>' + esc(f.name) + ': Unable to verify automatically</b><span>' + esc(f.evidence) + '</span></div>'; }).join('') : '<div class="priority manual"><b>Unable to verify automatically</b></div>')
       + '</div>'
-      + '<div class="google-standing"><b>Google AdSense / Ad Exchange Standing</b> — <span class="badge manual">' + esc(t.googleStanding || 'Manual Verification Required') + '</span><p class="muted">Google account status is private. Mediavine states a site need not have worked with AdSense, but an AdSense ban is a problem. This cannot be inferred from the website.</p></div></div>';
+      + '<div class="google-standing"><b>Google AdSense / Ad Exchange Standing</b>, <span class="badge manual">' + esc(t.googleStanding || 'Manual Verification Required') + '</span><p class="muted">Google account status is private. Mediavine states a site need not have worked with AdSense, but an AdSense ban is a problem. This cannot be inferred from the website.</p></div></div>';
   }
 
   function brandSafetyBlock(r) {
@@ -296,9 +294,9 @@
     var adv = r.advertising || {};
     return '<div class="audit-grid refined"><div class="audit-panel top-panel"><h3>Priority fixes</h3><div class="priority-list">' + priorityFixes(r) + '</div></div>'
       + '<div class="audit-panel"><h3>Summary</h3><div class="insight-row">'
-      + [['Site type', r.siteType || '—'], ['Language', (r.language && r.language.name) || '—'],
+      + [['Site type', r.siteType || ','], ['Language', (r.language && r.language.name) || ','],
          ['Useful content', (inv.useful || 0) + ' / ' + (inv.contentPages || 0)], ['Thin %', String(inv.thinPct || 0) + '%'],
-         ['Near-dupes %', String(inv.dupPct || 0) + '%'], ['Avg TTFB', (perf.avgTtfb != null ? perf.avgTtfb + 'ms' : '—')],
+         ['Near-dupes %', String(inv.dupPct || 0) + '%'], ['Avg TTFB', (perf.avgTtfb != null ? perf.avgTtfb + 'ms' : ',')],
          ['Ad networks', (adv.networks && adv.networks.length ? adv.networks.join(', ') : 'none')], ['Sitemap URLs', r.crawl.sitemapCount]
         ].map(function (x) { return '<div class="insight-card"><span>' + esc(x[0]) + '</span><b>' + esc(String(x[1])) + '</b></div>'; }).join('')
       + '</div></div></div>';
@@ -310,7 +308,7 @@
       .slice(0, 12);
     if (!fix.length) return '<div class="priority passed"><b>No critical or high-priority automated issues detected</b><span>Public signals look relatively strong. Complete the manual verification items (revenue, sessions, traffic) before applying.</span></div>';
     return fix.map(function (f) {
-      var label = { critical: 'Critical — fix before applying', high: 'High — strongly recommended', medium: 'Medium — improvement recommended' }[f.status];
+      var label = { critical: 'Critical, fix before applying', high: 'High, strongly recommended', medium: 'Medium, improvement recommended' }[f.status];
       return '<div class="priority ' + f.status + '"><b>' + esc(f.name) + ' · ' + esc(f.page) + '</b><span>' + esc(label) + ': ' + esc(f.fix || f.evidence) + '</span></div>';
     }).join('');
   }
@@ -331,7 +329,7 @@
     var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'mediavine-eligibility.csv'; a.click(); URL.revokeObjectURL(a.href);
   }
   function copySummary(r) {
-    var s = 'Mediavine Website Readiness Score: ' + r.score.total + '/100 — ' + r.verdict.label + '\n' + r.url + '\nNot an official Mediavine score.\n';
+    var s = 'Mediavine Website Readiness Score: ' + r.score.total + '/100, ' + r.verdict.label + '\n' + r.url + '\nNot an official Mediavine score.\n';
     r.score.categories.forEach(function (c) { s += '- ' + c.label + ': ' + c.score + '/' + c.max + '\n'; });
     if (navigator.clipboard) navigator.clipboard.writeText(s);
     toast('Summary copied');
@@ -353,13 +351,13 @@
       + '<div class="audit-panel wide"><h3>Advertising Readiness</h3><div class="insight-row">'
       + [['Networks', (r.advertising && r.advertising.networks && r.advertising.networks.length) ? esc(r.advertising.networks.join(', ')) : 'none'],
          ['Ad pages', String((r.advertising && r.advertising.adPages) || 0)], ['Heavy thin pages', String((r.advertising && r.advertising.heavyPages) || 0)],
-         ['Content:ad ratio', (r.advertising && r.advertising.contentToAdRatio != null) ? r.advertising.contentToAdRatio + ' words/slot' : '—'],
+         ['Content:ad ratio', (r.advertising && r.advertising.contentToAdRatio != null) ? r.advertising.contentToAdRatio + ' words/slot' : ','],
          ['ads.txt', (r.crawl && r.crawl.adsTxt && r.crawl.adsTxt.present) ? 'present' : 'not found']
         ].map(function (x) { return '<div class="insight-card"><span>' + esc(x[0]) + '</span><b>' + String(x[1]) + '</b></div>'; }).join('')
       + '</div></div>'
       + '<div class="audit-panel wide"><h3>Performance Signals</h3><div class="insight-row">'
-      + [['Avg TTFB', (r.performance && r.performance.avgTtfb != null) ? r.performance.avgTtfb + 'ms' : '—'],
-         ['Avg HTML size', (r.performance && r.performance.avgHtmlKb != null) ? r.performance.avgHtmlKb + 'KB' : '—'],
+      + [['Avg TTFB', (r.performance && r.performance.avgTtfb != null) ? r.performance.avgTtfb + 'ms' : ','],
+         ['Avg HTML size', (r.performance && r.performance.avgHtmlKb != null) ? r.performance.avgHtmlKb + 'KB' : ','],
          ['Third-party scripts', String((r.performance && r.performance.externalScripts) || 0)],
          ['Render-blocking', String((r.performance && r.performance.renderBlocking) || 0)],
          ['Compression', (r.performance && r.performance.compressionPct) + '%'], ['Cache headers', (r.performance && r.performance.cachePct) + '%']
@@ -417,7 +415,7 @@
       var url = b.getAttribute('data-url');
       var f = r.findings.filter(function (x) { return x.page === '/' + (url.split('/').filter(Boolean).join('/')) || (x.urls || []).indexOf(url) >= 0; });
       var det = document.getElementById('mv-page-detail');
-      det.innerHTML = '<h5>Details — ' + esc(url) + '</h5>' + (f.length ? renderIssues(f, 'all', '') : '<p class="muted">No findings for this page.</p>');
+      det.innerHTML = '<h5>Details, ' + esc(url) + '</h5>' + (f.length ? renderIssues(f, 'all', '') : '<p class="muted">No findings for this page.</p>');
       det.style.display = 'block';
     });
     out.scrollIntoView({ behavior: 'smooth', block: 'start' });

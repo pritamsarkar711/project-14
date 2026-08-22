@@ -1,4 +1,4 @@
-/* RSS Feed Generator — UI. Inherits the existing huvanti design system.
+/* RSS Feed Generator: UI. Inherits the existing huvanti design system.
  * Deterministic pipeline renderer: progress, existing-feed detection,
  * quality score + breakdown, statistics, editable item table, visual + XML
  * previews, validation, comparison, export and installation instructions.
@@ -22,7 +22,7 @@
     'article-published-time': ['article:published_time', 's-structured'],
     'time-datetime': ['<time datetime>', 's-structured'],
     'visible-publication': ['visible publication line', 's-visible'],
-    'sitemap-lastmod': ['sitemap lastmod — fallback', 's-fallback'],
+    'sitemap-lastmod': ['sitemap lastmod, fallback', 's-fallback'],
     'manual': ['set manually', 's-manual']
   };
 
@@ -45,11 +45,11 @@
       setTimeout(function () { try { document.body.removeChild(a); URL.revokeObjectURL(a.href); } catch (e) {} }, 1500);
     } catch (e) {
       copy(text);
-      toast('Download was blocked — content copied to clipboard instead.');
+      toast('Download was blocked, content copied to clipboard instead.');
     }
   }
   function shortUrl(u) {
-    if (!u) return '—';
+    if (!u) return ',';
     try {
       var x = new URL(u);
       var p = x.pathname + x.search;
@@ -66,6 +66,16 @@
     } catch (e) { return 'Unknown'; }
   }
   function isoDay(iso) { try { return String(iso).slice(0, 10); } catch (e) { return ''; } }
+  /* Long feeds are trimmed for the on page preview; the download always has the full file. */
+  function capPreview(xml, limit) {
+    limit = limit || 60000;
+    xml = String(xml || '');
+    if (xml.length <= limit) return xml;
+    var cut = xml.slice(0, limit);
+    var nl = cut.lastIndexOf('\n');
+    if (nl > limit * 0.5) cut = cut.slice(0, nl);
+    return cut + '\n<!-- Preview trimmed. Download the feed for the complete file. -->';
+  }
   function statusChip(p) {
     if (p.existing) return '<span class="status-pill s-ok">Existing feed</span>';
     if (p.added) return '<span class="status-pill s-ok">Manual</span>';
@@ -92,20 +102,22 @@
   ];
   var stageIndex = { validate: 0, connect: 0, robots: 1, feeds: 2, sitemaps: 3, crawl: 4, metadata: 5, verify: 6, select: 6, generate: 8, validate: 9, done: 10 };
 
-  function progressUI(s) {
+    function progressUI(s) {
+    var ICONS = {'validate': 'rule', 'robots': 'rule', 'feeds': 'rss_feed', 'sitemaps': 'account_tree', 'crawl': 'travel_explore', 'metadata': 'data_object', 'verify': 'link_off', 'select': 'filter_alt', 'generate': 'code', 'validate_x': 'verified', 'done': 'radio_button_unchecked'};
+    var KEYS = ['validate', 'robots', 'feeds', 'sitemaps', 'crawl', 'metadata', 'verify', 'select', 'generate', 'validate2'];
+    var LABELS = { validate2: 'XML validated' };
+    var stageIndex = { validate: 0, connect: 0, robots: 1, feeds: 2, sitemaps: 3, crawl: 4, metadata: 5, verify: 6, select: 6, generate: 8, validate: 9, done: 10 };
     var cur = stageIndex[s.stage] != null ? stageIndex[s.stage] : 0;
     var done = s.stage === 'done';
-    out.innerHTML = '<div class="paper paper-padded rss-progress"><h3>' + icon('rss_feed') + ' Generating RSS feed…</h3><ul class="progress-list">' +
-      STEPS.map(function (x, i) {
-        var st = done || i < cur ? 'done' : i === cur ? 'active' : 'wait';
-        var ic = st === 'done' ? 'check_circle' : st === 'active' ? 'autorenew' : x[1];
-        return '<li class="pi-' + st + '"><span class="material-icons pi-' + st + '">' + ic + '</span>' + esc(x[0]) + '</li>';
-      }).join('') +
-      '</ul><p class="muted">' + esc(s.message || 'Working…') + '</p>' +
-      (s.discovered != null ? '<p class="muted">' + esc(s.discovered) + ' discovered · ' + esc(s.crawled || 0) + ' analyzed</p>' : '') +
-      '<button class="btn" type="button" id="rss-cancel">Cancel</button></div>';
-    var b = document.getElementById('rss-cancel');
-    if (b) b.onclick = function () { if (abortCtrl) abortCtrl.abort(); };
+    var steps = KEYS.map(function (k, i) { return { key: k, label: LABELS[k] || STEPS[i][0], icon: ICONS[k] || 'radio_button_unchecked' }; });
+    var states = {};
+    steps.forEach(function (st, i) { states[st.key] = (done || i < cur) ? 'done' : i === cur ? 'active' : 'wait'; });
+    var p = window.ScanProgress.reuse(out, {
+      title: 'Generating the RSS feed', target: (document.getElementById('rss-url') || {}).value || '', icon: 'rss_feed', steps: steps,
+      note: s.message || 'Working\u2026',
+      onCancel: function () { if (abortCtrl) abortCtrl.abort(); }
+    });
+    p.set(states, (s.message || 'Working\u2026') + (s.discovered != null ? ' \u00b7 ' + s.discovered + ' discovered, ' + (s.crawled || 0) + ' analyzed' : ''), 8 + Math.round((done ? KEYS.length : cur) / KEYS.length * 88));
   }
 
   function errorUI(e) {
@@ -121,11 +133,11 @@
     else if (code === 'busy') title = 'Generator busy';
     else if (code === 'ratelimit') title = 'Too many requests';
     else if (code === 'ssrf') title = 'Private or local addresses cannot be scanned';
-    var hint = 'The tool reports access restrictions, bot protection, DNS, SSL, timeout and robots.txt errors accurately — it never claims the site has no pages when the crawler was blocked.';
+    var hint = 'The tool reports access restrictions, bot protection, DNS, SSL, timeout and robots.txt errors accurately, it never claims the site has no pages when the crawler was blocked.';
     if (['unreachable', 'timeout', 'fetch_failed', 'tls_blocked', 'dns', 'challenge', 'restricted', 'budget'].indexOf(code) >= 0) {
       hint = 'This environment cannot reach the site directly, and the browser fallback was also unable to fetch it. The website may be blocking automated access (Cloudflare, CAPTCHA), require a login, or be temporarily unreachable. Try again, or check the URL.';
     }
-    if (/^robots/.test(code)) hint = 'The site\'s robots.txt explicitly disallows crawling this path. The tool does not bypass robots.txt, so pages behind it are excluded — and are not claimed to be missing.';
+    if (/^robots/.test(code)) hint = 'The site\'s robots.txt explicitly disallows crawling this path. The tool does not bypass robots.txt, so pages behind it are excluded, and are not claimed to be missing.';
     out.innerHTML = '<div class="paper paper-padded audit-error"><span class="material-icons">error_outline</span><h3>' + esc(title) + '</h3><p>' + esc(e.message || 'The generation could not be completed.') + '</p>' +
       '<p class="muted">' + esc(hint) + '</p>' +
       '<button class="btn" id="rss-retry">Try again</button></div>';
@@ -206,7 +218,7 @@
       if (r.robotsRestricted) html += '<div class="rss-warn"><span class="material-icons">block</span><span>Some pages couldn\'t be crawled because of robots.txt restrictions. They are excluded but not claimed to be missing.</span></div>';
       if (r.challenge) html += '<div class="rss-warn"><span class="material-icons">security</span><span>' + esc(r.challenge) + ' page(s) are behind bot protection and could not be verified. They are not included.</span></div>';
       if (r.jsHeavy) html += '<div class="rss-warn"><span class="material-icons">javascript</span><span>This website appears to rely heavily on JavaScript. Some content may not be discoverable without rendering.</span></div>';
-      if (r.noContent) html += '<div class="rss-warn"><span class="material-icons">search_off</span><span>No article-like content pages were found. This may be a single-page site, a shop, or a JavaScript-only site — or the crawler may have been limited. Use <b>Add Item</b> to add articles manually.</span></div>';
+      if (r.noContent) html += '<div class="rss-warn"><span class="material-icons">search_off</span><span>No article-like content pages were found. This may be a single-page site, a shop, or a JavaScript-only site, or the crawler may have been limited. Use <b>Add Item</b> to add articles manually.</span></div>';
       if (state.transport === 'browser') html += '<div class="rss-warn"><span class="material-icons">cloud_off</span><span>The scan ran through your browser (the server could not reach the site directly). Page budget is limited to 60 pages in this mode.</span></div>';
       html += '</div>';
     }
@@ -219,7 +231,7 @@
     var wp = ef.wordpress;
     return '<div class="paper paper-padded sitemap-detected rss-existing"><div class="rss-existing-head"><h3>' + icon(wp ? 'widgets' : 'rss_feed') + ' ' + esc(wp ? 'WordPress RSS feed detected' : 'Existing RSS feed detected') + '</h3><div class="report-actions"><button class="btn" id="rss-use-existing" type="button">' + icon('check') + ' Use Existing Feed</button><button class="btn" id="rss-gen-new" type="button">' + icon('refresh') + ' Generate New Feed</button>' + (state.rssXml ? '<button class="btn" id="rss-compare" type="button">' + icon('compare_arrows') + ' Compare Existing Feed</button>' : '') + '</div></div>' +
       '<p>This site already serves a feed at <span class="llmstxt-mono">' + esc(ef.url) + '</span> (' + esc(ef.format) + ', ' + esc(ef.itemCount) + ' items' + (ef.title ? ', “' + esc(ef.title) + '”' : '') + ').</p>' +
-      '<p class="muted">Using the existing feed re-publishes its real items (validated and re-serialized) instead of creating a duplicate. Nothing on your site is modified automatically.' + (wp ? ' WordPress\'s built-in feed often already covers all posts — a second feed may be unnecessary.' : '') + '</p></div>';
+      '<p class="muted">Using the existing feed re-publishes its real items (validated and re-serialized) instead of creating a duplicate. Nothing on your site is modified automatically.' + (wp ? ' WordPress\'s built-in feed often already covers all posts, a second feed may be unnecessary.' : '') + '</p></div>';
   }
 
   function scorePanel() {
@@ -227,7 +239,7 @@
     var comps = (q.components || []).map(function (c) {
       return '<li>' + icon(c.earned >= c.max ? 'check_circle' : c.earned > 0 ? 'data_usage' : 'cancel') + '<span>' + esc(c.name) + '</span><b>' + esc(c.earned) + '/' + esc(c.max) + '</b>' + (c.note ? '<small>' + esc(c.note) + '</small>' : '') + '</li>';
     }).join('');
-    return '<div class="score-card"><div class="score-ring" style="--score:' + esc(q.score) + '"><b>' + esc(q.score) + '</b></div><div class="score-summary"><h2>RSS Feed Quality Score</h2><span class="source-chip">' + esc(q.label || 'Tool-generated RSS quality score') + ' — not a Google or official score</span><p>' + esc(q.note || '') + '</p><ul class="rss-score-breakdown">' + comps + '</ul></div></div>';
+    return '<div class="score-card"><div class="score-ring" style="--score:' + esc(q.score) + '"><b>' + esc(q.score) + '</b></div><div class="score-summary"><h2>RSS Feed Quality Score</h2><span class="source-chip">' + esc(q.label || 'Tool-generated RSS quality score') + ', not a Google or official score</span><p>' + esc(q.note || '') + '</p><ul class="rss-score-breakdown">' + comps + '</ul></div></div>';
   }
 
   function statsPanel() {
@@ -323,7 +335,7 @@
       '<option value="rss"' + (xmlFormat === 'rss' ? ' selected' : '') + '>RSS 2.0 (rss.xml)</option>' +
       '<option value="atom"' + (xmlFormat === 'atom' ? ' selected' : '') + '>Atom 1.0 (atom.xml)</option></select></label>' +
       '<span class="muted">' + esc(itemsXml.length) + ' bytes</span></div>' +
-      '<pre class="xml-preview rss-xml"><code>' + esc(itemsXml || '&lt;!-- no feed generated yet --&gt;') + '</code></pre>';
+      '<pre class="xml-preview rss-xml"><code>' + esc(capPreview(itemsXml) || '&lt;!-- no feed generated yet --&gt;') + '</code></pre>';
     return '<div class="audit-panel wide rss-preview-panel"><div class="llmstxt-preview-head"><h3>' + icon('preview') + ' Feed Preview</h3><div class="report-actions">' +
       '<div class="rss-tabs"><button class="btn ' + (previewTab === 'visual' ? 'rss-tab-on' : '') + '" id="rss-tab-visual" type="button">' + icon('list') + ' Visual</button><button class="btn ' + (previewTab === 'xml' ? 'rss-tab-on' : '') + '" id="rss-tab-xml" type="button">' + icon('code') + ' XML</button></div>' +
       '<button class="btn" id="rss-copy-xml" type="button">' + icon('content_copy') + ' Copy XML</button>' +
@@ -343,7 +355,7 @@
       return '<div class="check ' + cls + '"><span class="check-icon material-icons">' + ic + '</span><div><b>' + esc(c.name) + '</b><p>' + esc(c.message) + '</p></div></div>';
     }).join('');
     return '<div class="audit-panel wide"><h3>' + icon('verified') + ' XML Validation</h3>' +
-      (v.valid ? '<div class="llmstxt-valid-ok">' + icon('verified') + ' Valid ' + (xmlFormat === 'atom' ? 'document' : 'RSS 2.0') + ' — ready to download</div>' : '<div class="llmstxt-valid-bad">' + icon('error') + ' Not presented as valid: ' + esc((v.errors || []).length) + ' issue(s)</div>') +
+      (v.valid ? '<div class="llmstxt-valid-ok">' + icon('verified') + ' Valid ' + (xmlFormat === 'atom' ? 'document' : 'RSS 2.0') + ', ready to download</div>' : '<div class="llmstxt-valid-bad">' + icon('error') + ' Not presented as valid: ' + esc((v.errors || []).length) + ' issue(s)</div>') +
       ((v.autoFixes || []).length ? '<p class="muted">Auto-fixed: ' + v.autoFixes.map(esc).join('; ') + '</p>' : '') +
       rows + '</div>';
   }
@@ -356,12 +368,12 @@
       if (!items.length) return '<p class="muted">' + label + ': none</p>';
       return '<b>' + label + ' (' + items.length + ')</b><ul class="rss-cmp-list">' + items.map(function (i) { return '<li><a class="llmstxt-link" href="' + esc(i.url || i.link) + '" target="_blank" rel="noopener">' + esc(i.title || i.url || i.link) + '</a></li>'; }).join('') + '</ul>';
     }
-    var diffs = c.metadataDifferences.items.map(function (i) { return '<li><a class="llmstxt-link" href="' + esc(i.url) + '" target="_blank" rel="noopener">' + esc(i.title) + '</a> — differs in: ' + i.diffs.map(esc).join(', ') + '</li>'; }).join('');
+    var diffs = c.metadataDifferences.items.map(function (i) { return '<li><a class="llmstxt-link" href="' + esc(i.url) + '" target="_blank" rel="noopener">' + esc(i.title) + '</a>, differs in: ' + i.diffs.map(esc).join(', ') + '</li>'; }).join('');
     var broken = '';
     if (state.existingFeedCheck) {
       var bad = state.existingFeedCheck.filter(function (x) { return !x.ok; });
       broken = bad.length
-        ? '<b>Broken URLs in existing feed (' + bad.length + ')</b><ul class="rss-cmp-list">' + bad.map(function (x) { return '<li><span class="llmstxt-mono">' + esc(x.url) + '</span> — ' + esc(x.status) + '</li>'; }).join('') + '</ul>'
+        ? '<b>Broken URLs in existing feed (' + bad.length + ')</b><ul class="rss-cmp-list">' + bad.map(function (x) { return '<li><span class="llmstxt-mono">' + esc(x.url) + '</span>, ' + esc(x.status) + '</li>'; }).join('') + '</ul>'
         : '<p class="muted">Spot-checked ' + state.existingFeedCheck.length + ' existing-feed URLs: all reachable (2xx/3xx).</p>';
     } else {
       broken = '<p class="muted">Broken-URL spot check of the existing feed is unavailable in this mode.</p>';
@@ -374,17 +386,17 @@
       list(c.missingFromExisting.items, 'In generated feed, missing from existing') +
       (diffs ? '<b>Metadata differences</b><ul class="rss-cmp-list">' + diffs + '</ul>' : '<p class="muted">Metadata differences: none</p>') +
       broken +
-      '<p class="muted">The existing feed is never modified or replaced automatically — you choose which to publish.</p></div>';
+      '<p class="muted">The existing feed is never modified or replaced automatically, you choose which to publish.</p></div>';
   }
 
   function installPanel() {
     var feedUrl = (document.getElementById('rss-feed-url') && document.getElementById('rss-feed-url').value.trim()) || guessFeedUrl();
     var title = (state.channel.title || 'Site').replace(/[<>&"]/g, '');
     return '<div class="audit-panel wide"><h3>' + icon('publish') + ' Installation</h3><ol class="llmstxt-install">' +
-      '<li><b>Download</b> — click <b>Download RSS Feed</b> above. You get <code>rss.xml</code>' + (state.atomXml ? ' (plus <code>atom.xml</code> if you want an Atom 1.0 version)' : '') + '.</li>' +
-      '<li><b>Upload</b> — place it on your website, e.g. at <code>' + esc(feedUrl) + '</code>.</li>' +
+      '<li><b>Download</b>, click <b>Download RSS Feed</b> above. You get <code>rss.xml</code>' + (state.atomXml ? ' (plus <code>atom.xml</code> if you want an Atom 1.0 version)' : '') + '.</li>' +
+      '<li><b>Upload</b>, place it on your website, e.g. at <code>' + esc(feedUrl) + '</code>.</li>' +
       '<li><b>Add RSS discovery</b> to your HTML <code>&lt;head&gt;</code>:<pre class="rss-install-snippet">&lt;link rel="alternate"\n      type="application/rss+xml"\n      title="' + esc(title) + ' RSS Feed"\n      href="' + esc(feedUrl) + '"></pre></li>' +
-      '</ol><p class="muted">Publishing a feed helps readers and feed aggregators discover your content — it does not guarantee traffic, indexing or rankings.</p></div>';
+      '</ol><p class="muted">Publishing a feed helps readers and feed aggregators discover your content, it does not guarantee traffic, indexing or rankings.</p></div>';
   }
 
   /* ---------- table ---------- */
@@ -398,9 +410,9 @@
       '<input id="rss-add-author" class="text-input" placeholder="Author (optional)"><input id="rss-add-cat" class="text-input" placeholder="Category (optional)">' +
       '<input id="rss-add-image" class="text-input" placeholder="Image URL (optional)" inputmode="url">' +
       '<div class="rss-add-actions"><button class="btn" id="rss-add-confirm" type="button">Add</button><button class="btn" id="rss-add-cancel" type="button">Cancel</button></div>' +
-      '<p class="muted" style="grid-column:1/-1">Manual items are validated for URL format only — they are not crawled, and nothing is invented for them.</p></div>' +
+      '<p class="muted" style="grid-column:1/-1">Manual items are validated for URL format only, they are not crawled, and nothing is invented for them.</p></div>' +
       '<div class="table-scroll"><table class="mini-table rss-table"><thead><tr><th>Include</th><th>Article</th><th>URL</th><th>Date</th><th>Category</th><th>Author</th><th>Status</th><th></th></tr></thead><tbody id="rss-rows"></tbody></table></div>' +
-      '<p class="muted" style="margin-top:8px">Edits (title, description, URL, date, category, author, image, include/exclude, order) persist across regeneration. Assigning a date to an undated item makes it eligible for the feed.' + (state.options && state.options.sortOrder === 'manual' ? ' Sort is Manual — use the arrows.' : '') + '</p></div>';
+      '<p class="muted" style="margin-top:8px">Edits (title, description, URL, date, category, author, image, include/exclude, order) persist across regeneration. Assigning a date to an undated item makes it eligible for the feed.' + (state.options && state.options.sortOrder === 'manual' ? ' Sort is Manual, use the arrows.' : '') + '</p></div>';
   }
 
   function visiblePages() {
@@ -565,7 +577,7 @@
     if (cp) cp.onclick = function () { copy(currentXml()); };
     function warnIfInvalid() {
       var v = state.validation;
-      if (v && !v.valid) toast('Downloaded — note: validation reported ' + (v.errors || []).length + ' issue(s).');
+      if (v && !v.valid) toast('Downloaded, note: validation reported ' + (v.errors || []).length + ' issue(s).');
     }
     var dlr = document.getElementById('rss-dl-rss');
     if (dlr) dlr.onclick = function () { if (state.rssXml) { download('rss.xml', state.rssXml, 'application/rss+xml;charset=utf-8'); warnIfInvalid(); } else toast('Generate the feed first.'); };
@@ -632,7 +644,7 @@
       // Manually including a broken/blocked page: allowed, but flagged.
       if (page.included && (page.status === 0 || page.status >= 400 || page.blocked)) {
         page.reason = '';
-        toast('Note: this URL was not verified — double-check it resolves.');
+        toast('Note: this URL was not verified, double-check it resolves.');
       }
       regenerate(true);
     }

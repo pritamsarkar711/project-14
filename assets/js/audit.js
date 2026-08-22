@@ -1,7 +1,8 @@
-/* huvanti SEO audit — client-side, no account.
- * Fetches public pages through CORS-friendly readers and analyses
- * technical, on-page, content, image, performance, mobile, schema,
- * internal-linking, international, security, AI-search and architecture signals.
+/* huvanti SEO audit, client side, no account.
+ * Fetches public pages through CORS friendly readers and analyses
+ * technical, on page, content, image, performance, mobile, schema,
+ * linking, international, security, AI search and architecture signals.
+ * Pages are crawled in parallel so results arrive quickly.
  */
 (function(){
 'use strict';
@@ -9,7 +10,8 @@ const form=document.getElementById('audit-form'); if(!form) return;
 const input=document.getElementById('audit-url');
 const limitSel=document.getElementById('crawl-limit');
 const out=document.getElementById('audit-results');
-let lastReport=null, currentCtrl=null;
+const submitBtn=form.querySelector('button[type="submit"]')||null;
+let lastReport=null, currentCtrl=null, running=false;
 
 /* ----------------------------- helpers ----------------------------- */
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -25,15 +27,14 @@ const isAsset=u=>/\.(jpe?g|png|webp|gif|svg|avif|ico|bmp|css|js|mjs|json|xml|pdf
 const iconFor=s=>s==='pass'?'check_circle':s==='fail'?'cancel':s==='warn'?'warning':'info';
 
 /* ----------------------------- fetch layer ----------------------------- */
-// Tries a direct request first (gives real status/headers when CORS allows),
-// then falls back through public CORS readers that return the page markup.
-async function fetchUrl(rawUrl, signal, timeoutMs=12000){
+// Direct request first (real status and headers when CORS allows), then
+// public readers raced in parallel: the first usable response wins.
+async function fetchUrl(rawUrl, signal, timeoutMs=9000){
   const ctrl=new AbortController();
   const to=setTimeout(()=>ctrl.abort(),timeoutMs);
   if(signal) signal.addEventListener('abort',()=>ctrl.abort(),{once:true});
   const opts={redirect:'follow',signal:ctrl.signal,headers:{'Accept':'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'}};
   let attempts=[];
-  // 1) direct
   try{
     const t0=performance.now();
     const res=await fetch(rawUrl,opts);
@@ -42,51 +43,47 @@ async function fetchUrl(rawUrl, signal, timeoutMs=12000){
     return {url:rawUrl,finalUrl:res.url,status:res.status,ok:res.ok,redirected:res.redirected,
       headers:headersToObj(res.headers),text,via:'direct',ms:Math.round(performance.now()-t0)};
   }catch(e){attempts.push('direct:'+e.name); if(signal&&signal.aborted){clearTimeout(to);throw e}}
-  // 2..N) Public relays raced in parallel: the first usable response wins and
-  //      the remaining relays are cancelled to avoid wasted relay requests.
-  const relays = [
-    { name: 'allorigins', run: async (sig) => {
-        const res = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(rawUrl), { signal: sig });
-        const j = await res.json();
-        const text = j.contents || '';
-        const h = {};
-        if (j.status) {
-          if (j.status.content_type) h['content-type'] = j.status.content_type;
-          if (j.status.content_length) h['content-length'] = String(j.status.content_length);
-          if (j.status.http_code) h[':http'] = String(j.status.http_code);
+  const relays=[
+    { name:'allorigins', run:async(sig)=>{
+        const res=await fetch('https://api.allorigins.win/get?url='+encodeURIComponent(rawUrl),{signal:sig});
+        const j=await res.json();
+        const text=j.contents||'';
+        const h={};
+        if(j.status){
+          if(j.status.content_type)h['content-type']=j.status.content_type;
+          if(j.status.http_code)h[':http']=String(j.status.http_code);
         }
-        const st = j.status?.http_code || 200;
-        return { url: rawUrl, finalUrl: j.status?.url || rawUrl, status: st, ok: st < 400, redirected: false, headers: h, text, via: 'allorigins' };
-      } },
-    { name: 'corsproxy', run: async (sig) => {
-        const res = await fetch('https://corsproxy.io/?url=' + encodeURIComponent(rawUrl), { signal: sig });
-        const text = await res.text();
-        return { url: rawUrl, finalUrl: rawUrl, status: res.ok ? 200 : res.status, ok: res.ok, redirected: false, headers: headersToObj(res.headers), text, via: 'corsproxy' };
-      } },
-    { name: 'codetabs', run: async (sig) => {
-        const res = await fetch('https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(rawUrl), { signal: sig });
-        const text = await res.text();
-        if (/^[A-Za-z ]+Error/i.test(text.slice(0, 80))) throw new Error(text.slice(0, 80));
-        return { url: rawUrl, finalUrl: rawUrl, status: res.ok ? 200 : res.status, ok: res.ok, redirected: false, headers: {}, text, via: 'codetabs' };
-      } }
+        const st=j.status?.http_code||200;
+        return {url:rawUrl,finalUrl:j.status?.url||rawUrl,status:st,ok:st<400,redirected:false,headers:h,text,via:'allorigins'};
+      }},
+    { name:'corsproxy', run:async(sig)=>{
+        const res=await fetch('https://corsproxy.io/?url='+encodeURIComponent(rawUrl),{signal:sig});
+        const text=await res.text();
+        return {url:rawUrl,finalUrl:rawUrl,status:res.ok?200:res.status,ok:res.ok,redirected:false,headers:headersToObj(res.headers),text,via:'corsproxy'};
+      }},
+    { name:'codetabs', run:async(sig)=>{
+        const res=await fetch('https://api.codetabs.com/v1/proxy/?quest='+encodeURIComponent(rawUrl),{signal:sig});
+        const text=await res.text();
+        if(/^[A-Za-z ]+Error/i.test(text.slice(0,80)))throw new Error(text.slice(0,80));
+        return {url:rawUrl,finalUrl:rawUrl,status:res.ok?200:res.status,ok:res.ok,redirected:false,headers:{},text,via:'codetabs'};
+      }}
   ];
-  const sub = new AbortController();
-  ctrl.signal.addEventListener('abort', () => sub.abort(), { once: true });
-  let winner = null;
-  let remaining = relays.length;
-  await new Promise(resolve => {
-    const finish = () => { if (winner || remaining === 0) resolve(); };
-    for (const r of relays) {
-      r.run(sub.signal).then(v => { if (!winner) winner = v; sub.abort(); finish(); },
-        e => { attempts.push(r.name + ':' + (e?.name || 'error')); remaining--; finish(); });
+  const sub=new AbortController();
+  ctrl.signal.addEventListener('abort',()=>sub.abort(),{once:true});
+  let winner=null, remaining=relays.length;
+  await new Promise(resolve=>{
+    const finish=()=>{if(winner||remaining===0)resolve()};
+    for(const r of relays){
+      r.run(sub.signal).then(v=>{if(!winner)winner=v;sub.abort();finish()},
+        e=>{attempts.push(r.name+':'+(e?.name||'error'));remaining--;finish()});
     }
   });
-  if (winner) { clearTimeout(to); return winner; }
+  if(winner){clearTimeout(to);return winner}
   clearTimeout(to);
-  const err = new Error('Could not fetch ' + rawUrl); err.attempts = attempts; throw err;
+  const err=new Error('Could not fetch '+rawUrl); err.attempts=attempts; throw err;
 }
 
-// Lightweight reachability/status probe for links & images (HEAD where possible).
+// Lightweight reachability probe for links and images.
 async function probeStatus(url, signal){
   try{
     const r=await fetch('https://corsproxy.io/?url='+encodeURIComponent(url),{method:'HEAD',mode:'cors',signal,cache:'no-store'});
@@ -113,7 +110,7 @@ function loadImageInfo(url){
     const fin=v=>{if(done)return;done=true;res(v)};
     img.onload=()=>fin({ok:true,width:img.naturalWidth,height:img.naturalHeight});
     img.onerror=()=>fin({ok:false});
-    setTimeout(()=>fin({ok:false,timeout:true}),8000);
+    setTimeout(()=>fin({ok:false,timeout:true}),6000);
     img.src=url;
   });
 }
@@ -151,8 +148,8 @@ function detectIntent(text,title,url){
   if(/\b(how to|guide|tutorial|learn|what is|ways|tips|steps|example)\b/.test(t))intents.push('Informational');
   if(/\b(vs|versus|review|best|top|comparison|alternative)\b/.test(t))intents.push('Comparison');
   if(/\b(near me|address|hours|directions|phone|location|appointment)\b/.test(t))intents.push('Local');
-  if(/\b(login|sign in|sign up|register|dashboard|account|download)\b/.test(t))intents.push('Navigational/transactional');
-  if(!intents.length)intents.push('General/informational');
+  if(/\b(login|sign in|sign up|register|dashboard|account|download)\b/.test(t))intents.push('Navigational');
+  if(!intents.length)intents.push('General');
   return intents;
 }
 function freshness(text,metas,url){
@@ -161,8 +158,8 @@ function freshness(text,metas,url){
   const um=url.match(/\/(20\d{2})\/(0[1-9]|1[0-2])\//); if(um)dates.push(um[1]+'-'+um[2]);
   const vm=text.match(/\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2},?\s+20\d{2}\b/i); if(vm)dates.push(vm[0]);
   const ym=text.match(/\b(20\d{2})\b/g);
-  let latest=null, year=null;
-  for(const d of dates){const y=(String(d).match(/20\d{2}/)||[])[0];if(y){year=Number(y);if(!latest||y>latest)latest=Number(y)}}
+  let latest=null;
+  for(const d of dates){const y=(String(d).match(/20\d{2}/)||[])[0];if(y){if(!latest||Number(y)>latest)latest=Number(y)}}
   if(ym){const max=Math.max(...ym.map(Number).filter(y=>y>=2000&&y<=2030));if(!latest||max>latest)latest=max}
   const age=latest?new Date().getFullYear()-latest:null;
   return {dates:[...new Set(dates)].slice(0,5),latest,age};
@@ -183,12 +180,12 @@ function parseRobots(txt){
   return {txt,sitemaps,groups,blocksAll:agentBlocked('*'),agentBlocked,botMentioned};
 }
 async function fetchRobots(origin,signal){
-  try{return (await fetchUrl(origin+'/robots.txt',signal,8000)).text||''}catch{return ''}
+  try{return (await fetchUrl(origin+'/robots.txt',signal,6000)).text||''}catch{return ''}
 }
 async function readSitemap(sm,origin,signal,depth=0){
   if(depth>2)return {urls:[],nested:[]};
   try{
-    const txt=(await fetchUrl(sm,signal,10000)).text||'';
+    const txt=(await fetchUrl(sm,signal,8000)).text||'';
     const locs=[...txt.matchAll(/<loc>([^<]+)<\/loc>/gi)].map(m=>m[1].trim()).filter(u=>sameSite(u,origin)&&!isAsset(u));
     const nested=[...txt.matchAll(/<loc>([^<]+sitemap[^<]*)<\/loc>/gi)].map(m=>m[1].trim());
     return {urls:locs,nested};
@@ -231,9 +228,8 @@ function extractPage(html,baseUrl,fetchInfo){
       width:img.getAttribute('width'), height:img.getAttribute('height'),
       loading:(img.getAttribute('loading')||'').toLowerCase(),
       srcset:img.getAttribute('srcset')||'',
-      inPicture:!!img.closest('picture'),
       format:(src.split('.').pop()||'').toLowerCase().split('?')[0],
-      bytes:null, dims:null
+      dims:null
     };
   }).filter(i=>i.src);
   const links=qsa('a[href]').map(a=>{
@@ -248,7 +244,6 @@ function extractPage(html,baseUrl,fetchInfo){
   const scripts=qsa('script[src]').map(s=>({src:abs(s.getAttribute('src'),baseUrl),async:s.hasAttribute('async'),defer:s.hasAttribute('defer')}));
   const inlineScripts=qsa('script:not([src])').length;
   const stylesheets=qsa('link[rel~="stylesheet"]').map(l=>abs(l.getAttribute('href'),baseUrl)).filter(Boolean);
-  const inlineStyles=qsa('style').length;
   const stylesheetsInHead=qsa('head link[rel~="stylesheet"]').length;
   const blockingScripts=qsa('head script[src]').filter(s=>!s.hasAttribute('async')&&!s.hasAttribute('defer')).length;
   const jsonLd=[];
@@ -271,7 +266,7 @@ function extractPage(html,baseUrl,fetchInfo){
     url:baseUrl,title,titleLen:title.length,desc,descLen:desc.length,canonical,robotsMeta,viewport,lang,
     headings,h1,h2,headingsCount:headings.length,
     bodyText,wordCount:words.length,keywords:topKeywords(bodyText,15),
-    charset,contentType,images,links,scripts,inlineScripts,stylesheets,inlineStyles,
+    charset,contentType,images,links,scripts,inlineScripts,stylesheets,
     stylesheetsInHead,blockingScripts,jsonLd,schemaTypes,microdata,rdfa,hreflangs,
     fonts,inlineFontFace,metaRefreshes,ratio,
     noindex:/noindex/i.test(robotsMeta),nofollow:/nofollow/i.test(robotsMeta),
@@ -281,324 +276,293 @@ function extractPage(html,baseUrl,fetchInfo){
 
 /* ----------------------------- issue model ----------------------------- */
 function addTo(arr,g,s,page,check,value,why,fix,weight=1){arr.push({group:g,severity:s,page,check,value,why,fix,weight})}
-const sevScore=s=>s==='critical'?0:s==='warning'?55:s==='info'?100:100;
+const sevScore=s=>s==='critical'?0:s==='warning'?60:100;
 const statusOf=s=>s==='critical'?'fail':s==='warning'?'warn':s==='pass'?'pass':'info';
 function grade(s){return s>=90?'Excellent':s>=75?'Good':s>=60?'Needs work':s>=40?'Poor':'Critical'}
 
+/* ----------------------------- progress steps ----------------------------- */
+const SCAN_STEPS=[
+  {key:'connect',label:'Connecting to the site',icon:'power'},
+  {key:'robots',label:'Reading robots.txt',icon:'rule'},
+  {key:'sitemap',label:'Checking the sitemap',icon:'account_tree'},
+  {key:'crawl',label:'Crawling pages',icon:'travel_explore'},
+  {key:'images',label:'Checking images',icon:'image'},
+  {key:'links',label:'Checking links and resources',icon:'link'},
+  {key:'analyze',label:'Analyzing content and code',icon:'manage_search'},
+  {key:'report',label:'Building the report',icon:'grading'}
+];
+function startScan(url){
+  out._scan=null;
+  return window.ScanProgress.create(out,{
+    title:'Auditing '+ (hostOf(url)||url),
+    target:url,
+    icon:'travel_explore',
+    steps:SCAN_STEPS,
+    note:'Starting the crawl',
+    onCancel:()=>{if(currentCtrl)currentCtrl.abort()}
+  });
+}
+
 /* ----------------------------- main audit ----------------------------- */
-async function audit(rawUrl,progress,signal){
+async function audit(rawUrl,scan,signal){
   let start=rawUrl.trim(); if(!/^https?:\/\//i.test(start))start='https://'+start;
   const startUrl=new URL(start), origin=startUrl.origin;
-  const limit=clamp(parseInt(limitSel?.value||'6',10)||6,1,50);
-  progress('Discovering site…');
+  const limit=clamp(parseInt(limitSel?.value||'15',10)||15,1,200);
 
+  scan.set({connect:'active'},'Connecting to '+startUrl.hostname,4);
   const robotsTxt=await fetchRobots(origin,signal);
   const robots=parseRobots(robotsTxt);
+  scan.set({connect:'done',robots:'done'},robotsTxt?'robots.txt read':'No robots.txt found',10);
+
+  scan.set({sitemap:'active'},robots.sitemaps.length?'Reading sitemaps':'Looking for sitemap URLs',16);
   let sitemapUrls=[];
-  for(const sm of robots.sitemaps.slice(0,3)){
-    if(signal.aborted)throw new DOMException('aborted','AbortError');
-    progress('Reading sitemap…');
-    const r=await readSitemap(sm,origin,signal);
-    sitemapUrls.push(...r.urls);
-    for(const n of r.nested.slice(0,2)){const rr=await readSitemap(n,origin,signal,2);sitemapUrls.push(...rr.urls)}
+  const smEntries=(await Promise.all(robots.sitemaps.slice(0,3).map(sm=>readSitemap(sm,origin,signal).catch(()=>({urls:[],nested:[]}))))).flat();
+  for(const r of smEntries) sitemapUrls.push(...r.urls);
+  for(const r of smEntries){
+    for(const n of r.nested.slice(0,2)){ if(signal.aborted)throw new DOMException('aborted','AbortError');
+      const rr=await readSitemap(n,origin,signal,2); sitemapUrls.push(...rr.urls); }
   }
   sitemapUrls=[...new Set(sitemapUrls)].filter(u=>!isAsset(u));
+  scan.label('sitemap',sitemapUrls.length?`Sitemap: ${sitemapUrls.length} URLs found`:'Sitemap check finished');
+  scan.set({sitemap:'done'},sitemapUrls.length?sitemapUrls.length+' sitemap URLs found':'No sitemap URLs discovered',20);
 
-  // BFS crawl starting from the entered URL, seeded with sitemap URLs.
+  /* Parallel crawl: several pages are fetched at once and new links are
+     queued as soon as a page is parsed, so the audit finishes faster. */
   const visited=new Set(); const queue=[start,...sitemapUrls.filter(u=>u!==start)];
-  const pages=[]; const errors=[];
-  const headers=[];
-  let firstInfo=null;
-  while(visited.size<limit && queue.length){
-    if(signal.aborted)throw new DOMException('aborted','AbortError');
-    const u=new URL(queue.shift(),origin); u.hash=''; const key=u.href;
-    if(visited.has(key))continue; visited.add(key);
-    progress(`Crawling ${visited.size}/${Math.min(limit,visited.size+queue.length)}: ${pathOf(key)}`);
-    let info;
-    try{ info=await fetchUrl(key,signal,12000); }
-    catch(e){ errors.push({url:key,error:e.message}); continue; }
-    if(!firstInfo)firstInfo=info;
-    headers.push({url:key,status:info.status,via:info.via,ms:info.ms||null,
-      server:info.headers['server']||'',viaHdr:info.headers['via']||'',
-      encoding:info.headers['content-encoding']||'',cache:info.headers['cache-control']||'',
-      type:info.headers['content-type']||'',redirected:info.redirected,finalUrl:info.finalUrl});
-    // Only parse HTML responses
-    const ctype=info.headers['content-type']||'';
-    if(info.text && /html|xml|text\/plain/i.test(ctype)||info.text && !/\x00/.test(info.text.slice(0,200))){
-      const page=extractPage(info.text,info.finalUrl||key,info);
-      page.status=info.status; page.finalUrl=info.finalUrl; page.via=info.via;
-      pages.push(page);
-      // discover internal links (BFS)
-      for(const l of page.links){if(l.internal&&!visited.has(l.href)&&!isAsset(l.href)&&!queue.includes(l.href)&&sameSite(l.href,origin))queue.push(l.href)}
+  const pages=[]; const errors=[]; const headers=[];
+  let firstInfo=null, active=0, budgetDone=false;
+  const crawlStart=Date.now();
+  const nap=ms=>new Promise(r=>setTimeout(r,ms));
+  async function crawlWorker(){
+    for(;;){
+      if(visited.size>=limit)break;
+      if(signal.aborted)throw new DOMException('aborted','AbortError');
+      if(!budgetDone&&Date.now()-crawlStart>90000){budgetDone=true;break;}
+      if(!queue.length){ if(active===0)break; await nap(40); continue; }
+      const raw=queue.shift();
+      let u; try{u=new URL(raw,origin)}catch{continue}
+      u.hash=''; const key=u.href;
+      if(visited.has(key))continue; visited.add(key);
+      let info; active++;
+      try{ info=await fetchUrl(key,signal,12000); }
+      catch(e){ active--; errors.push({url:key,error:e.message}); continue; }
+      active--;
+      if(!firstInfo)firstInfo=info;
+      headers.push({url:key,status:info.status,via:info.via,ms:info.ms||null,
+        server:info.headers['server']||'',viaHdr:info.headers['via']||'',
+        encoding:info.headers['content-encoding']||'',cache:info.headers['cache-control']||'',
+        type:info.headers['content-type']||'',redirected:info.redirected,finalUrl:info.finalUrl});
+      const ctype=info.headers['content-type']||'';
+      const looksHtml=/html|xml/i.test(ctype)||(!ctype&&!/\x00/.test(info.text.slice(0,200))&&/^\s*<(!doctype|html|\?xml)/i.test(info.text.slice(0,250)));
+      if(info.text&&looksHtml){
+        const page=extractPage(info.text,info.finalUrl||key,info);
+        page.status=info.status; page.finalUrl=info.finalUrl; page.via=info.via;
+        pages.push(page);
+        for(const l of page.links){
+          if(l.internal&&!visited.has(l.href)&&!isAsset(l.href)&&!queue.includes(l.href)&&sameSite(l.href,origin)&&queue.length<limit*4)queue.push(l.href);
+        }
+      }
+      scan.label('crawl',`Crawling pages (${pages.length}/${Math.min(limit,visited.size+queue.length)})`);
+      scan.note('Reading '+trim(pathOf(key),52));
+      scan.progress(20+Math.min(40,Math.round(visited.size/Math.max(1,Math.min(limit,visited.size+queue.length))*40)));
     }
   }
-  if(!pages.length&&errors.length)throw new Error('No pages could be read. '+errors[0].error);
+  const workers=Math.min(4, Math.max(1, limit));
+  await Promise.all(Array.from({length:workers},()=>crawlWorker()));
+  if(!pages.length){
+    const e=new Error('No Reliable Page Found');
+    e.name='NoPagesError';
+    throw e;
+  }
   const home=pages[0];
+
+  scan.set({crawl:'done',images:'active'},`${pages.length} page${pages.length===1?'':'s'} crawled${budgetDone?' (crawl time budget reached)':''}`,62);
   const issues=[];
   const I=(g,s,p,c,v,w,f,wt)=>addTo(issues,g,s,p,c,v,w,f,wt);
 
   /* ----- Site / Technical ----- */
   I('Technical',startUrl.protocol==='https:'?'pass':'critical','Site','HTTPS',
     startUrl.protocol==='https:'?'Site uses HTTPS':'Site served over HTTP',
-    'HTTPS protects visitors and is a confirmed Google ranking signal. Modern browsers flag HTTP as "Not secure".',
-    'Install an SSL/TLS certificate (Let’s Encrypt is free) and serve every URL over HTTPS.',5);
+    'HTTPS protects visitors and is a confirmed Google ranking signal. Modern browsers flag HTTP as not secure.',
+    'Install an SSL certificate (Let Us Encrypt is free) and serve every URL over HTTPS.',5);
   if(firstInfo&&firstInfo.via==='direct'){
-    I('Technical','pass','Site','SSL/TLS',`Secure connection established (${firstInfo.headers['content-type']?'response readable':'direct TLS'})`,
+    I('Technical','pass','Site','SSL/TLS','Secure connection established',
       'A valid certificate keeps the connection encrypted and preserves referrer data.',
       'Renew certificates automatically and monitor expiry.',1);
-  }else{
-    I('Technical','info','Site','SSL certificate',`Detailed certificate not visible through a CORS reader (fetched via ${firstInfo?.via||'proxy'})`,
-      'Certificate validity, issuer and expiry affect trust and rankings.',
-      'Check certificate chain and expiry with SSL Labs Server Test.',1);
   }
-  // HTTP -> HTTPS / www consistency
-  try{
-    const httpUrl='http://'+startUrl.host+startUrl.pathname;
-    // best-effort: only detectable directly; otherwise infer from start
-    if(startUrl.protocol==='http:'){
-      I('Technical','critical','Site','HTTP to HTTPS redirect','No HTTPS detected on the entered URL','Redirecting HTTP to HTTPS prevents duplicate/insecure access.','301-redirect all http:// traffic to https://.',4);
-   }else{
-      I('Technical','pass','Site','HTTP to HTTPS redirect','Entered URL uses HTTPS','All traffic should be served over HTTPS.','Ensure the server 301-redirects http:// to https://.',3);
-    }
-    const www=startUrl.host.startsWith('www.');
-    I('Technical','pass','Site','WWW vs non-WWW',(www?'www':'non-www')+' canonical chosen',
-      'Search engines should index one host version to avoid duplicate content.',
-      'Pick one version and 301-redirect the other to it.',2);
-  }catch{}
   I('Technical',robots.txt?'pass':'warning','Site','robots.txt',robots.txt?'Found':'Missing',
     'robots.txt gives crawlers instructions and points to your sitemap.','Create a robots.txt that references your XML sitemap.',4);
   I('Technical',robots.blocksAll?'critical':'pass','Site','Robots block',robots.blocksAll?'Disallow: / blocks the whole site':'No global block found',
-    'Blocking / removes the entire site from search results.','Remove "Disallow: /" unless the site should be private.',5);
+    'Blocking / removes the entire site from search results.','Remove Disallow: / unless the site should be private.',5);
   I('Technical',robots.sitemaps.length?'pass':'warning','Site','XML sitemap',robots.sitemaps[0]||'Not referenced in robots.txt',
-    'Sitemaps help search engines discover important pages.','Submit an XML sitemap and reference it in robots.txt.',4);
-  I('Technical',sitemapUrls.length?'pass':'warning','Site','Sitemap URLs',`${sitemapUrls.length} usable URLs discovered`,
-    'A sitemap should list canonical, indexable pages.','Keep the sitemap current and submit it in Search Console.',3);
-  // per-page indexability / canonical / status
+    'Sitemaps help search engines discover important pages.','Publish an XML sitemap and reference it in robots.txt.',4);
   pages.forEach(p=>{
     const path=pathOf(p.url);
-    if(p.status>=400&&p.status<500)I('Technical','critical',path,'HTTP status',String(p.status),'A 4xx status means the page is unavailable to visitors and crawlers.','Fix or 301-redirect the URL to a working page.',5);
-    else if(p.status>=500)I('Technical','critical',path,'HTTP status',String(p.status),'Server errors prevent crawling.','Fix the application/server error.',5);
-    else if(p.status>=300&&p.status<400)I('Technical','warning',path,'Redirect',String(p.status),'Redirects waste crawl budget and add latency.','Link directly to the final URL.',3);
+    if(p.status>=400&&p.status<500)I('Technical','critical',path,'HTTP status',String(p.status),'A 4xx status means the page is unavailable to visitors and crawlers.','Fix or redirect the URL to a working page.',5);
+    else if(p.status>=500)I('Technical','critical',path,'HTTP status',String(p.status),'Server errors prevent crawling.','Fix the application or server error.',5);
+    else if(p.status>=300&&p.status<400)I('Technical','warning',path,'Redirect',String(p.status),'Redirects add latency and waste crawl budget.','Link directly to the final URL.',3);
     else if(p.status&&p.via==='direct')I('Technical','pass',path,'HTTP status',String(p.status),'A 200 response is the expected result for indexable pages.','',1);
-    else I('Technical','info',path,'HTTP status',p.status?String(p.status):'unknown (via proxy)','Status codes confirm whether a page is reachable.','Verify directly if the proxy could not expose the status.',1);
     if(p.noindex)I('Technical','critical',path,'Noindex meta','Page carries noindex','A noindex directive removes the page from search results.','Remove noindex if the page should rank.',5);
     else I('Technical','pass',path,'Meta robots',p.robotsMeta||'index, follow (default)','Indexable pages can appear in search results.','Keep important pages indexable.',1);
     if(p.nofollow)I('Technical','warning',path,'Nofollow meta','Page carries nofollow','Nofollow on a page stops link equity flowing through its links.','Remove unless intentionally needed.',2);
-    if(!p.canonical)I('Technical','warning',path,'Canonical URL','Missing','Canonical tags prevent duplicate-content issues.','Add a self-referencing canonical tag.',3);
-    else if(sameSite(p.canonical,p.url)&&p.canonical.replace(/\/$/,'')!==p.url.replace(/\/$/,''))I('Technical','warning',path,'Canonical URL',trim(p.canonical,80),'Canonical points to a different URL; ensure it is intentional.','Use a self-referencing canonical unless this is a duplicate.',3);
-    else I('Technical','pass',path,'Canonical URL',trim(p.canonical,80)||'(self)','Canonical helps consolidate duplicate signals.','',1);
+    if(!p.canonical)I('Technical','warning',path,'Canonical URL','Missing','Canonical tags prevent duplicate content issues.','Add a self referencing canonical tag.',3);
+    else if(sameSite(p.canonical,p.url)&&p.canonical.replace(/\/$/,'')!==p.url.replace(/\/$/,''))I('Technical','warning',path,'Canonical URL',trim(p.canonical,80),'Canonical points to a different URL. Make sure that is intentional.','Use a self referencing canonical unless this is a duplicate.',3);
+    else I('Technical','pass',path,'Canonical URL',trim(p.canonical,80)||'(self)','Canonical tags consolidate duplicate signals.','',1);
+    if(p.url.length>115)I('Technical','warning',path,'URL length',p.url.length+' characters',
+      'Very long URLs are harder to share and may be truncated in results.','Keep URLs short and descriptive.',1);
   });
-  // URL structure
-  pages.forEach(p=>{
-    const path=pathOf(p.url);
-    if(p.url.length>75)I('Technical','warning',path,'URL length',`${p.url.length} chars`,
-      'Long URLs are harder to share and may be truncated in results.','Keep URLs short, descriptive and keyword-aware.',1);
-    if(/[^A-Za-z0-9\-._~!$&'()*+,;=:@/\%\?\=]/.test(decodeURIComponent(p.url)))I('Technical','warning',path,'URL structure','Contains non-ASCII/special characters','Clean URLs are easier to read and share.','Use hyphens and plain words.',1);
-  });
-  // trailing slash consistency + duplicate URLs
   const slashCounts={with:0,without:0}; pages.forEach(p=>{const pp=new URL(p.url); if(pp.pathname==='/')return; pp.pathname.endsWith('/')?slashCounts.with++:slashCounts.without++;});
   if(slashCounts.with&&slashCounts.without)I('Technical','warning','Site','Trailing slash',`Mixed: ${slashCounts.with} with slash, ${slashCounts.without} without`,
-    'Inconsistent trailing slashes create duplicate URLs.','Standardise on one format and 301-redirect the other.',2);
+    'Inconsistent trailing slashes create duplicate URLs.','Standardise on one format and redirect the other.',2);
   else I('Technical','pass','Site','Trailing slash',slashCounts.with?'All use trailing slash':'No trailing slash','Consistent URL format avoids duplicates.','',1);
-  // duplicate URLs by path/query
   const byPath={}; pages.forEach(p=>{const k=new URL(p.url).pathname;(byPath[k]=byPath[k]||[]).push(p.url)});
-  Object.entries(byPath).forEach(([k,urls])=>{if(urls.length>1)I('Technical','warning',k,'Duplicate URLs',`${urls.length} variants`,'Duplicate URLs split ranking signals.','Canonicalise and 301 variants.',3)});
-  // redirect chain / loop (best effort from direct fetches)
-  headers.forEach(h=>{if(h.redirected&&h.finalUrl)I('Technical','info',pathOf(h.url),'Redirect detected',`→ ${pathOf(h.finalUrl)}`,'Redirect chains waste crawl budget.','Keep redirects to a single hop.',1)});
+  Object.entries(byPath).forEach(([k,urls])=>{if(urls.length>1)I('Technical','warning',k,'Duplicate URLs',urls.length+' variants','Duplicate URLs split ranking signals.','Canonicalise and redirect variants.',3)});
+  headers.forEach(h=>{if(h.redirected&&h.finalUrl)I('Technical','info',pathOf(h.url),'Redirect detected','to '+pathOf(h.finalUrl),'Redirect chains waste crawl budget.','Keep redirects to a single hop.',1)});
 
-  /* ----- On-page ----- */
+  /* ----- On page ----- */
   const titleMap={}, descMap={};
   pages.forEach(p=>{
     const path=pathOf(p.url); titleMap[p.title]=(titleMap[p.title]||0)+1; descMap[p.desc]=(descMap[p.desc]||0)+1;
-    I('On-page',!p.title?'critical':p.titleLen>=30&&p.titleLen<=60?'pass':'warning',path,'Title tag',p.title?`${p.titleLen} chars · ${trim(p.title,70)}`:'Missing',
-      'The title is the most visible on-page ranking element and drives click-through.','Write a unique 30–60 character title starting with the primary keyword.',5);
-    I('On-page',!p.desc?'warning':p.descLen>=120&&p.descLen<=160?'pass':'warning',path,'Meta description',p.desc?`${p.descLen} chars`:'Missing',
-      'Descriptions do not directly rank but strongly influence CTR from results.','Write a unique 120–160 character description with a clear call to action.',3);
-    I('On-page',p.h1.length===1?'pass':p.h1.length?'warning':'critical',path,'H1',`${p.h1.length} H1`,
+    I('On page',!p.title?'critical':p.titleLen>=30&&p.titleLen<=60?'pass':'warning',path,'Title tag',p.title?p.titleLen+' characters: '+trim(p.title,60):'Missing',
+      'The title is the most visible on page element and drives clicks from search results.','Write a unique 30 to 60 character title starting with the primary keyword.',5);
+    I('On page',!p.desc?'warning':p.descLen>=120&&p.descLen<=160?'pass':'warning',path,'Meta description',p.desc?p.descLen+' characters':'Missing',
+      'Descriptions strongly influence how often people click your result.','Write a unique 120 to 160 character description with a clear promise.',3);
+    I('On page',p.h1.length===1?'pass':p.h1.length?'warning':'critical',path,'H1',p.h1.length+' H1',
       'One clear H1 establishes the page topic for crawlers and readers.','Use exactly one descriptive H1 per page.',5);
-    if(p.h1.length>1)p.h1.forEach(h=>I('On-page','warning',path,'Multiple H1',trim(h,60),'Multiple H1s dilute topic clarity.','Convert extra H1s to H2s.',3));
-    I('On-page',p.h2.length>=1?'pass':'warning',path,'H2–H6 structure',`${p.headingsCount} headings`,
-      'Heading hierarchy makes content scannable and semantically clear.','Use H2s for main sections and H3s for sub-points.',2);
-    // heading hierarchy skips
+    if(p.h1.length>1)p.h1.slice(1).forEach(h=>I('On page','warning',path,'Multiple H1',trim(h,60),'Multiple H1s dilute topic clarity.','Convert extra H1s to H2s.',3));
+    I('On page',p.h2.length>=1?'pass':'warning',path,'Heading structure',p.headingsCount+' headings',
+      'Heading hierarchy makes content scannable and semantically clear.','Use H2s for main sections and H3s for sub points.',2);
     let prev=1, skip=false;
     p.headings.forEach(h=>{const lvl=Number(h.tag[1]);if(lvl>prev+1)skip=true;prev=lvl});
-    I('On-page',skip?'warning':'pass',path,'Heading hierarchy',skip?'Skips a heading level':'Logical order',
-      'Skipping levels (e.g. H1→H3) confuses document outline.','Nest headings without skipping levels.',2);
+    I('On page',skip?'warning':'pass',path,'Heading hierarchy',skip?'Skips a heading level':'Logical order',
+      'Skipping levels confuses the document outline.','Nest headings without skipping levels.',2);
     const kw=p.keywords[0];
-    if(kw){
+    if(kw&&kw[1]>1){
       const inTitle=new RegExp('\\b'+kw[0].replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i').test(p.title);
       const inH1=p.h1.some(h=>new RegExp('\\b'+kw[0]+'\\b','i').test(h));
-      const inDesc=new RegExp('\\b'+kw[0]+'\\b','i').test(p.desc);
-      const density=((kw[1]/Math.max(1,p.wordCount))*100).toFixed(1);
-      I('On-page',(inTitle&&inH1)?'pass':'warning',path,'Keyword placement',`Primary "${kw[0]}" ${inTitle?'in title':'NOT in title'}, ${inH1?'in H1':'NOT in H1'}, ${inDesc?'in description':'not in description'}`,
-        'Placing the primary topic in the title and H1 reinforces relevance.','Include the primary keyword in title, H1, first paragraph and meta description.',3);
-      I('On-page','pass',path,'Keyword density',`"${kw[0]}" ${kw[1]}× (${density}%)`,'Natural keyword use signals relevance.','Keep density natural; avoid stuffing.',1);
+      I('On page',(inTitle&&inH1)?'pass':'warning',path,'Keyword placement',`Primary term "${kw[0]}" ${inTitle?'in title':'not in title'}, ${inH1?'in H1':'not in H1'}`,
+        'Placing the primary topic in the title and H1 reinforces relevance.','Include the main keyword in the title, H1 and first paragraph.',3);
     }
   });
-  Object.entries(titleMap).forEach(([t,n])=>{if(t&&n>1)I('On-page','warning','Site','Duplicate titles',`${n} pages share: ${trim(t,60)}`,'Duplicate titles cannibalise relevance and reduce CTR.','Write unique titles per page.',4)});
-  Object.entries(descMap).forEach(([d,n])=>{if(d&&n>1)I('On-page','warning','Site','Duplicate descriptions',`${n} pages share the same description`,'Unique descriptions improve targeting and CTR.','Write unique descriptions.',3)});
+  Object.entries(titleMap).forEach(([t,n])=>{if(t&&n>1)I('On page','warning','Site','Duplicate titles',n+' pages share: '+trim(t,60),'Duplicate titles cannibalise relevance and reduce clicks.','Write unique titles per page.',4)});
+  Object.entries(descMap).forEach(([d,n])=>{if(d&&n>1)I('On page','warning','Site','Duplicate descriptions',n+' pages share the same description','Unique descriptions improve targeting.','Write unique descriptions.',3)});
 
   /* ----- Content ----- */
+  scan.set({images:'done',links:'done',analyze:'active'},'Analyzing content, images and links',78);
   const pageShingles=pages.map(p=>({p,sh:shingles(p.bodyText.slice(0,8000))}));
   pages.forEach(p=>{
     const path=pathOf(p.url);
-    I('Content',p.wordCount>=500?'pass':p.wordCount>=250?'warning':'critical',path,'Word count',`${p.wordCount} words`,
-      'Thin content provides little value and rarely ranks for competitive queries.','Add genuinely useful, original content that satisfies intent.',4);
-    I('Content',p.ratio>=10?'pass':p.ratio>=5?'warning':'warning',path,'Text-to-HTML ratio',`${p.ratio}% text`,
-      'A low ratio can signal heavy markup relative to content.','Reduce bloated markup and increase useful text.',1);
+    I('Content',p.wordCount>=500?'pass':p.wordCount>=250?'warning':'critical',path,'Word count',p.wordCount+' words',
+      'Thin content provides little value and rarely ranks for competitive queries.','Add genuinely useful original content that satisfies the query.',4);
+    I('Content',p.ratio>=10?'pass':p.ratio>=5?'warning':'warning',path,'Text to HTML ratio',p.ratio+'% text',
+      'A very low ratio can signal heavy markup relative to content.','Reduce bloated markup and increase useful text.',1);
     const rd=flesch(p.bodyText);
-    I('Content',rd>=60?'pass':rd>=40?'warning':'warning',path,'Readability',`Flesch ${rd}/100`,
-      'Readable content keeps users engaged and is favoured by many ranking systems.','Use shorter sentences, subheadings and plain language.',2);
+    I('Content',rd>=60?'pass':rd>=40?'warning':'warning',path,'Readability','Flesch '+rd+' of 100',
+      'Readable content keeps visitors engaged.','Use shorter sentences, subheadings and plain language.',2);
     const fr=freshness(p.bodyText,{},p.url);
-    I('Content',fr.latest?(fr.age<=1?'pass':fr.age<=2?'warning':'warning'):'info',path,'Content freshness',fr.latest?`Latest year: ${fr.latest}`:'No date detected',
-      'Fresh content matters for time-sensitive queries and shows maintenance.','Update or republish with the date and new information.',2);
-    I('Content',p.headings.length?'pass':'warning',path,'Missing headings',p.headings.length?`${p.headings.length} found`:'None',
-      'Headings break content into digestible sections.','Add descriptive H2/H3 sections.',2);
+    I('Content',fr.latest?(fr.age<=1?'pass':'warning'):'info',path,'Content freshness',fr.latest?'Latest year: '+fr.latest:'No date detected',
+      'Fresh content matters for time sensitive queries.','Update older pages with current information.',2);
     if(p.bodyText.trim().length<50)I('Content','critical',path,'Empty content','Very little visible text','Pages without visible content cannot rank.','Add meaningful content.',5);
   });
-  // near-duplicate detection
   for(let i=0;i<pageShingles.length;i++)for(let j=i+1;j<pageShingles.length;j++){
     const sim=jaccard(pageShingles[i].sh,pageShingles[j].sh);
-    if(sim>0.9)I('Content','critical','Site','Duplicate content',`${pathOf(pageShingles[i].p.url)} ≈ ${pathOf(pageShingles[j].p.url)} (${Math.round(sim*100)}%)`,'Duplicate pages compete against each other.','Consolidate or canonicalise duplicates.',4);
-    else if(sim>0.6)I('Content','warning','Site','Near-duplicate content',`${pathOf(pageShingles[i].p.url)} ≈ ${pathOf(pageShingles[j].p.url)} (${Math.round(sim*100)}%)`,'Very similar pages dilute topical focus.','Differentiate or merge.',3);
+    if(sim>0.9)I('Content','critical','Site','Duplicate content',pathOf(pageShingles[i].p.url)+' matches '+pathOf(pageShingles[j].p.url)+' ('+Math.round(sim*100)+'%)','Duplicate pages compete against each other.','Consolidate or canonicalise duplicates.',4);
+    else if(sim>0.6)I('Content','warning','Site','Near duplicate content',pathOf(pageShingles[i].p.url)+' is close to '+pathOf(pageShingles[j].p.url)+' ('+Math.round(sim*100)+'%)','Very similar pages dilute topical focus.','Differentiate or merge.',3);
   }
-  // keyword cannibalization
-  const primaryByPage=pages.filter(p=>p.keywords[0]).map(p=>({p,kw:p.keywords[0][0]}));
+  const primaryByPage=pages.filter(p=>p.keywords[0]&&p.keywords[0][1]>2).map(p=>({p,kw:p.keywords[0][0]}));
   const kwPages={}; primaryByPage.forEach(x=>{(kwPages[x.kw]=kwPages[x.kw]||[]).push(x.p)});
-  Object.entries(kwPages).forEach(([kw,ps])=>{if(ps.length>1)I('Content','warning','Site','Keyword cannibalization',`"${kw}" targeted by ${ps.length} pages`,'Multiple pages targeting the same term split authority.','Consolidate into one strong page or clearly differentiate intent.',3)});
-  // search intent + semantic / entity (home page)
+  Object.entries(kwPages).forEach(([kw,ps])=>{if(ps.length>1)I('Content','warning','Site','Keyword cannibalisation','"'+kw+'" targeted by '+ps.length+' pages','Multiple pages targeting the same term split authority.','Consolidate into one strong page or differentiate the intent.',3)});
   if(home){
     const intent=detectIntent(home.bodyText,home.title,home.url);
     I('Content','info','Site','Search intent',intent.join(', '),
       'Matching search intent is essential for ranking.','Align format and depth with the dominant intent.',1);
     const ents=entities(home.bodyText.slice(0,6000));
-    I('Content','info','Site','Entities / topics',ents.length?ents.slice(0,6).join(', '):'None detected',
-      'Clear entities help search engines understand the topic.','Mention well-defined people, places, organisations and concepts.',1);
-    if(home.keywords.length){
-      I('Content','info','Site','Semantic coverage',home.keywords.slice(0,8).map(k=>k[0]).join(', '),
-        'Topical authority comes from covering related concepts, not repeating one phrase.','Add related terms, definitions, FAQs and synonyms.',1);
-    }
+    if(ents.length)I('Content','info','Site','Entities and topics',ents.slice(0,6).join(', '),
+      'Clear entities help search engines understand the topic.','Name concrete people, places, organisations and concepts.',1);
   }
 
   /* ----- Images ----- */
-  let allImages=[];
+  const allImages=[];
   pages.forEach(p=>p.images.forEach(im=>allImages.push({...im,page:pathOf(p.url)})));
   pages.forEach(p=>{
     const path=pathOf(p.url), imgs=p.images;
     const missing=imgs.filter(i=>i.alt===null).length;
-    const empty=imgs.filter(i=>i.alt==='').length;
     const withAlt=imgs.length-missing;
-    I('Images',!imgs.length?'info':withAlt/imgs.length>=0.8?'pass':'warning',path,'Image alt text',`${withAlt}/${imgs.length} have alt`,
-      'Alt text makes images accessible and helps image-search ranking.','Add descriptive alt text to meaningful images.',3);
-    if(missing)I('Images','warning',path,'Missing alt attributes',`${missing} missing`,'Missing alt hurts accessibility and image SEO.','Add alt attributes.',3);
-    if(empty)I('Images','warning',path,'Empty alt text',`${empty} empty`,'Empty alt is only appropriate for purely decorative images.','Describe meaningful images; mark decorative images appropriately.',1);
+    const empty=imgs.filter(i=>i.alt==='').length;
+    I('Images',!imgs.length?'info':withAlt/imgs.length>=0.8?'pass':'warning',path,'Image alt text',withAlt+' of '+imgs.length+' have alt text',
+      'Alt text makes images accessible and helps image search ranking.','Add descriptive alt text to meaningful images.',3);
+    if(missing)I('Images','warning',path,'Missing alt attributes',missing+' missing','Missing alt hurts accessibility and image SEO.','Add alt attributes.',3);
+    if(empty>2)I('Images','info',path,'Empty alt text',empty+' empty','Empty alt is only appropriate for decorative images.','Describe meaningful images.',1);
     const modern=imgs.filter(i=>/^(webp|avif)$/i.test(i.format)).length;
-    I('Images',!imgs.length?'info':modern?'pass':'warning',path,'Modern formats (WebP/AVIF)',`${modern}/${imgs.length} modern`,
-      'WebP/AVIF reduce file size and speed up pages (a ranking factor).','Convert large images to WebP/AVIF with a fallback.',2);
+    I('Images',!imgs.length?'info':modern?'pass':'warning',path,'Modern image formats',modern+' of '+imgs.length+' use WebP or AVIF',
+      'Modern formats cut file size and speed up pages.','Convert large images to WebP or AVIF.',2);
     const lazy=imgs.filter(i=>i.loading==='lazy').length;
-    I('Images',!imgs.length?'info':lazy>=Math.ceil(imgs.length/2)?'pass':'warning',path,'Lazy loading',`${lazy}/${imgs.length} lazy`,
-      'Lazy loading offscreen images speeds up initial load.','Add loading="lazy" to below-the-fold images.',2);
+    I('Images',!imgs.length?'info':lazy>=Math.ceil(imgs.length/2)?'pass':'warning',path,'Lazy loading',lazy+' of '+imgs.length+' lazy loaded',
+      'Lazy loading offscreen images speeds up the first paint.','Add loading="lazy" to below the fold images.',2);
     const noSize=imgs.filter(i=>!i.width||!i.height).length;
-    I('Images',!imgs.length?'info':noSize?'warning':'pass',path,'Missing width/height',`${noSize} unsized`,
-      'Unsized images cause layout shift (CLS) while loading.','Set width and height attributes and use CSS aspect-ratio.',3);
-    const srcset=imgs.filter(i=>i.srcset).length;
-    I('Images',!imgs.length?'info':srcset>=Math.ceil(imgs.length/2)?'pass':'info',path,'Responsive images (srcset)',`${srcset}/${imgs.length} with srcset`,
-      'Responsive images serve appropriately sized files per device.','Use srcset/sizes for large images.',1);
+    I('Images',!imgs.length?'info':noSize?'warning':'pass',path,'Image dimensions',noSize+' of '+imgs.length+' without width and height',
+      'Unsized images cause layout shift while loading.','Set width and height attributes.',3);
   });
 
-  /* ----- Performance / resources ----- */
-  // probe a capped subset of resources for status & size
-  const probeTargets=[];
-  pages.forEach(p=>{
-    p.images.slice(0,6).forEach(im=>probeTargets.push(im.src));
-    p.links.filter(l=>l.isAsset).slice(0,6).forEach(l=>probeTargets.push(l.href));
-  });
-  progress('Checking resources…');
-  const probes=new Map((await poolMap([...new Set(probeTargets)].slice(0,24),4,(u)=>probeStatus(u,signal))).map((r,i)=>[ [...new Set(probeTargets)].slice(0,24)[i], r]));
-  // attach image dims by loading
-  const dimTargets=[...new Set(pages.flatMap(p=>p.images.map(i=>i.src)).filter(Boolean))].slice(0,18);
-  const dims=new Map((await poolMap(dimTargets,4,(u)=>loadImageInfo(u))).map((r,i)=>[dimTargets[i],r]));
-  let bytesTotal=0, brokenImgs=0, oversized=0;
+  /* ----- Performance ----- */
+  const dimTargets=[...new Set(pages.flatMap(p=>p.images.map(i=>i.src)).filter(Boolean))].slice(0,14);
+  const dims=new Map((await poolMap(dimTargets,5,(u)=>loadImageInfo(u))).map((r,i)=>[dimTargets[i],r]));
+  let brokenImgs=0, oversized=0;
   allImages.forEach(im=>{
     const d=dims.get(im.src); if(d){im.dims=d; if(!d.ok)brokenImgs++; if(d.ok&&(d.width>2000||d.height>2000))oversized++;}
-    const pr=probes.get(im.src); if(pr&&pr.headers&&pr.headers['content-length'])bytesTotal+=parseInt(pr.headers['content-length'],10)||0;
   });
-  if(brokenImgs)I('Performance','warning','Site','Broken images',`${brokenImgs} failed to load`,'Broken images hurt UX and trust.','Re-upload or fix image paths.',3);
-  if(oversized)I('Performance','warning','Site','Oversized images',`${oversized} images larger than 2000px`,
-    'Oversized images waste bandwidth and slow mobiles.','Serve appropriately sized images and use srcset.',2);
+  if(brokenImgs)I('Performance','warning','Site','Broken images',brokenImgs+' failed to load','Broken images hurt the experience and trust.','Fix or replace the image paths.',3);
+  if(oversized)I('Performance','warning','Site','Oversized images',oversized+' larger than 2000 pixels',
+    'Oversized images waste bandwidth on mobile devices.','Serve appropriately sized images with srcset.',2);
   pages.forEach(p=>{
     const path=pathOf(p.url);
-    I('Performance',p.blockingScripts?'warning':'pass',path,'Render-blocking JavaScript',`${p.blockingScripts} blocking script(s) in <head>`,
-      'Blocking scripts delay rendering and hurt LCP/FCP.','Use defer/async or move scripts to the end of <body>.',3);
-    I('Performance',p.stylesheetsInHead?'info':'pass',path,'Render-blocking CSS',`${p.stylesheetsInHead} stylesheet(s)`,
-      'CSS is render-blocking by default; large sheets delay first paint.','Inline critical CSS and preload key stylesheets.',2);
-    I('Performance',p.inlineScripts>20?'warning':'info',path,'Inline scripts',`${p.inlineScripts} inline`,
-      'Many inline scripts bloat HTML and reduce caching.','Move inline scripts to external cacheable files.',1);
+    I('Performance',p.blockingScripts?'warning':'pass',path,'Render blocking JavaScript',p.blockingScripts+' blocking script(s) in head',
+      'Blocking scripts delay rendering and hurt LCP and FCP.','Use defer or async, or move scripts to the end of body.',3);
     const ext=p.scripts.filter(s=>!sameSite(s,origin)).length;
-    I('Performance',ext>8?'warning':'info',path,'Third-party scripts',`${ext} external`,
-      'Third-party scripts are a common source of slowdown and CLS.','Audit and defer/self-host where possible.',2);
-    I('Performance',p.fonts.length||p.inlineFontFace?'info':'pass',path,'Font optimization',`${p.fonts.length} font stylesheet(s)`,
-      'Web fonts can cause FOIT/FOUT and delay text rendering.','Use font-display:swap and preload primary weights.',1);
+    I('Performance',ext>8?'warning':'info',path,'Third party scripts',ext+' external',
+      'Third party scripts are a common source of slowdowns.','Audit them and defer or remove what you can.',2);
+    I('Performance',p.fonts.length||p.inlineFontFace?'info':'pass',path,'Web fonts',p.fonts.length+' font stylesheet(s)',
+      'Web fonts can delay text rendering.','Use font display swap and preload primary weights.',1);
   });
-  // compression / caching / cdn / cms from headers of first page
   const fh=firstInfo?.headers||{};
-  I('Performance',/gzip|br|deflate/i.test(fh['content-encoding'])?'pass':'warning','Site','Compression',fh['content-encoding']?'Content-encoding: '+fh['content-encoding']:'No compression detected',
-    'Gzip/Brotli shrinks HTML/CSS/JS and speeds delivery.','Enable Brotli or gzip on the server.',3);
-  if(fh['cache-control'])I('Performance','pass','Site','Browser caching',fh['cache-control'],'Cache-control lets browsers reuse assets.','Set long max-age with versioned filenames.',2);
-  else I('Performance','warning','Site','Browser caching','No cache-control header seen','Without caching headers, return visitors re-download assets.','Set Cache-Control for static assets.',2);
+  I('Performance',/gzip|br|deflate/i.test(fh['content-encoding'])?'pass':'warning','Site','Compression',fh['content-encoding']?'Content encoding: '+fh['content-encoding']:'No compression detected',
+    'Gzip or Brotli shrinks HTML, CSS and JavaScript.','Enable Brotli or gzip on the server.',3);
+  if(fh['cache-control'])I('Performance','pass','Site','Browser caching',fh['cache-control'],'Cache headers let browsers reuse assets.','',2);
+  else I('Performance','warning','Site','Browser caching','No cache control header seen','Without caching headers returning visitors re download assets.','Set Cache Control for static assets.',2);
   const serverHdr=(fh['server']||'').toLowerCase();
   const cdnHdr=fh['via']||fh['x-cache']||fh['x-served-by']||'';
   const cdnKnown=/cloudflare|akamai|fastly|cdn|google|azure|amazon|cloudfront|netlify|vercel|nginx/i.test(cdnHdr+' '+serverHdr);
   I('Performance',cdnKnown?'pass':'info','Site','CDN detection',cdnKnown?(cdnHdr+' '+serverHdr).trim():'No CDN header detected',
-    'A CDN reduces latency by serving content from edge locations.','Use a CDN for global audiences.',1);
-  const cmsPatterns=[['WordPress',/wp-content|wp-includes/i],['Drupal',/drupal|sites\/default/i],['Joomla',/joomla/i],['Shopify',/cdn\.shopify/i],['Wix',/wix\.com/i],['Squarespace',/squarespace/i],['React',/_next|reactroot/i],['Next.js',/_next/i],['Vue',/data-v-|vue/i]];
+    'A CDN reduces latency by serving content from nearby locations.','Use a CDN for a global audience.',1);
+  const cmsPatterns=[['WordPress',/wp-content|wp-includes/i],['Drupal',/drupal|sites\/default/i],['Joomla',/joomla/i],['Shopify',/cdn\.shopify/i],['Wix',/wix\.com/i],['Squarespace',/squarespace/i],['React',/_next|reactroot/i],['Vue',/data-v-|vue/i]];
   const cms=cmsPatterns.filter(([,re])=>re.test((home?.bodyText||'')+(firstInfo?.text||''))).map(([n])=>n);
-  I('Performance','info','Site','CMS / technology',cms.length?[...new Set(cms)].join(', '):'Not identified','Knowing the stack helps prioritise performance fixes.','Keep core, themes and plugins updated.',1);
-  I('Performance','info','Site','Core Web Vitals (LCP,INP,CLS,FCP,TTFB,TBT,Speed Index)','Requires a lab/field run',
-    'Core Web Vitals are confirmed ranking factors but need a real browser or CrUX data.','Run PageSpeed Insights for lab and field metrics.',0);
-  I('Performance','info','Site','Unused CSS/JavaScript','Requires rendering the page',
-    'Unused code wastes bytes and delays interactivity.','Audit with Chrome DevTools Coverage or Lighthouse.',0);
-  // Response time (direct only)
+  I('Performance','info','Site','CMS / technology',cms.length?[...new Set(cms)].join(', '):'Not identified','Knowing the stack helps prioritise fixes.','Keep core, themes and plugins updated.',1);
+  I('Performance','info','Site','Core Web Vitals (LCP, INP, CLS)','Needs a lab or field run',
+    'Core Web Vitals are confirmed ranking signals but need real browser data.','Run PageSpeed Insights for LCP, INP and CLS values.',0);
   const directH=headers.find(h=>h.via==='direct'&&h.ms);
-  I('Performance',directH?(directH.ms<600?'pass':directH.ms<1500?'warning':'warning'):'info','Site','Server response time (TTFB)',directH?`${directH.ms} ms`:'Not measurable through CORS reader',
-    'Slow time-to-first-byte delays every other metric.','Optimise hosting, database and caching.',2);
+  I('Performance',directH?(directH.ms<600?'pass':'warning'):'info','Site','Server response time',directH?directH.ms+' ms':'Not measurable through a relay',
+    'Slow time to first byte delays every other metric.','Optimise hosting, caching and the database.',2);
 
   /* ----- Mobile ----- */
   pages.forEach(p=>{
     const path=pathOf(p.url);
     I('Mobile',/width=device-width/.test(p.viewport)?'pass':p.viewport?'warning':'critical',path,'Viewport meta tag',p.viewport||'Missing',
-      'A viewport tag tells mobile browsers how to scale the page.','Add <meta name="viewport" content="width=device-width, initial-scale=1">.',5);
-    const mq=(firstInfo?.text.match(/@media[^{]*/g)||[]).length;
-    I('Mobile',mq>0?'pass':'warning',path,'Responsive design',mq?`${mq} media queries found`:'No media queries detected',
-      'Responsive layout adapts to all screen sizes.','Use fluid layouts and media queries.',3);
-    I('Mobile','info',path,'Tap targets','Needs visual layout check',
-      'Closely packed links/buttons are hard to tap on touchscreens.','Keep tap targets ≥48px with adequate spacing.',0);
-    I('Mobile','info',path,'Horizontal overflow / small text','Needs visual layout check',
-      'Horizontal scroll and tiny text hurt mobile usability.','Use relative units and test at 360px width.',0);
+      'A viewport tag tells mobile browsers how to scale the page.','Add meta viewport with width=device-width.',5);
   });
+  const mqAll=(firstInfo?.text.match(/@media[^{]*/g)||[]).length;
+  I('Mobile',mqAll>0?'pass':'warning','Site','Responsive design',mqAll?mqAll+' media queries found':'No media queries detected',
+    'A responsive layout adapts to every screen size.','Use fluid layouts and media queries.',3);
 
   /* ----- Schema ----- */
   pages.forEach(p=>{
     const path=pathOf(p.url);
     const invalid=p.jsonLd.filter(j=>j.__parseError).length;
-    I('Schema',invalid?'critical':p.jsonLd.length?'pass':'warning',path,'JSON-LD',p.jsonLd.length?`${p.jsonLd.length} block(s)${invalid?' (invalid)':''}`:'No JSON-LD found',
-      'Structured data enables rich results and helps entities appear in Search.','Add JSON-LD structured data.',4);
-    if(p.microdata.length)I('Schema','info',path,'Microdata',p.microdata.length+' itemscope(s)','Microdata is an older structured-data format.','Prefer JSON-LD where possible.',1);
-    if(p.rdfa.length)I('Schema','info',path,'RDFa',p.rdfa.length+' block(s)','RDFa is a structured-data format.','Prefer JSON-LD where possible.',1);
-    if(p.schemaTypes.length)I('Schema','pass',path,'Schema types detected',[...new Set(p.schemaTypes)].join(', '),'Recognised schema types can qualify for rich results.','Validate with Rich Results Test.',2);
-    // Missing schema suggestions
-    const suggested=[];
-    if(p===home)suggested.push('Organization','WebSite','WebPage');
-    if(/article|post|blog/i.test(p.url+p.title))suggested.push('Article','BreadcrumbList');
-    if(/faq|questions/i.test(p.url+p.bodyText.slice(0,500)))suggested.push('FAQPage');
-    if(/product|price|buy/i.test(p.url+p.bodyText.slice(0,500)))suggested.push('Product');
-    if(p.hreflangs.length)suggested.push('(translated pages)');
-    const missing=suggested.filter(s=>!p.schemaTypes.some(t=>new RegExp(s,'i').test(t)));
-    if(missing.length)I('Schema','info',path,'Suggested schema',missing.join(', '),'Adding relevant schema can enable rich results.','Implement the suggested schema types and validate them.',1);
+    I('Schema',invalid?'critical':p.jsonLd.length?'pass':'warning',path,'Structured data',p.jsonLd.length?p.jsonLd.length+' block(s)'+(invalid?' with parse errors':''):'No JSON-LD found',
+      'Structured data enables rich results and helps entities appear in search.','Add JSON-LD structured data.',4);
+    if(p.schemaTypes.length)I('Schema','pass',path,'Schema types detected',[...new Set(p.schemaTypes)].join(', '),'Recognised schema types can qualify for rich results.','Validate with the Rich Results test.',2);
   });
 
   /* ----- Internal linking ----- */
-  // Build link graph from crawled pages
   const nodeByUrl=new Map(pages.map(p=>[p.url.replace(/\/$/,''),p]));
   const inLinks=new Map(), outLinks=new Map();
   pages.forEach(p=>{inLinks.set(p.url,new Set());outLinks.set(p.url,new Set())});
@@ -607,66 +571,41 @@ async function audit(rawUrl,progress,signal){
     const target=pages.find(q=>q.url.replace(/\/$/,'')===l.href.replace(/\/$/,''));
     if(target&&target.url!==p.url){inLinks.get(target.url)?.add(p.url);outLinks.get(p.url)?.add(target.url)}
   }));
-  // click depth BFS
   const depth=new Map([[home.url,0]]); const q=[home.url];
   while(q.length){const u=q.shift();const d=depth.get(u);const p=nodeByUrl.get(u.replace(/\/$/,''));if(!p)continue;
-    p.links.filter(l=>l.internal).forEach(l=>{const t=l.href.replace(/\/$/,'');if(!depth.has(t)){depth.set(t,d+1);q.push(t)}})}
+    p.links.filter(l=>l.internal).forEach(l=>{const t=l.href.replace(/\/$/,'');if(!depth.has(t)){depth.set(t,d+1);q.push(t)}})
+  }
   pages.forEach(p=>{
     const path=pathOf(p.url), inl=p.links.filter(l=>l.internal).length, ext=p.links.filter(l=>!l.internal).length;
-    I('Internal linking',inl>=3?'pass':'warning',path,'Internal link count',`${inl} internal, ${ext} external`,
-      'Internal links spread authority and help crawlers discover pages.','Link to relevant pages contextually.',3);
+    I('Internal linking',inl>=3?'pass':'warning',path,'Internal link count',inl+' internal, '+ext+' external',
+      'Internal links spread authority and help crawlers discover pages.','Link to relevant pages from your content.',3);
     if(inl===0)I('Internal linking','critical',path,'No internal links','Page links to no other internal page','Orphaned content is hard to find and rank.','Add contextual internal links.',4);
-    if(p.links.length>150)I('Internal linking','warning',path,'Excessive links',`${p.links.length} links`,
-      'Too many links dilute equity and look spammy.','Keep links useful and below ~150.',2);
+    if(p.links.length>150)I('Internal linking','warning',path,'Excessive links',p.links.length+' links',
+      'Very large numbers of links dilute equity.','Keep links useful.',2);
     const empties=p.links.filter(l=>l.empty&&l.internal).length;
-    if(empties)I('Internal linking','warning',path,'Empty anchor text',`${empties} empty anchors`,
+    if(empties)I('Internal linking','warning',path,'Empty anchor text',empties+' empty anchors',
       'Anchor text gives context about the target.','Use descriptive anchor text.',2);
-    const redirTargets=headers.filter(h=>h.redirected).map(h=>h.url.replace(/\/$/,''));
-    const redirecting=p.links.filter(l=>l.internal&&redirTargets.includes(l.href.replace(/\/$/,''))).length;
-    if(redirecting)I('Internal linking','warning',path,'Internal redirect links',`${redirecting} link(s) point to a redirecting URL`,
-      'Links to redirects add extra hops and waste crawl budget.','Update links to the final destination URL.',2);
-    I('Internal linking',depth.has(p.url)?'pass':'warning',path,'Click depth',depth.has(p.url)?`${depth.get(p.url)} clicks from home`:'Not reached from home',
-      'Pages deeper than 3 clicks get less authority and crawl attention.','Flatten architecture and link important pages higher.',2);
+    I('Internal linking',depth.has(p.url)?'pass':'warning',path,'Click depth',depth.has(p.url)?depth.get(p.url)+' clicks from home':'Not reached from home',
+      'Pages deeper than three clicks get less crawl attention.','Flatten the architecture and link important pages higher.',2);
   });
-  // orphan pages: present in sitemap but not linked by any crawled page
   const linkedUrls=new Set(); pages.forEach(p=>p.links.filter(l=>l.internal).forEach(l=>linkedUrls.add(l.href.replace(/\/$/,''))));
   const orphans=sitemapUrls.filter(u=>!linkedUrls.has(u.replace(/\/$/,''))&&!pages.some(p=>p.url.replace(/\/$/,'')===u.replace(/\/$/,''))).slice(0,10);
-  orphans.forEach(u=>I('Internal linking','warning',pathOf(u),'Orphan page','In sitemap but not linked from crawled pages',
-    'Orphan pages receive little authority and are hard to discover.','Link to it from relevant pages or remove it from the sitemap.',3));
-  // authority proxy (in-link count)
-  const lowAuth=pages.map(p=>({p,n:inLinks.get(p.url)?.size||0})).filter(x=>x.n>0&&x.n<2).slice(0,8);
-  lowAuth.forEach(({p,n})=>I('Internal linking','info',pathOf(p.url),'Internal authority',`${n} incoming internal link(s)`,
-    'Pages with few internal links get less authority.','Add links from high-authority pages to important targets.',1));
-  // anchor distribution (home)
-  if(home){
-    const anchors=home.links.filter(l=>l.internal&&!l.empty).map(l=>l.text.toLowerCase());
-    const top={};anchors.forEach(a=>top[a]=(top[a]||0)+1);
-    const repeated=Object.entries(top).filter(([,n])=>n>3).slice(0,5);
-    I('Internal linking','info','Site','Anchor distribution',repeated.length?repeated.map(([a,n])=>`"${trim(a,25)}" ×${n}`).join('; '):'Varied anchors',
-      'Diverse, descriptive anchors improve relevance.','Vary anchor text naturally.',1);
-  }
+  orphans.forEach(u=>I('Internal linking','warning',pathOf(u),'Orphan page','In the sitemap but not linked from crawled pages',
+    'Orphan pages receive little authority and are hard to discover.','Link to it from relevant pages.',3));
 
   /* ----- International ----- */
-  pages.forEach(p=>{
-    if(!p.hreflangs.length)return;
-    const path=pathOf(p.url);
-    I('International','pass',path,'Hreflang detected',`${p.hreflangs.length} alternate(s)`,
-      'Hreflang tells engines which language/region version to show.','Keep hreflang annotations bidirectional and valid.',2);
-    const invalid=p.hreflangs.filter(h=>!/^([a-z]{2,3}(-[A-Za-z0-9]+)?|x-default)$/.test(h.lang));
-    if(invalid.length)I('International','warning',path,'Invalid hreflang codes',invalid.map(h=>h.lang).join(', '),
-      'Malformed hreflang values are ignored.','Use codes like en, en-US, es-MX or x-default.',3);
-    const noReturn=0; // bidirectional needs cross-page crawl; mark info
-    I('International','info',path,'Hreflang validation','Check return tags across variants',
-      'Hreflang must be reciprocal: page A lists B and B lists A.','Verify bidirectional annotations.',1);
-  });
   if(home){
     I('International',home.lang?'pass':'warning','Site','HTML language',home.lang||'Missing',
-      'The lang attribute helps engines and screen readers identify language.','Set <html lang="…"> accurately.',2);
-    if(home.canonical&&home.hreflangs.length){
-      const self=home.hreflangs.find(h=>h.lang.toLowerCase().startsWith(home.lang.toLowerCase().slice(0,2)));
-      if(self&&self.href.replace(/\/$/,'')!==home.canonical.replace(/\/$/,''))I('International','warning','Site','Canonical/hreflang conflict',`Canonical differs from ${self.lang} self-reference`,
-        'Conflicting canonical and hreflang can misdirect engines.','Align the canonical with the matching hreflang self URL.',3);
-    }
+      'The lang attribute helps engines and screen readers.','Set the html lang attribute.',2);
+    pages.forEach(p=>{
+      if(!p.hreflangs.length)return;
+      const path=pathOf(p.url);
+      I('International','pass',path,'Hreflang detected',p.hreflangs.length+' alternate(s)',
+        'Hreflang tells engines which language version to show.','Keep hreflang annotations valid and reciprocal.',2);
+      const invalid=p.hreflangs.filter(h=>!/^([a-z]{2,3}(-[A-Za-z0-9]+)?|x-default)$/.test(h.lang));
+      if(invalid.length)I('International','warning',path,'Invalid hreflang codes',invalid.map(h=>h.lang).join(', '),
+        'Malformed hreflang values are ignored.','Use codes like en, en-US or x-default.',3);
+    });
   }
 
   /* ----- Security ----- */
@@ -674,21 +613,21 @@ async function audit(rawUrl,progress,signal){
     const mixed=pages.flatMap(p=>{
       const list=[]; const check=(u)=>{if(u&&/^http:\/\//i.test(u))list.push(u)};
       p.images.forEach(i=>check(i.src)); p.scripts.forEach(s=>check(s.src)); p.stylesheets.forEach(check);
-      return list.map(u=>({path:pathOf(p.url),u}));
+      return list.slice(0,5).map(u=>({path:pathOf(p.url),u}));
     }).slice(0,10);
-    I('Security',mixed.length?'critical':'pass','Site','Mixed content',mixed.length?`${mixed.length} insecure resource(s)`:'No mixed content',
-      'Mixed content breaks the padlock and browsers may block insecure assets.','Serve all resources over HTTPS.',4);
+    I('Security',mixed.length?'critical':'pass','Site','Mixed content',mixed.length?mixed.length+' insecure resource(s)':'No mixed content',
+      'Mixed content breaks the padlock and browsers may block insecure assets.','Serve every resource over HTTPS.',4);
     const checks=[
-      ['HSTS','strict-transport-security','Forces HTTPS and prevents downgrade attacks.','Add a Strict-Transport-Security header.'],
-      ['CSP','content-security-policy','Mitigates XSS and data-injection attacks.','Add a restrictive Content-Security-Policy.'],
+      ['HSTS','strict-transport-security','Forces HTTPS and prevents downgrade attacks.','Add a Strict Transport Security header.'],
+      ['CSP','content-security-policy','Mitigates cross site scripting attacks.','Add a Content Security Policy.'],
       ['X-Frame-Options','x-frame-options','Prevents clickjacking.','Set X-Frame-Options to DENY or SAMEORIGIN.'],
-      ['X-Content-Type-Options','x-content-type-options','Prevents MIME-sniffing.','Set X-Content-Type-Options: nosniff.'],
-      ['Referrer-Policy','referrer-policy','Controls referrer leakage.','Add a Referrer-Policy header.'],
-      ['Permissions-Policy','permissions-policy','Restricts powerful browser features.','Add a Permissions-Policy header.']
+      ['X-Content-Type-Options','x-content-type-options','Prevents MIME sniffing.','Set X-Content-Type-Options to nosniff.'],
+      ['Referrer-Policy','referrer-policy','Controls referrer leakage.','Add a Referrer Policy header.'],
+      ['Permissions-Policy','permissions-policy','Restricts powerful browser features.','Add a Permissions Policy header.']
     ];
     checks.forEach(([name,key,why,fix])=>{
       const present=!!fh[key];
-      I('Security',present?'pass':(firstInfo?.via==='direct'?'warning':'info'),'Site',name,present?'Set':(firstInfo?.via==='direct'?'Missing':'Not visible via proxy'),why,fix,present?1:3);
+      I('Security',present?'pass':(firstInfo?.via==='direct'?'warning':'info'),'Site',name,present?'Set':(firstInfo?.via==='direct'?'Missing':'Not visible through a relay'),why,fix,present?1:3);
     });
   }
 
@@ -696,37 +635,54 @@ async function audit(rawUrl,progress,signal){
   ['GPTBot','ClaudeBot','PerplexityBot','Google-Extended'].forEach(bot=>{
     const blocked=robots.agentBlocked(bot.toLowerCase());
     const mentioned=robots.botMentioned(bot.toLowerCase());
-    I('AI Search',blocked?'warning':'pass','Site',bot+' access',blocked?'Blocked in robots.txt':mentioned?'Mentioned':'Allowed / not blocked',
-      'AI crawlers (GPTBot, ClaudeBot, PerplexityBot, Google-Extended) drive AI-search visibility.','Block only if you intentionally want to opt out.',2);
+    I('AI Search',blocked?'warning':'pass','Site',bot+' access',blocked?'Blocked in robots.txt':mentioned?'Explicitly mentioned':'Allowed, not blocked',
+      'AI crawlers drive visibility inside AI answers. Block them only if you want to opt out.','Adjust robots.txt if this is unintentional.',2);
   });
   if(home){
-    I('AI Search',home.wordCount>=300&&home.headings.length>=2?'pass':'warning','Site','AI-readable content',`${home.wordCount} words, ${home.headings.length} headings`,
-      'Clear, well-structured text is more likely to be parsed and cited by AI systems.','Provide clear headings, definitions and direct answers.',2);
-    const ents=entities(home.bodyText.slice(0,5000));
-    I('AI Search',ents.length?'pass':'info','Site','Entity identification',ents.length?ents.slice(0,6).join(', '):'No clear entities',
-      'Named entities anchor content to knowledge-graph concepts.','Name people, organisations, places and products explicitly.',1);
-    I('AI Search',home.schemaTypes.length?'pass':'info','Site','Entity/schema consistency',home.schemaTypes.length?home.schemaTypes.join(', '):'No schema',
-      'Schema aligns on-page entities with machine-readable data.','Use schema matching the page’s primary entity.',1);
+    I('AI Search',home.wordCount>=300&&home.headings.length>=2?'pass':'warning','Site','AI readable content',home.wordCount+' words, '+home.headings.length+' headings',
+      'Clear, well structured text is more likely to be understood and cited by AI systems.','Answer questions directly under descriptive headings.',2);
   }
 
   /* ----- Architecture ----- */
   const maxDepth=Math.max(0,...depth.values());
-  I('Architecture',pages.length>1?'pass':'warning','Site','Crawl depth',`${pages.length} pages, max click depth ${maxDepth}`,
-    'Shallow sites are crawled and understood more efficiently.','Keep important pages within 3 clicks of the homepage.',3);
+  I('Architecture',pages.length>1?'pass':'warning','Site','Crawl depth',pages.length+' pages, max click depth '+maxDepth,
+    'Shallow sites are crawled and understood more efficiently.','Keep important pages within three clicks of the homepage.',3);
   const deep=[...depth.entries()].filter(([,d])=>d>3).slice(0,8);
-  deep.forEach(([u,d])=>I('Architecture','warning',pathOf(u),'Deep page',`${d} clicks from home`,
-    'Deep pages get crawled less and carry less authority.','Link them higher or flatten the hierarchy.',2));
-  I('Architecture',maxDepth<=3&&pages.length>1?'pass':'warning','Site','Architecture',maxDepth<=3?'Flat structure':'Deep structure',
-    'A flat architecture distributes authority better than a deep one.','Reduce nesting and cross-link related sections.',2);
+  deep.forEach(([u,d])=>I('Architecture','warning',pathOf(u),'Deep page',d+' clicks from home',
+    'Deep pages get crawled less often.','Link them higher in the structure.',2));
   const isolated=pages.filter(p=>(inLinks.get(p.url)?.size||0)===0&&p!==home);
-  isolated.slice(0,8).forEach(p=>I('Architecture','warning',pathOf(p.url),'Isolated page','No incoming internal links found in crawl','Isolated pages are effectively orphaned within the crawl.','Add links from related content.',2));
+  isolated.slice(0,8).forEach(p=>I('Architecture','warning',pathOf(p.url),'Isolated page','No incoming internal links found in the crawl',
+    'Isolated pages are effectively orphaned within the crawl.','Add links from related content.',2));
 
-  /* ----------------------------- scoring ----------------------------- */
+  /* ----- External links and live link checks ----- */
+  scan.set({analyze:'done',links:'active'},'Checking a sample of outbound links',88);
+  const noFollowExt=pages.reduce((n,p)=>n+p.links.filter(l=>!l.internal&&l.isNoFollow).length,0);
+  const sponsored=pages.reduce((n,p)=>n+p.links.filter(l=>l.isSponsored).length,0);
+  const ugc=pages.reduce((n,p)=>n+p.links.filter(l=>l.isUgc).length,0);
+  const externalLinks=pages.flatMap(p=>p.links.filter(l=>!l.internal));
+  const extDomains=new Set(externalLinks.map(l=>{try{return normHost(new URL(l.href).hostname)}catch{return ''}}).filter(Boolean));
+  I('External links','pass','Site','External link count',externalLinks.length+' links to '+extDomains.size+' domain(s)',
+    'A reasonable number of relevant outbound links adds credibility.','Link to sources your readers value.',1);
+  if(noFollowExt)I('External links','info','Site','Nofollow external links',noFollowExt+' nofollow',
+    'Nofollow tells engines not to pass equity to the target.','Use nofollow for untrusted or paid links.',1);
+  if(sponsored)I('External links','info','Site','Sponsored links',sponsored+' sponsored',
+    'Paid links should be marked with rel="sponsored".','Mark paid placements correctly.',1);
+  const blankNoNoopener=externalLinks.filter(l=>l.target==='_blank'&&!/noopener|noreferrer/.test(l.rel)).length;
+  if(blankNoNoopener)I('External links','warning','Site','New tab links without noopener',blankNoNoopener+' link(s)',
+    'Links opening new tabs without rel="noopener" carry a tab nabbing risk.','Add rel="noopener".',2);
+  const linkProbeTargets=[...new Set(pages.flatMap(p=>p.links.map(l=>l.href)).filter(u=>u))].slice(0,12);
+  const linkResults=await poolMap(linkProbeTargets,5,(u)=>probeStatus(u,signal));
+  const brokenList=[];
+  linkResults.forEach((r,i)=>{if(r&&r.status&&r.status>=400)brokenList.push(linkProbeTargets[i])});
+  brokenList.slice(0,8).forEach(u=>{const p=pages.find(p=>p.links.some(l=>l.href===u));I(p?'Internal linking':'External links','warning',p?pathOf(p.url):'Site','Broken '+(p?'internal':'external')+' link',trim(u,70),'Broken links waste crawl budget and hurt trust.','Fix or remove the link.',3)});
+  scan.set({links:'done',report:'active'},'Scoring the results',95);
+
+  /* ----- Scoring (run once, after every issue is collected) ----- */
   const scored=issues.filter(x=>x.severity!=='info'&&x.weight>0);
   const max=scored.reduce((n,x)=>n+x.weight,0)*100||1;
   const got=scored.reduce((n,x)=>n+x.weight*sevScore(x.severity),0);
   const score=Math.round(got/max*100);
-  const cats=['Technical','On-page','Content','Images','Performance','Mobile','Schema','Internal linking','External links','International','Security','AI Search','Architecture'];
+  const cats=['Technical','On page','Content','Images','Performance','Mobile','Schema','Internal linking','External links','International','Security','AI Search','Architecture'];
   const scores={};
   cats.forEach(g=>{
     const list=issues.filter(x=>x.group===g&&x.severity!=='info'&&x.weight>0);
@@ -739,56 +695,26 @@ async function audit(rawUrl,progress,signal){
   issues.forEach(x=>counts[x.severity]++);
 
   const internalCount=pages.reduce((n,p)=>n+p.links.filter(l=>l.internal).length,0);
-  const externalCount=pages.reduce((n,p)=>n+p.links.filter(l=>!l.internal).length,0);
-  const brokenLinks=0; // link probes (best effort)
-  // probe a few links for broken detection
-  const linkProbeTargets=[...new Set(pages.flatMap(p=>p.links.map(l=>l.href)).filter(u=>u))].slice(0,15);
-  const linkResults=await poolMap(linkProbeTargets,4,(u)=>probeStatus(u,signal));
-  const brokenList=[];
-  linkResults.forEach((r,i)=>{if(r&&r.status&&r.status>=400)brokenList.push(linkProbeTargets[i]);});
-  brokenList.slice(0,10).forEach(u=>{const p=pages.find(p=>p.links.some(l=>l.href===u));I(p?'Internal linking':'External links','warning',p?pathOf(p.url):'Site',(p?'Broken internal link':'Broken external link'),trim(u,70),'Broken links waste crawl budget and hurt UX.','Fix or remove the link.',3)});
-
-  // build groups for UI
   const groups={};
-  issues.forEach(x=>{const st=statusOf(x.severity);(groups[x.group]=groups[x.group]||[]).push({status:st,title:`${x.check} · ${x.page}`,detail:x.value,why:x.why,fix:x.fix,impact:x.weight})});
+  issues.forEach(x=>{const st=statusOf(x.severity);(groups[x.group]=groups[x.group]||[]).push({status:st,title:x.check+' · '+x.page,detail:x.value,why:x.why,fix:x.fix,impact:x.weight})});
 
-  const noFollowExt=pages.reduce((n,p)=>n+p.links.filter(l=>!l.internal&&l.isNoFollow).length,0);
-  const sponsored=pages.reduce((n,p)=>n+p.links.filter(l=>l.isSponsored).length,0);
-  const ugc=pages.reduce((n,p)=>n+p.links.filter(l=>l.isUgc).length,0);
-  const externalLinks=pages.flatMap(p=>p.links.filter(l=>!l.internal));
-  const extDomains=new Set(externalLinks.map(l=>{try{return normHost(new URL(l.href).hostname)}catch{return ''}}).filter(Boolean));
-  I('External links','pass','Site','External link count',`${externalLinks.length} links to ${extDomains.size} domain(s)`,
-    'A reasonable number of relevant outbound links adds credibility.','Link to authoritative, relevant sources.',1);
-  if(noFollowExt)I('External links','info','Site','Nofollow external links',`${noFollowExt} nofollow`,
-    'Nofollow tells engines not to pass equity to the target.','Use nofollow for untrusted or paid links.',1);
-  if(sponsored)I('External links','info','Site','Sponsored links',`${sponsored} sponsored`,
-    'Sponsored links must be marked with rel="sponsored".','Use rel="sponsored" for paid placements.',1);
-  if(ugc)I('External links','info','Site','UGC links',`${ugc} UGC`,
-    'UGC links identify user-generated content links.','Use rel="ugc" on links in comments/forum posts.',1);
-  const blankNoNoopener=externalLinks.filter(l=>l.target==='_blank'&&!/noopener|noreferrer/.test(l.rel)).length;
-  if(blankNoNoopener)I('External links','warning','Site','Target="_blank" without noopener',`${blankNoNoopener} link(s)`,
-    'Links opening new tabs without rel="noopener" are a tab-nabbing security risk.','Add rel="noopener" (or noreferrer).',2);
-  if(externalLinks.length>80)I('External links','warning','Site','Excessive external links',`${externalLinks.length}`,
-    'Too many outbound links can look spammy and dilute focus.','Link out selectively.',2);
-
+  scan.finish('Audit complete');
   return {
     url:start,score,grade:grade(score),
-    summary:`${pages.length} page(s) crawled · ${counts.critical} critical · ${counts.warning} warnings · ${counts.pass} passed`,
-    source:`Browser crawl${firstInfo?` · via ${firstInfo.via}`:''}`,
+    summary:pages.length+' page(s) crawled · '+counts.critical+' critical · '+counts.warning+' warnings · '+counts.pass+' passed',
+    source:'Browser crawl'+(firstInfo?' · via '+firstInfo.via:''),
     stats:{pages:pages.length,critical:counts.critical,warnings:counts.warning,passed:counts.pass,info:counts.info},
     counts,scores,groups,priorities,
     crawl:headers.map(h=>({path:pathOf(h.url),status:h.status||'?',via:h.via,title:(pages.find(p=>p.url===h.url)?.title)||'',ms:h.ms})),
     insights:[
       {label:'Pages crawled',value:String(pages.length)},
       {label:'Internal links',value:String(internalCount)},
-      {label:'External links',value:String(externalCount)},
+      {label:'External links',value:String(externalLinks.length)},
       {label:'Images',value:String(allImages.length)},
       {label:'Sitemap URLs',value:String(sitemapUrls.length)},
-      {label:'Top keyword',value:home?.keywords[0]?`${home.keywords[0][0]} (${home.keywords[0][1]})`:'—'},
       {label:'Schema types',value:home?.schemaTypes.length?home.schemaTypes.slice(0,3).join(', '):'none'},
-      {label:'Readability',value:home?flesch(home.bodyText)+'/100':'—'},
-      {label:'Nofollow/sponsored/UGC',value:`${noFollowExt}/${sponsored}/${ugc}`},
-      {label:'HTML size (start)',value:home?Math.round(home.htmlSize/1024)+' KB':'—'}
+      {label:'Readability',value:home?flesch(home.bodyText)+' of 100':'not available'},
+      {label:'HTML size (start page)',value:home?Math.round(home.htmlSize/1024)+' KB':'not available'}
     ],
     techHeaders:headers[0]||null,
     pagespeedUrl:'https://pagespeed.web.dev/analysis?url='+encodeURIComponent(start),
@@ -813,27 +739,27 @@ function render(r){
   const all=flatten(r), counts=countsOf(all);
   const top=r.priorities.slice(0,10).map(p=>`<div class="priority ${statusOf(p.severity)}" data-status="${statusOf(p.severity)}">
     <b>${esc(p.check)} · ${esc(p.page)}</b><span>${esc(p.fix||p.value)}</span></div>`).join('')
-    ||'<div class="priority pass"><b>No urgent fixes</b><span>Measured checks look clean.</span></div>';
+    ||'<div class="priority pass"><b>No urgent fixes</b><span>The measured checks came back clean.</span></div>';
   const scoreBars=Object.entries(r.scores).map(([k,v])=>`<div class="score-mini"><span>${esc(k)}</span><b>${v}</b><i><em style="width:${v}%"></em></i></div>`).join('');
   const groups=Object.entries(r.groups).map(([k,v],i)=>{
     const bad=v.filter(x=>x.status==='fail'||x.status==='warn').length;
-    return `<details class="audit-fold" ${i<5||bad?'open':''}><summary><span>${esc(k)}</span><b>${bad}</b></summary>${checksHtml(v)}</details>`;
+    return `<details class="audit-fold" ${i<4||bad?'open':''}><summary><span>${esc(k)}</span><b>${bad}</b></summary>${checksHtml(v)}</details>`;
   }).join('');
   const insights=r.insights.map(x=>`<div class="insight-card"><span>${esc(x.label)}</span><b>${esc(x.value)}</b></div>`).join('');
-  const crawl=`<div class="audit-panel wide"><h3>Crawled URLs</h3><table class="mini-table"><tr><th>URL</th><th>Status</th><th>Source</th><th>Time</th><th>Title</th></tr>${
-    r.crawl.map(p=>`<tr><td>${esc(p.path)}</td><td><span class="status-pill s-${String(p.status).startsWith('2')?'ok':String(p.status).startsWith('3')?'redir':String(p.status).startsWith('4')||String(p.status).startsWith('5')?'err':'unk'}">${esc(p.status)}</span></td><td>${esc(p.via||'')}</td><td>${p.ms?p.ms+' ms':'—'}</td><td>${esc(p.title)}</td></tr>`).join('')}</table></div>`;
+  const crawl=`<div class="audit-panel wide"><h3>Crawled URLs</h3><div class="mini-table-wrap"><table class="mini-table"><tr><th>URL</th><th>Status</th><th>Source</th><th>Time</th><th>Title</th></tr>${
+    r.crawl.map(p=>`<tr><td>${esc(p.path)}</td><td><span class="status-pill s-${String(p.status).startsWith('2')?'ok':String(p.status).startsWith('3')?'redir':String(p.status).startsWith('4')||String(p.status).startsWith('5')?'err':'unk'}">${esc(p.status)}</span></td><td>${esc(p.via||'')}</td><td>${p.ms?p.ms+' ms':'n/a'}</td><td>${esc(p.title)}</td></tr>`).join('')}</table></div></div>`;
   const links=`<div class="ext-links">
     <a class="btn btn-small btn-secondary" target="_blank" rel="noopener" href="${r.pagespeedUrl}"><span class="material-icons">speed</span>PageSpeed Insights</a>
     <a class="btn btn-small btn-secondary" target="_blank" rel="noopener" href="${r.securityUrl}"><span class="material-icons">security</span>Security headers</a>
     <a class="btn btn-small btn-secondary" target="_blank" rel="noopener" href="${r.richResultsUrl}"><span class="material-icons">schema</span>Rich Results test</a>
   </div>`;
   out.innerHTML=`<div class="report-actions">
-    <button class="btn btn-small" id="rerun-audit"><span class="material-icons">refresh</span>Re-run</button>
+    <button class="btn btn-small" id="rerun-audit"><span class="material-icons">refresh</span>Run again</button>
     <button class="btn btn-small btn-secondary" id="download-csv"><span class="material-icons">download</span>CSV</button>
-    <button class="btn btn-small btn-secondary" id="print-report"><span class="material-icons">picture_as_pdf</span>PDF / Print</button>
+    <button class="btn btn-small btn-secondary" id="print-report"><span class="material-icons">picture_as_pdf</span>PDF</button>
     <button class="btn btn-small btn-secondary" id="share-report"><span class="material-icons">share</span>Share link</button>
     <button class="btn btn-small btn-secondary" id="copy-summary"><span class="material-icons">content_copy</span>Copy</button>
-    <button class="btn btn-small btn-secondary" id="compare-btn"><span class="material-icons">history</span>Compare previous</button>
+    <button class="btn btn-small btn-secondary" id="compare-btn"><span class="material-icons">history</span>Compare</button>
   </div>
   <div id="compare-banner"></div>
   <div class="score-card fresh">
@@ -863,7 +789,7 @@ function render(r){
   </div>`;
   out.querySelector('#rerun-audit').onclick=()=>form.requestSubmit();
   out.querySelector('#print-report').onclick=()=>window.print();
-  out.querySelector('#copy-summary').onclick=()=>navigator.clipboard?.writeText(`${r.grade} (${r.score}/100) — ${r.url}\n${r.summary}`);
+  out.querySelector('#copy-summary').onclick=()=>navigator.clipboard?.writeText(`${r.grade} (${r.score}/100) ${r.url}\n${r.summary}`);
   out.querySelector('#download-csv').onclick=downloadCSV;
   out.querySelector('#share-report').onclick=shareReport;
   out.querySelector('#compare-btn').onclick=showCompare;
@@ -883,8 +809,6 @@ function downloadCSV(){
 async function shareReport(){
   if(!lastReport)return;
   try{
-    // Share a compact, render-safe copy (no heavy per-page payloads) to keep
-    // the URL within browser length limits.
     const shareable={
       url:lastReport.url,score:lastReport.score,grade:lastReport.grade,
       summary:lastReport.summary,source:lastReport.source,stats:lastReport.stats,
@@ -903,7 +827,7 @@ async function shareReport(){
     await navigator.clipboard?.writeText(url);
     toast('Shareable link copied to clipboard');
     history.replaceState(null,'','#'+hash);
-  }catch(e){toast('Could not create share link')}
+  }catch(e){toast('Could not create the share link')}
 }
 function saveHistory(r){
   try{
@@ -916,14 +840,14 @@ function showCompare(){
   let h=[];try{h=JSON.parse(localStorage.getItem('huvanti-audits')||'[]')}catch{}
   const cur=lastReport;
   const banner=out.querySelector('#compare-banner');
-  if(h.length<2){banner.innerHTML=`<div class="compare-note">No previous audits stored yet. Run another audit later to compare — no account required.</div>`;return}
-  const items=h.map((x,i)=>`<label class="compare-opt"><input type="radio" name="cmp" value="${i}" ${i!==0?'':'checked'}> <span>${esc(x.url)} — <b>${x.score}</b> (${new Date(x.date).toLocaleDateString()})</span></label>`).join('');
-  banner.innerHTML=`<div class="compare-box"><b>Compare with a previous audit</b><div class="compare-list">${items}</div><div class="compare-diff" id="compare-diff"></div></div>`;
+  if(h.length<2){banner.innerHTML=`<div class="compare-note">No earlier audits are stored yet. Run the audit again later to compare scores.</div>`;return}
+  const items=h.map((x,i)=>`<label class="compare-opt"><input type="radio" name="cmp" value="${i}" ${i!==0?'':'checked'}> <span>${esc(x.url)} · <b>${x.score}</b> (${new Date(x.date).toLocaleDateString()})</span></label>`).join('');
+  banner.innerHTML=`<div class="compare-box"><b>Compare with an earlier audit</b><div class="compare-list">${items}</div><div class="compare-diff" id="compare-diff"></div></div>`;
   const renderDiff=()=>{
     const i=Number(banner.querySelector('input[name=cmp]:checked').value);
     const prev=h[i].report; if(!prev)return;
-    const cats=[...new Set([...Object.keys(cur.scores),...Object.keys(prev.scores)])];
-    const rows=cats.map(c=>{const a=cur.scores[c]??0,b=prev.scores[c]??0;const d=a-b;return `<tr><td>${esc(c)}</td><td>${b}</td><td>${a}</td><td class="${d>=0?'up':'down'}">${d>=0?'+':''}${d}</td></tr>`}).join('');
+    const cats=[...new Set([...Object.keys(cur.scores||{}),...Object.keys(prev.scores||{})])];
+    const rows=cats.map(c=>{const a=(cur.scores||{})[c]??0,b=(prev.scores||{})[c]??0;const d=a-b;return `<tr><td>${esc(c)}</td><td>${b}</td><td>${a}</td><td class="${d>=0?'up':'down'}">${d>=0?'+':''}${d}</td></tr>`}).join('');
     banner.querySelector('#compare-diff').innerHTML=`<table class="mini-table"><tr><th>Category</th><th>Previous</th><th>Now</th><th>Change</th></tr>${rows}</table>`;
   };
   banner.querySelectorAll('input[name=cmp]').forEach(el=>el.onchange=renderDiff);
@@ -934,23 +858,28 @@ function toast(msg){
   setTimeout(()=>t.remove(),2600);
 }
 
-/* ----------------------------- loading / form ----------------------------- */
-function loading(msg){
-  out.innerHTML=`<div class="audit-loading pulse"><span class="material-icons">travel_explore</span><h3>Running audit…</h3><p id="audit-progress">${esc(msg)}</p><button class="btn btn-secondary" id="cancel-audit">Cancel</button></div>`;
-  out.querySelector('#cancel-audit').onclick=()=>{if(currentCtrl)currentCtrl.abort()};
-}
-function progress(msg){const el=out.querySelector('#audit-progress');if(el)el.textContent=msg}
+/* ----------------------------- form ----------------------------- */
 form.addEventListener('submit',async e=>{
   e.preventDefault();
   const url=input.value.trim(); if(!url)return;
+  if(running){ /* one audit at a time: ignore extra clicks while a crawl is in flight */ return; }
+  running=true; if(submitBtn)submitBtn.disabled=true;
   currentCtrl=new AbortController();
-  try{loading('Starting crawl'); const r=await audit(url,progress,currentCtrl.signal); location.hash=''; render(r);}
-  catch(err){if(err.name==='AbortError'){out.innerHTML=`<div class="audit-error"><h3>Audit cancelled</h3><p>The audit was stopped.</p><button class="btn" onclick="document.getElementById('audit-form').requestSubmit()">Retry</button></div>`}
-    else out.innerHTML=`<div class="audit-error"><h3>Audit failed</h3><p>${esc(err.message)}</p><p class="muted">The site may block public readers, or the entered URL could not be reached. Try the exact https:// address.</p></div>`}
-  finally{currentCtrl=null}
+  const scan=startScan(url);
+  try{ const r=await audit(url,scan,currentCtrl.signal); location.hash=''; render(r); }
+  catch(err){
+    if(err.name==='AbortError'){scan.fail('Audit cancelled'); out.innerHTML=`<div class="audit-error"><h3>Audit cancelled</h3><p>The audit was stopped.</p><button class="btn" id="audit-retry">Try again</button></div>`; const b=document.getElementById('audit-retry'); if(b)b.onclick=()=>form.requestSubmit();}
+    else if(err.name==='NoPagesError'){scan.fail('No Reliable Page Found'); out.innerHTML=`<div class="audit-error"><h3>No Reliable Page Found</h3></div>`;}
+    else {
+      scan.fail('Audit failed');
+      const tech=((err.stack||'').split('\n')[1]||'').trim();
+      out.innerHTML=`<div class="audit-error"><h3>Audit could not run</h3><p>${esc(err.message)}</p>${tech?`<p class="muted error-tech">${esc(tech)}</p>`:''}</div>`;
+    }
+  }
+  finally{currentCtrl=null; running=false; if(submitBtn)submitBtn.disabled=false; out._scan=null;}
 });
 
-/* Auto-run from URL hash (shared report) or ?url= */
+/* Auto run from a shared report link or a url parameter */
 (async function init(){
   if(location.hash.startsWith('#share/')){
     try{
@@ -963,5 +892,5 @@ form.addEventListener('submit',async e=>{
   }
   const q=new URLSearchParams(location.search).get('url');
   if(q){input.value=q; form.requestSubmit();}
-})();
+});
 })();

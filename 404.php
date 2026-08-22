@@ -1,1 +1,0 @@
-<?php $pageTitle='Page Not Found'; require __DIR__.'/includes/header.php'; ?><section class="hero"><h1>404</h1><p>Page not found.</p><a class="btn" href="/">Back home</a></section><?php require __DIR__.'/includes/footer.php'; ?>

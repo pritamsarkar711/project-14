@@ -1,4 +1,4 @@
-/* huvanti AdSense checker — orchestration: crawl, parse, analyze (page + site), score. */
+/* huvanti AdSense checker, orchestration: crawl, parse, analyze (page + site), score. */
 (function (global) {
 'use strict';
 var A = global.Adsense = global.Adsense || {};
