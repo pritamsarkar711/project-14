@@ -66,6 +66,16 @@
     } catch (e) { return 'Unknown'; }
   }
   function isoDay(iso) { try { return String(iso).slice(0, 10); } catch (e) { return ''; } }
+  /* Long feeds are trimmed for the on page preview; the download always has the full file. */
+  function capPreview(xml, limit) {
+    limit = limit || 60000;
+    xml = String(xml || '');
+    if (xml.length <= limit) return xml;
+    var cut = xml.slice(0, limit);
+    var nl = cut.lastIndexOf('\n');
+    if (nl > limit * 0.5) cut = cut.slice(0, nl);
+    return cut + '\n<!-- Preview trimmed. Download the feed for the complete file. -->';
+  }
   function statusChip(p) {
     if (p.existing) return '<span class="status-pill s-ok">Existing feed</span>';
     if (p.added) return '<span class="status-pill s-ok">Manual</span>';
@@ -325,7 +335,7 @@
       '<option value="rss"' + (xmlFormat === 'rss' ? ' selected' : '') + '>RSS 2.0 (rss.xml)</option>' +
       '<option value="atom"' + (xmlFormat === 'atom' ? ' selected' : '') + '>Atom 1.0 (atom.xml)</option></select></label>' +
       '<span class="muted">' + esc(itemsXml.length) + ' bytes</span></div>' +
-      '<pre class="xml-preview rss-xml"><code>' + esc(itemsXml || '&lt;!-- no feed generated yet --&gt;') + '</code></pre>';
+      '<pre class="xml-preview rss-xml"><code>' + esc(capPreview(itemsXml) || '&lt;!-- no feed generated yet --&gt;') + '</code></pre>';
     return '<div class="audit-panel wide rss-preview-panel"><div class="llmstxt-preview-head"><h3>' + icon('preview') + ' Feed Preview</h3><div class="report-actions">' +
       '<div class="rss-tabs"><button class="btn ' + (previewTab === 'visual' ? 'rss-tab-on' : '') + '" id="rss-tab-visual" type="button">' + icon('list') + ' Visual</button><button class="btn ' + (previewTab === 'xml' ? 'rss-tab-on' : '') + '" id="rss-tab-xml" type="button">' + icon('code') + ' XML</button></div>' +
       '<button class="btn" id="rss-copy-xml" type="button">' + icon('content_copy') + ' Copy XML</button>' +

@@ -18,6 +18,13 @@
 
   function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]; }); }
   function icon(n) { return '<span class="material-icons" aria-hidden="true">' + esc(n) + '</span>'; }
+  function capText(t, limit, note) {
+    t = String(t || '');
+    if (t.length <= limit) return t;
+    var cut = t.slice(0, limit); var nl = cut.lastIndexOf('\n');
+    if (nl > limit * 0.5) cut = cut.slice(0, nl);
+    return cut + '\n' + note;
+  }
   function toast(t) { var e = document.createElement('div'); e.className = 'toast'; e.textContent = t; document.body.appendChild(e); setTimeout(function () { e.remove(); }, 2600); }
   function copy(text) {
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { toast('Copied'); });
