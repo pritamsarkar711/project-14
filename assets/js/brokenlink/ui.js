@@ -52,16 +52,17 @@
   }
 
   function getMaxPages() {
+    if (!maxPagesSel) return 500;
     var v = maxPagesSel.value;
     if (v === 'custom') {
-      var c = parseInt(maxPagesCustom.value, 10);
-      if (!c || c < 1) return 100;
+      var c = parseInt(maxPagesCustom ? maxPagesCustom.value : 0, 10);
+      if (!c || c < 1) return 500;
       return Math.min(Math.max(c, 1), 10000);
     }
-    return parseInt(v, 10) || 100;
+    return parseInt(v, 10) || 500;
   }
 
-  maxPagesSel.addEventListener('change', function () {
+  if (maxPagesSel) maxPagesSel.addEventListener('change', function () {
     if (!maxPagesCustom) return;
     if (maxPagesSel.value === 'custom') {
       maxPagesCustom.style.display = '';
@@ -71,7 +72,7 @@
     }
   });
 
-  scanScopeSel.addEventListener('change', function () {
+  if (scanScopeSel && checkExternalToggle) scanScopeSel.addEventListener('change', function () {
     if (scanScopeSel.value === 'internal') {
       checkExternalToggle.checked = false;
     } else {
@@ -565,13 +566,13 @@
     var payload = {
       url: url,
       maxPages: getMaxPages(),
-      maxDepth: maxDepthSel.value,
-      scanScope: scanScopeSel.value,
-      checkExternal: checkExternalToggle.checked,
-      checkImages: checkImagesToggle.checked,
-      checkDocuments: checkDocsToggle.checked,
-      checkAnchors: checkAnchorsToggle.checked,
-      respectRobots: respectRobotsToggle.checked
+      maxDepth: maxDepthSel ? maxDepthSel.value : '5',
+      scanScope: scanScopeSel ? scanScopeSel.value : 'internal+external',
+      checkExternal: checkExternalToggle ? checkExternalToggle.checked : true,
+      checkImages: checkImagesToggle ? checkImagesToggle.checked : false,
+      checkDocuments: checkDocsToggle ? checkDocsToggle.checked : false,
+      checkAnchors: checkAnchorsToggle ? checkAnchorsToggle.checked : false,
+      respectRobots: respectRobotsToggle ? respectRobotsToggle.checked : true
     };
     out.innerHTML = '';
     progressUI({ stage: 'validate', message: 'Starting scan for ' + url });
