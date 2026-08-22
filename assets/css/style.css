@@ -1101,3 +1101,32 @@ html,body{max-width:100%;overflow-x:clip}
 .sitemap-detected,.compare-box{border-color:rgba(25,118,210,.3)}
 .sitemap-detected{border-left:0}
 .error-tech{font-size:.78rem;opacity:.75;word-break:break-word}
+
+/* ============================================================
+   Header mark, chips, related tools centering, contact form.
+   ============================================================ */
+
+/* Brand mark: white chip with a blue icon in light mode for strong contrast
+   on the blue app bar; the gradient chip stays in dark mode where it reads well. */
+.brand-logo{background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.28)}
+.brand-logo .material-icons{color:#1565c0}
+.dark .brand-logo{background:linear-gradient(135deg,#42a5f5,#1565c0);box-shadow:0 2px 6px rgba(0,0,0,.45)}
+.dark .brand-logo .material-icons{color:#fff}
+
+/* Chips: icon and text sit together in one clean pill, no inner boxes */
+.audit-trust span{padding:6px 12px;gap:7px}
+.audit-trust span .material-icons{background:none;border-radius:0;padding:0;font-size:17px}
+
+/* Related tools: center the whole grid so few items do not hug the left */
+.alltools-grid{grid-template-columns:repeat(auto-fit,minmax(200px,240px));justify-content:center}
+
+/* Contact form */
+.contact-wrap{display:grid;grid-template-columns:1fr;gap:24px;max-width:1040px;margin:0 auto;align-items:start}
+@media(min-width:900px){.contact-wrap{grid-template-columns:1fr 1fr}}
+.contact-form{display:grid;gap:14px;text-align:left}
+.contact-form label{display:grid;gap:6px;font-size:.85rem;font-weight:600;color:var(--text-secondary)}
+.contact-form input,.contact-form textarea,.contact-form select{width:100%;border:1px solid var(--outline);border-radius:8px;background:transparent;color:var(--text-primary);font:inherit;padding:10px 12px;outline:0}
+.contact-form input:focus,.contact-form textarea:focus,.contact-form select:focus{border-color:var(--primary)}
+.contact-form textarea{min-height:130px;resize:vertical}
+.contact-form .btn{justify-self:start}
+.contact-note{font-size:.85rem;color:var(--text-secondary);margin:0}

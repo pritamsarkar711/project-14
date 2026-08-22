@@ -63,5 +63,27 @@
   };
   window.addEventListener('DOMContentLoaded', () => { const tool = window.SUMLY_TOOL, el = $('#tool-app'); if (tool && el) { (sumly.engines[tool.type] || sumly.engines.basic)(el, tool); } });
 
+  /* Contact form: composes an email in the visitor's own mail app. Nothing
+     is sent to or stored on a server. */
+  const contactForm = $('#contact-form');
+  if (contactForm) {
+    contactForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = ($('#contact-name') || {}).value?.trim() || '';
+      const email = ($('#contact-email') || {}).value?.trim() || '';
+      const topic = ($('#contact-topic') || {}).value || 'Message';
+      const message = ($('#contact-message') || {}).value?.trim() || '';
+      const note = $('#contact-note');
+      if (!name || !email || !message || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+        if (note) note.textContent = 'Please fill in your name, a valid email address and a short message.';
+        return;
+      }
+      const subject = encodeURIComponent('[Huvanti] ' + topic + ' from ' + name);
+      const body = encodeURIComponent(message + '\n\nReply to: ' + name + ' <' + email + '>');
+      window.location.href = 'mailto:hello@huvanti.com?subject=' + subject + '&body=' + body;
+      if (note) note.textContent = 'Your email app should now be open with the message ready. Thank you.';
+    });
+  }
+
   /* The shared scan progress panel lives in progress.js (loaded first). */
 })();

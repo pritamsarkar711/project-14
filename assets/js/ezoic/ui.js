@@ -62,7 +62,7 @@
     var states = {};
     STEPS.forEach(function (s) { states[s[0]] = stepState(s[0], state.stage); });
     var p = window.ScanProgress.reuse(out, {
-      title: 'Checking Ezoic readiness', target: (urlInput && urlInput.value) || '', icon: 'insights', steps: steps,
+      title: 'Checking Ezoic readiness', target: (urlInput && urlInput.value) || '', icon: 'paid', steps: steps,
       note: state.message || 'Working\u2026',
       onCancel: function () { if (abortCtrl) abortCtrl.abort(); }
     });

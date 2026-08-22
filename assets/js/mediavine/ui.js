@@ -55,7 +55,7 @@
     var states = {};
     STEPS.forEach(function (s) { states[s[0]] = stepState(s[0], state.stage); });
     var p = window.ScanProgress.reuse(out, {
-      title: 'Checking Mediavine readiness', target: (urlInput && urlInput.value) || '', icon: 'trending_up', steps: steps,
+      title: 'Checking Mediavine readiness', target: (urlInput && urlInput.value) || '', icon: 'savings', steps: steps,
       note: state.message || 'Working\u2026',
       onCancel: function () { if (abortCtrl) abortCtrl.abort(); }
     });

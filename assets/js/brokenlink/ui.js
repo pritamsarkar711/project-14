@@ -113,7 +113,7 @@
     if (state.checked != null && state.total) pct = 15 + Math.round(state.checked / state.total * 78);
     else if (state.crawled != null && state.discovered) pct = 12 + Math.round(state.crawled / Math.max(1, state.discovered) * 45);
     var p = window.ScanProgress.reuse(out, {
-      title: 'Scanning for broken links', target: (document.getElementById('bl-url') || {}).value || '', icon: 'link_off', steps: STEPS,
+      title: 'Scanning for broken links', target: (document.getElementById('bl-url') || {}).value || '', icon: 'search_off', steps: STEPS,
       note: state.message || 'Working\u2026',
       onCancel: function () { if (abortCtrl) abortCtrl.abort(); }
     });

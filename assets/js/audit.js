@@ -10,7 +10,8 @@ const form=document.getElementById('audit-form'); if(!form) return;
 const input=document.getElementById('audit-url');
 const limitSel=document.getElementById('crawl-limit');
 const out=document.getElementById('audit-results');
-let lastReport=null, currentCtrl=null, scan=null;
+const submitBtn=form.querySelector('button[type="submit"]')||null;
+let lastReport=null, currentCtrl=null, running=false;
 
 /* ----------------------------- helpers ----------------------------- */
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -291,7 +292,8 @@ const SCAN_STEPS=[
   {key:'report',label:'Building the report',icon:'grading'}
 ];
 function startScan(url){
-  scan=window.ScanProgress.reuse(out,{
+  out._scan=null;
+  return window.ScanProgress.create(out,{
     title:'Auditing '+ (hostOf(url)||url),
     target:url,
     icon:'travel_explore',
@@ -299,11 +301,10 @@ function startScan(url){
     note:'Starting the crawl',
     onCancel:()=>{if(currentCtrl)currentCtrl.abort()}
   });
-  return scan;
 }
 
 /* ----------------------------- main audit ----------------------------- */
-async function audit(rawUrl,progress,signal){
+async function audit(rawUrl,scan,signal){
   let start=rawUrl.trim(); if(!/^https?:\/\//i.test(start))start='https://'+start;
   const startUrl=new URL(start), origin=startUrl.origin;
   const limit=clamp(parseInt(limitSel?.value||'15',10)||15,1,200);
@@ -329,12 +330,14 @@ async function audit(rawUrl,progress,signal){
      queued as soon as a page is parsed, so the audit finishes faster. */
   const visited=new Set(); const queue=[start,...sitemapUrls.filter(u=>u!==start)];
   const pages=[]; const errors=[]; const headers=[];
-  let firstInfo=null, active=0;
+  let firstInfo=null, active=0, budgetDone=false;
+  const crawlStart=Date.now();
   const nap=ms=>new Promise(r=>setTimeout(r,ms));
   async function crawlWorker(){
     for(;;){
       if(visited.size>=limit)break;
       if(signal.aborted)throw new DOMException('aborted','AbortError');
+      if(!budgetDone&&Date.now()-crawlStart>90000){budgetDone=true;break;}
       if(!queue.length){ if(active===0)break; await nap(40); continue; }
       const raw=queue.shift();
       let u; try{u=new URL(raw,origin)}catch{continue}
@@ -367,14 +370,13 @@ async function audit(rawUrl,progress,signal){
   const workers=Math.min(4, Math.max(1, limit));
   await Promise.all(Array.from({length:workers},()=>crawlWorker()));
   if(!pages.length){
-    const detail=errors.length?(' '+errors[0].error):'';
-    const e=new Error('No readable pages were returned for this address.'+detail+' The site may block public readers, need JavaScript, or serve no HTML content.');
+    const e=new Error('No Reliable Page Found');
     e.name='NoPagesError';
     throw e;
   }
   const home=pages[0];
 
-  scan.set({crawl:'done',images:'active'},`${pages.length} page${pages.length===1?'':'s'} crawled`,62);
+  scan.set({crawl:'done',images:'active'},`${pages.length} page${pages.length===1?'':'s'} crawled${budgetDone?' (crawl time budget reached)':''}`,62);
   const issues=[];
   const I=(g,s,p,c,v,w,f,wt)=>addTo(issues,g,s,p,c,v,w,f,wt);
 
@@ -860,18 +862,21 @@ function toast(msg){
 form.addEventListener('submit',async e=>{
   e.preventDefault();
   const url=input.value.trim(); if(!url)return;
+  if(running){ /* one audit at a time: ignore extra clicks while a crawl is in flight */ return; }
+  running=true; if(submitBtn)submitBtn.disabled=true;
   currentCtrl=new AbortController();
-  startScan(url);
-  try{ const r=await audit(url,null,currentCtrl.signal); location.hash=''; render(r); }
+  const scan=startScan(url);
+  try{ const r=await audit(url,scan,currentCtrl.signal); location.hash=''; render(r); }
   catch(err){
-    if(err.name==='AbortError'){scan&&scan.fail('Audit cancelled'); out.innerHTML=`<div class="audit-error"><h3>Audit cancelled</h3><p>The audit was stopped.</p><button class="btn" onclick="document.getElementById('audit-form').requestSubmit()">Try again</button></div>`}
+    if(err.name==='AbortError'){scan.fail('Audit cancelled'); out.innerHTML=`<div class="audit-error"><h3>Audit cancelled</h3><p>The audit was stopped.</p><button class="btn" id="audit-retry">Try again</button></div>`; const b=document.getElementById('audit-retry'); if(b)b.onclick=()=>form.requestSubmit();}
+    else if(err.name==='NoPagesError'){scan.fail('No Reliable Page Found'); out.innerHTML=`<div class="audit-error"><h3>No Reliable Page Found</h3></div>`;}
     else {
-      scan&&scan.fail('Audit failed');
+      scan.fail('Audit failed');
       const tech=((err.stack||'').split('\n')[1]||'').trim();
-      out.innerHTML=`<div class="audit-error"><h3>${esc(err.name==='NoPagesError'?'No readable pages found':'Audit could not run')}</h3><p>${esc(err.message)}</p>${tech?`<p class="muted error-tech">${esc(tech)}</p>`:''}</div>`;
+      out.innerHTML=`<div class="audit-error"><h3>Audit could not run</h3><p>${esc(err.message)}</p>${tech?`<p class="muted error-tech">${esc(tech)}</p>`:''}</div>`;
     }
   }
-  finally{currentCtrl=null; scan=null; out._scan=null;}
+  finally{currentCtrl=null; running=false; if(submitBtn)submitBtn.disabled=false; out._scan=null;}
 });
 
 /* Auto run from a shared report link or a url parameter */

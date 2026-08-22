@@ -47,7 +47,8 @@
     this.live = this.card && this.card.querySelectorAll && this.card.querySelectorAll('.scan-step').length > 0;
   };
   ScanProgress.prototype.set = function (states, note, pct) {
-    if (!this.live) { this.markup(states, note != null ? note : undefined, pct); this.wire(); return; }
+    var connected = this.card && (this.card.isConnected === undefined || this.card.isConnected);
+    if (!this.live || !connected) { this.markup(states, note != null ? note : undefined, pct); this.wire(); return; }
     var self = this;
     var lis = this.card.querySelectorAll('.scan-step');
     for (var i = 0; i < lis.length; i++) {
@@ -64,7 +65,11 @@
     if (note != null) this.note(note);
     if (pct != null) this.progress(pct);
   };
-  ScanProgress.prototype.note = function (text) { if (this.statusText && text != null) this.statusText.textContent = text; };
+  ScanProgress.prototype.note = function (text) {
+    var connected = this.card && (this.card.isConnected === undefined || this.card.isConnected);
+    if (!this.statusText || !connected) { if (this.card) { this.markup(undefined, text, null); this.wire(); } return; }
+    if (text != null) this.statusText.textContent = text;
+  };
   ScanProgress.prototype.progress = function (p) { if (this.bar && this.bar.style) this.bar.style.width = Math.max(0, Math.min(100, p)) + '%'; };
   ScanProgress.prototype.label = function (key, text) {
     var li = this.card && this.card.querySelector ? this.card.querySelector('.scan-step[data-key="' + key + '"] .sc-label') : null;

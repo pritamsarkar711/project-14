@@ -36,13 +36,13 @@ const FAVICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
 const TOOLS = {
   seo:        { name:'Deep SEO Auditor', icon:'travel_explore', path:'/', short:'Deep technical, content and performance audit' },
   adsense:    { name:'AdSense Eligibility Checker', icon:'monetization_on', path:'/adsense-eligibility-checker', short:'Website readiness for AdSense' },
-  ezoic:      { name:'Ezoic Eligibility Checker', icon:'insights', path:'/ezoic-eligibility-checker', short:'Website readiness for Ezoic' },
-  mediavine:  { name:'Mediavine Eligibility Checker', icon:'trending_up', path:'/mediavine-eligibility-checker', short:'Website readiness for Mediavine' },
+  ezoic:      { name:'Ezoic Eligibility Checker', icon:'paid', path:'/ezoic-eligibility-checker', short:'Website readiness for Ezoic' },
+  mediavine:  { name:'Mediavine Eligibility Checker', icon:'savings', path:'/mediavine-eligibility-checker', short:'Website readiness for Mediavine' },
   raptive:    { name:'Raptive Eligibility Checker', icon:'campaign', path:'/raptive-eligibility-checker', short:'Website readiness for Raptive' },
   wptheme:    { name:'WordPress Theme Detector', icon:'palette', path:'/wordpress-theme-detector', short:'Detect the active WP theme' },
   domaincheck:{ name:'Domain Information Checker', icon:'dns', path:'/domain-information-checker', short:'DNS, WHOIS, SSL and hosting intelligence' },
   sitemap:    { name:'XML Sitemap Generator', icon:'account_tree', path:'/xml-sitemap-generator', short:'Crawl, validate and export XML sitemaps' },
-  brokenlink: { name:'Broken Link Checker', icon:'link_off', path:'/broken-link-checker', short:'Find and classify broken links accurately' },
+  brokenlink: { name:'Broken Link Checker', icon:'search_off', path:'/broken-link-checker', short:'Find and classify broken links accurately' },
   llmstxt:    { name:'LLMs.txt Generator', icon:'auto_stories', path:'/llms-txt-generator', short:'Generate and validate an llms.txt file' },
   botblocker: { name:'AI Crawler &amp; LLM Bot Blocker', icon:'security', path:'/ai-crawler-blocker', short:'Control AI bots via robots.txt and server rules' },
   cwv:        { name:'Core Web Vitals &amp; INP Auditor', icon:'speed', path:'/core-web-vitals-auditor', short:'Real LCP, INP, CLS, FCP and TTFB measurement' },
@@ -97,7 +97,7 @@ const cards = (heading, headingIcon, cells) =>
   `<div class="container section"><div class="section-heading-row">${icon(headingIcon)}<h4 style="margin:0;">${heading}</h4></div>` +
   `<div class="grid feature-grid">${cells.map(([ic, title, text]) =>
     `<div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon(ic)}${title}</h6><p>${text}</p></div></div></div>`).join('')}</div></div>`;
-const faqSection = (items, heading = 'Common Questions', ic = 'help') =>
+const faqSection = (items, heading = 'Common FAQs', ic = 'live_help') =>
   `<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon(ic)}<h4 style="margin:0;">${heading}</h4></div>` +
   `<div class="faq-accordion">${items.map(([q, a]) => `<details><summary><b>${q}</b></summary><p>${a}</p></details>`).join('')}</div></div>`;
 const faqLd = items => ({ '@context':'https://schema.org', '@type':'FAQPage', mainEntity: items.map(([q, a]) =>
@@ -191,9 +191,9 @@ function home() {
 <form id="audit-form" class="search-field audit-search" role="search" aria-label="Deep SEO audit"><input id="audit-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL">${crawlSelect('crawl-limit','Crawl limit',['1','6','15','30','50','100','200'],'15')}<button class="btn" type="submit">Audit</button></form>
 ${chips([['person_outline','No account'],['settings_input_component','Technical'],['description','On page'],['article','Content'],['image','Images'],['speed','Performance']])}</section>
 <div id="audit-results" class="audit-results"></div>
-${cards('What the audit checks', 'verified', cardsList)}
-<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('route')}<h4 style="margin:0;">How the audit works</h4></div>${lede('One honest pipeline, run the same way every time: a real crawl, measurable checks, transparent scoring and a fix list in priority order.')}${guideGrid(howItWorks)}</div>
-<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('checklist')}<h4 style="margin:0;">What to fix first</h4></div>${lede('A long report is only useful if you know where to start. This is the order experienced auditors usually work in, and it maps directly to the priority list in your report.')}${guideGrid(fixFirst)}
+${cards('What does the audit check?', 'verified', cardsList)}
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('route')}<h4 style="margin:0;">How does the audit work?</h4></div>${lede('One honest pipeline, run the same way every time: a real crawl, measurable checks, transparent scoring and a fix list in priority order.')}${guideGrid(howItWorks)}</div>
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('checklist')}<h4 style="margin:0;">What to fix first?</h4></div>${lede('A long report is only useful if you know where to start. This is the order experienced auditors usually work in, and it maps directly to the priority list in your report.')}${guideGrid(fixFirst)}
 <p class="prose-block">Once the technical layer is clean, go deeper: the <a href="/core-web-vitals-auditor">Core Web Vitals auditor</a> measures real loading and interaction speed, and the <a href="/broken-link-checker">broken link checker</a> verifies every link on the site.</p></div>
 <div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('apps')}<h4 style="margin:0;">Explore the full toolkit</h4></div>${lede('Thirteen focused tools in four categories, all free, all without an account.')}<div class="toolcats">${CATEGORIES.map(cat => `<div class="toolcat"><div class="toolcat-head">${icon(cat.icon)}<h5>${cat.name}</h5></div><div class="toolcat-links">${cat.tools.map(k => { const t = TOOLS[k]; return `<a href="${t.path}"><span class="material-icons" aria-hidden="true">${t.icon}</span><span>${t.name}</span></a>`; }).join('')}</div></div>`).join('')}</div></div>
 ${faqSection(faqs)}`;
@@ -240,10 +240,10 @@ function adsensePage() {
 <form id="adsense-form" class="search-field audit-search" role="search" aria-label="AdSense eligibility check"><input id="adsense-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL">${crawlSelect('adsense-limit','Crawl limit',['10','25','50','100','250'],'50')}<button class="btn" type="submit">Check Eligibility</button></form>
 ${chips([['article','Content quality'],['verified_user','Trust pages'],['gpp_maybe','Policy risk'],['touch_app','User experience'],['build','Technical'],['speed','Performance']])}</section>
 <div id="adsense-results" class="audit-results adsense-results"></div>
-${cards('What the checker measures', 'rule_folder', cardsList)}
-<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">How to get a site ready for AdSense</h4></div>${lede('Most AdSense rejections are avoidable. These are the steps publishers who get approved on the first or second attempt tend to follow.')}${guideGrid(guides)}
+${cards('What does the checker measure?', 'rule_folder', cardsList)}
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">How do you get a site ready for AdSense?</h4></div>${lede('Most AdSense rejections are avoidable. These are the steps publishers who get approved on the first or second attempt tend to follow.')}${guideGrid(guides)}
 <p class="prose-block">If AdSense feels like the wrong fit for your traffic level, the sister tools check the requirements of the larger networks: <a href="/ezoic-eligibility-checker">Ezoic</a>, <a href="/mediavine-eligibility-checker">Mediavine</a> and <a href="/raptive-eligibility-checker">Raptive</a>. A full <a href="/">Deep SEO audit</a> is also a sensible base before any network application.</p></div>
-${faqSection(faqs, 'People Often Ask')}`;
+${faqSection(faqs)}`;
   return layout('AdSense Eligibility Checker | Free Website Readiness Score | Huvanti', body, {
     active:'adsense', canonical:'https://huvanti.com/adsense-eligibility-checker',
     description:'Free AdSense eligibility checker. Enter a URL and get a readiness score across content quality, trust pages, policy risk, user experience and technical health before you apply. No account.',
@@ -282,11 +282,11 @@ function ezoicPage() {
     ['monitoring','Keep analytics healthy','A clean GA4 install is part of the application, not an afterthought. Check that the tag fires on every page, that key events are configured, and grant read access promptly when Ezoic asks.'],
     ['compare','Compare the networks with real numbers','Run the same site through the <a href="/mediavine-eligibility-checker">Mediavine</a>, <a href="/raptive-eligibility-checker">Raptive</a> and <a href="/adsense-eligibility-checker">AdSense</a> checkers. Seeing all four readiness reports side by side makes the sensible next step obvious.']
   ];
-  const body = `<section class="hero audit-home ezoic-home"><span class="material-icons hero-icon" aria-hidden="true">insights</span><h1>Ezoic Eligibility Checker</h1><p class="hero-subtitle">Check how your site lines up with Ezoic before you apply</p>
+  const body = `<section class="hero audit-home ezoic-home"><span class="material-icons hero-icon" aria-hidden="true">paid</span><h1>Ezoic Eligibility Checker</h1><p class="hero-subtitle">Check how your site lines up with Ezoic before you apply</p>
 <form id="ezoic-form" class="search-field audit-search" role="search" aria-label="Ezoic eligibility check"><input id="ezoic-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL">${crawlSelect('ezoic-limit','Crawl limit',['10','25','50','100','250'],'50')}<button class="btn" type="submit">Check Eligibility</button></form>
 ${chips([['verified','Official requirements'],['article','Content quality'],['merge_type','Duplicates'],['verified_user','Trust pages'],['gpp_maybe','Policy risk'],['ads_click','Monetization']])}</section>
 <div id="ezoic-results" class="audit-results ezoic-results"></div>
-${cards('What the checker measures', 'rule_folder', cardsList)}
+${cards('What does the checker measure?', 'rule_folder', cardsList)}
 <div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">Getting ready for Ezoic</h4></div>${lede('Ezoic approval is mostly a content and verification exercise. This is the short version of what works.')}${guideGrid(guides)}
 <p class="prose-block">A clean technical base helps every application. The <a href="/">SEO audit</a> catches the indexing and content problems that slow reviews, and the <a href="/core-web-vitals-auditor">Core Web Vitals auditor</a> confirms the site is pleasant to use, which Ezoic testing also measures indirectly.</p></div>
 ${faqSection(faqs)}`;
@@ -329,14 +329,14 @@ function mediavinePage() {
     ['badge','Prepare the paperwork','About, Contact, Privacy and affiliate disclosure pages, plus a clean GDPR and CCPA setup once accepted. Reviewers check these, and so does the checker.'],
     ['trending_up','Grow sessions deliberately','Journey starts at 1,000 sessions but earnings feel real closer to 10,000. Double down on the posts that already earn traffic, refresh the rest, and let internal links from strong pages lift the weak ones. The <a href="/">SEO audit</a> shows which pages have that untapped potential.']
   ];
-  const body = `<section class="hero audit-home mediavine-home"><span class="material-icons hero-icon" aria-hidden="true">trending_up</span><h1>Mediavine Eligibility Checker</h1><p class="hero-subtitle">Score your site against Mediavine Official and Journey</p>
+  const body = `<section class="hero audit-home mediavine-home"><span class="material-icons hero-icon" aria-hidden="true">savings</span><h1>Mediavine Eligibility Checker</h1><p class="hero-subtitle">Score your site against Mediavine Official and Journey</p>
 <form id="mediavine-form" class="search-field audit-search" role="search" aria-label="Mediavine eligibility check"><input id="mediavine-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL"><select id="mediavine-program" class="crawl-select" aria-label="Program"><option value="both" selected>Both programs</option><option value="official">Mediavine Official</option><option value="journey">Journey by Mediavine</option></select>${crawlSelect('mediavine-limit','Crawl limit',['10','25','50','100','250'],'50')}<button class="btn" type="submit">Check Eligibility</button></form>
 ${chips([['verified','Official and Journey'],['article','Original content'],['gpp_maybe','Brand safety'],['touch_app','Reader experience'],['build','Technical'],['verified_user','Trust pages']])}</section>
 <div id="mediavine-results" class="audit-results mediavine-results"></div>
-${cards('What the checker measures', 'rule_folder', cardsList)}
+${cards('What does the checker measure?', 'rule_folder', cardsList)}
 <div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">Preparing a site for Mediavine</h4></div>${lede('Mediavine reviews sites the way a magazine editor would. These are the areas that decide most applications.')}${guideGrid(guides)}
 <p class="prose-block">Not sure which network fits your stage? Compare with the <a href="/adsense-eligibility-checker">AdSense</a>, <a href="/ezoic-eligibility-checker">Ezoic</a> and <a href="/raptive-eligibility-checker">Raptive</a> checkers, and run a full <a href="/">SEO audit</a> first so technical issues never reach a reviewer.</p></div>
-${faqSection(faqs, 'People Often Ask')}`;
+${faqSection(faqs)}`;
   return layout('Mediavine Eligibility Checker | Free Website Readiness Score | Huvanti', body, {
     active:'mediavine', canonical:'https://huvanti.com/mediavine-eligibility-checker',
     description:'Free Mediavine eligibility checker. Score your site against Journey and Mediavine Official requirements across content, brand safety, reader experience and technical health. No account.',
@@ -390,7 +390,7 @@ function raptivePage() {
 </details>
 ${chips([['verified','Official requirements'],['article','Original content'],['person','Human involvement'],['analytics','Analytics'],['history','Domain age'],['gpp_maybe','Brand safety']])}</section>
 <div id="raptive-results" class="audit-results raptive-results"></div>
-${cards('What the checker measures', 'rule_folder', cardsList)}
+${cards('What does the checker measure?', 'rule_folder', cardsList)}
 <div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">Preparing a site for Raptive</h4></div>${lede('Raptive is a premium network, and the review reflects that. Here is what actually moves applications.')}${guideGrid(guides)}
 <p class="prose-block">Every network checker on Huvanti uses the same crawl engine, so results are comparable. See also the <a href="/adsense-eligibility-checker">AdSense</a> and <a href="/ezoic-eligibility-checker">Ezoic</a> checkers, or start with a full <a href="/">SEO audit</a>.</p></div>
 ${faqSection(faqs)}`;
@@ -434,7 +434,7 @@ function wpthemePage() {
 <form id="wptheme-form" class="search-field audit-search" role="search" aria-label="WordPress theme detection"><input id="wptheme-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL"><button class="btn" type="submit">Detect Theme</button></form>
 ${chips([['wordpress','Theme name and slug'],['history','Version'],['account_tree','Child and parent'],['fingerprint','Fingerprints'],['verified','Evidence based']])}</section>
 <div id="wptheme-results" class="audit-results wptheme-results"></div>
-${cards('How detection works', 'rule_folder', cardsList)}
+${cards('How does detection work?', 'rule_folder', cardsList)}
 <div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">Getting value from theme detection</h4></div>${lede('A theme name is a starting point, not an answer. Here is how experienced builders use that information.')}${guideGrid(guides)}
 <p class="prose-block">Detection is one page of the picture. A full <a href="/">Deep SEO audit</a> of the same site shows how well the theme is actually configured, and the <a href="/broken-link-checker">broken link checker</a> confirms the maintenance discipline behind it.</p></div>
 ${faqSection(faqs)}`;
@@ -482,10 +482,10 @@ function domainInfoPage() {
 <form id="domaincheck-form" class="search-field audit-search" role="search" aria-label="Domain information check"><input id="domaincheck-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="example.com or https://example.com" required aria-label="Domain name or URL"><button class="btn" type="submit">Check Domain</button></form>
 ${chips([['assignment','RDAP and WHOIS'],['storage','DNS and DNSSEC'],['router','Hosting and ASN'],['lock','SSL and TLS'],['mail','Email security'],['verified','Evidence based']])}</section>
 <div id="domaincheck-results" class="audit-results domaincheck-results"></div>
-${cards('What the report covers', 'rule_folder', cardsList)}
+${cards('What does the report cover?', 'rule_folder', cardsList)}
 <div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">Reading a domain report well</h4></div>${lede('Domain data answers questions that a website deliberately or accidentally leaves open. These habits get the most out of it.')}${guideGrid(guides)}
 <p class="prose-block">Curious what a full site review covers beyond infrastructure? Start with the <a href="/">SEO audit</a>, then check accessibility of every link with the <a href="/broken-link-checker">broken link checker</a>.</p></div>
-${faqSection(faqs, 'People Often Ask')}`;
+${faqSection(faqs)}`;
   return layout('Domain Information Checker | DNS, WHOIS, SSL and Hosting | Huvanti', body, {
     active:'domaincheck', canonical:'https://huvanti.com/domain-information-checker',
     description:'Free domain information checker. Registration and WHOIS data, DNS records, hosting and CDN detection, SSL certificate, email security and domain age in one report. No account.',
@@ -536,7 +536,7 @@ function sitemapPage() {
 </form>
 ${chips([['rule','Robots respected'],['link','Canonicals checked'],['do_not_disturb_on','Noindex excluded'],['code','XML validated'],['download','Download ready']])}</section>
 <div id="sitemap-results" class="audit-results sitemap-results"></div>
-${cards('What the generator does', 'verified', cardsList)}
+${cards('What does the generator do?', 'verified', cardsList)}
 <div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">Building a sitemap that helps</h4></div>${lede('A sitemap is easy to generate and easy to get wrong. These are the practices that separate a useful file from a noisy one.')}${guideGrid(guides)}
 <p class="prose-block">Before generating, a quick <a href="/">SEO audit</a> will surface the redirect and canonical problems that decide which URLs belong in the file at all.</p></div>
 ${faqSection(faqs)}`;
@@ -579,7 +579,7 @@ function brokenlinkPage() {
     ['event_repeat','Make it a routine, not a rescue','Link rot returns. A quarterly scan catches rot while it is small, keeps crawl budget on real pages, and gives you a health score trend instead of an annual archaeology project.'],
     ['hub','Combine with the structure tools','Run the <a href="/xml-sitemap-generator">sitemap generator</a> in analyze mode afterwards to confirm the file lists no dead URLs, and a full <a href="/">SEO audit</a> to catch the duplicate and canonical issues that usually travel with link problems.']
   ];
-  const body = `<section class="hero audit-home brokenlink-home"><span class="material-icons hero-icon" aria-hidden="true">link_off</span><h1>Broken Link Checker</h1><p class="hero-subtitle">Crawl a site and verify every link, with no false alarms</p>
+  const body = `<section class="hero audit-home brokenlink-home"><span class="material-icons hero-icon" aria-hidden="true">search_off</span><h1>Broken Link Checker</h1><p class="hero-subtitle">Crawl a site and verify every link, with no false alarms</p>
 <form id="brokenlink-form" class="brokenlink-form" aria-label="Broken link checker">
   <div class="search-field audit-search" style="flex-wrap:wrap;gap:8px;padding:10px;max-width:900px">
     <input id="bl-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL" style="flex:1;min-width:200px">
@@ -608,10 +608,10 @@ function brokenlinkPage() {
 </form>
 ${chips([['fact_check','Accurate classes'],['security','SSRF safe'],['rule','Robots respected'],['loop','Redirect chains'],['retry','Retry verification'],['grading','Health score']])}</section>
 <div id="brokenlink-results" class="audit-results brokenlink-results"></div>
-${cards('What the scan covers', 'verified', cardsList)}
+${cards('What does the scan cover?', 'verified', cardsList)}
 <div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">Fixing links the professional way</h4></div>${lede('A link report is only as good as the fixes that follow. This is the order that returns the most value for the effort.')}${guideGrid(guides)}
 <p class="prose-block">Link problems rarely travel alone. After the cleanup, a <a href="/">SEO audit</a> confirms the technical side is clean and the <a href="/xml-sitemap-generator">sitemap generator</a> rebuilds a file with only live URLs.</p></div>
-${faqSection(faqs, 'People Often Ask')}`;
+${faqSection(faqs)}`;
   return layout('Broken Link Checker | Accurate Scan with No False Positives | Huvanti', body, {
     active:'brokenlink', canonical:'https://huvanti.com/broken-link-checker',
     description:'Free broken link checker. Crawl any public site, find confirmed broken links, redirect chains and loops, with careful classification and no false positives. No account.',
@@ -659,7 +659,7 @@ function llmstxtPage() {
 </form>
 ${chips([['rule','Robots respected'],['auto_awesome','Deterministic scoring'],['link','Canonicals handled'],['code','Output validated'],['download','Download ready']])}</section>
 <div id="llmstxt-results" class="audit-results llmstxt-results"></div>
-${cards('What the generator does', 'verified', cardsList)}
+${cards('What does the generator do?', 'verified', cardsList)}
 <div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">Writing an llms.txt worth reading</h4></div>${lede('The format is simple, which puts all the weight on what you choose to include. These habits produce files that actually help.')}${guideGrid(guides)}
 <p class="prose-block">Visibility in AI answers starts with content that answers questions well. The <a href="/">SEO audit</a> shows whether your pages are structured for humans and crawlers alike.</p></div>
 ${faqSection(faqs)}`;
@@ -762,10 +762,10 @@ function botblockerPage() {
 </form>
 ${chips([['smart_toy','Documented bots'],['rule','robots.txt and server rules'],['science','Access simulator'],['lock','Runs in your browser']])}</section>
 <div id="botblocker-results" class="audit-results botblocker-results"></div>
-${cards('What the tool does', 'verified', cardsList)}
+${cards('What does the tool do?', 'verified', cardsList)}
 <div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">Choosing an AI crawler policy</h4></div>${lede('Blocking is a business decision with technical execution. This is how to think about the decision, then ship it safely.')}${guideGrid(guides)}
 <p class="prose-block">Once access rules are in place, make sure compliant AI tools can find your best work: generate an <a href="/llms-txt-generator">llms.txt</a> and keep your <a href="/xml-sitemap-generator">XML sitemap</a> current.</p></div>
-${faqSection(faqs, 'People Often Ask')}`;
+${faqSection(faqs)}`;
   const scripts = ['/assets/js/progress.js','/assets/js/common.js',
     '/lib/botblocker/botDatabase.js', '/lib/botblocker/botClassifier.js', '/lib/botblocker/botPatternMatcher.js',
     '/lib/botblocker/robotsParser.js', '/lib/botblocker/robotsSimulator.js', '/lib/botblocker/robotsGenerator.js',
@@ -833,10 +833,10 @@ function cwvPage() {
 </form>
 ${chips([['speed','Real measurements'],['touch_app','INP interactions'],['image','LCP phases'],['swap_vert','CLS windows'],['waterfall_chart','Waterfall'],['key_off','No API keys']])}</section>
 <div id="cwv-results" class="audit-results cwv-results"></div>
-${cards('What the auditor measures', 'rule_folder', cardsList)}
+${cards('What does the auditor measure?', 'rule_folder', cardsList)}
 <div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">Making pages genuinely fast</h4></div>${lede('Most performance work fails from fixing the wrong thing first. This is the order that pays off.')}${guideGrid(guides)}
 <p class="prose-block">Speed is one signal among many. Balance it with a full <a href="/">SEO audit</a>, and remember that healthy internal linking, which the audit maps, is what spreads fast pages across a site.</p></div>
-${faqSection(faqs, 'People Often Ask')}`;
+${faqSection(faqs)}`;
   return layout('Core Web Vitals and INP Auditor | Free Performance Measurement | Huvanti', body, {
     active:'cwv', canonical:'https://huvanti.com/core-web-vitals-auditor',
     description:'Free Core Web Vitals auditor. Real lab measurement of LCP, INP, CLS, FCP and TTFB with element attribution, long tasks, a request waterfall and evidence based fixes. No API key.',
@@ -887,7 +887,7 @@ function rssPage() {
 </form>
 ${chips([['rss_feed','Existing feed detection'],['data_object','Accurate metadata'],['link','Canonical URLs'],['code','XML validated'],['download','Download ready']])}</section>
 <div id="rss-results" class="audit-results rss-results"></div>
-${cards('What the generator does', 'verified', cardsList)}
+${cards('What does the generator do?', 'verified', cardsList)}
 <div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">Running a feed worth subscribing to</h4></div>${lede('A feed is a quiet contract with your most committed readers. These are the practices that keep it healthy.')}${guideGrid(guides)}
 <p class="prose-block">Feeds, sitemaps and llms.txt are three faces of the same job. Generate the <a href="/xml-sitemap-generator">sitemap</a> and the <a href="/llms-txt-generator">llms.txt</a> from the same crawl, and check overall site health with the <a href="/">SEO audit</a>.</p></div>
 ${faqSection(faqs)}`;
@@ -906,25 +906,42 @@ function page(name) {
       title: 'About Huvanti',
       heading: 'About Huvanti',
       description: 'Huvanti.com builds free, no account website tools: deep SEO auditing, ad network readiness, sitemaps, feeds, domain intelligence and AI bot control.',
-      html: `<p>Huvanti exists because most website tools want an account before they show you anything, or they hide the method behind a score. Our tools do the opposite. You paste a URL, real work happens, and the report shows exactly what was measured.</p>
-<h2>The tools</h2>
-<p>The <a href="/">Deep SEO Auditor</a> leads the collection: a technical review of up to 200 pages on any public site. Around it are twelve focused tools. Four of them check ad network readiness for <a href="/adsense-eligibility-checker">AdSense</a>, <a href="/ezoic-eligibility-checker">Ezoic</a>, <a href="/mediavine-eligibility-checker">Mediavine</a> and <a href="/raptive-eligibility-checker">Raptive</a>. The <a href="/wordpress-theme-detector">theme detector</a> and the <a href="/domain-information-checker">domain checker</a> look at how a site is built and hosted. The <a href="/xml-sitemap-generator">sitemap</a>, <a href="/rss-feed-generator">RSS</a> and <a href="/llms-txt-generator">llms.txt</a> generators cover the discovery formats, while the <a href="/broken-link-checker">broken link checker</a>, the <a href="/core-web-vitals-auditor">Core Web Vitals auditor</a> and the <a href="/ai-crawler-blocker">AI bot blocker</a> handle maintenance, speed and access control.</p>
-<h2>How everything works</h2>
-<p>The tools run from your browser against public pages, exactly the way any visitor's browser would. When a server side fetch is genuinely needed, it requests only the URL you entered and keeps nothing. The analysis is deterministic: rules, measurements and statistics you can inspect. When something cannot be verified, the report says so, because a wrong confident answer is worse than an honest gap.</p>
+      html: `<p>Huvanti started with a familiar frustration. You want to check something about a website, you find a tool that promises to do it, and then it asks you to create an account before it shows you anything. Or it hands you a score with no explanation of where the score came from.</p>
+<p>We built the opposite of that. Every tool on this site does its work first and explains itself after. You paste a URL, the tool crawls and measures, and the report shows the evidence behind every finding. If something cannot be verified, the report says so plainly.</p>
+<h2>What you will find here</h2>
+<p>The <a href="/">Deep SEO Auditor</a> is the centerpiece: it reviews up to 200 pages on any public site and scores twelve categories, from indexability and content quality to images, linking and security headers. Around it sit twelve focused tools. Four of them check ad network readiness for <a href="/adsense-eligibility-checker">AdSense</a>, <a href="/ezoic-eligibility-checker">Ezoic</a>, <a href="/mediavine-eligibility-checker">Mediavine</a> and <a href="/raptive-eligibility-checker">Raptive</a>, so you can fix problems before a human reviewer ever sees your site. The <a href="/wordpress-theme-detector">theme detector</a> and the <a href="/domain-information-checker">domain checker</a> look at how a site is built, hosted and registered. The <a href="/xml-sitemap-generator">sitemap</a>, <a href="/rss-feed-generator">RSS</a> and <a href="/llms-txt-generator">llms.txt</a> generators cover the formats that help people and machines discover your work, while the <a href="/broken-link-checker">broken link checker</a>, the <a href="/core-web-vitals-auditor">Core Web Vitals auditor</a> and the <a href="/ai-crawler-blocker">AI bot blocker</a> keep the day to day maintenance honest.</p>
+<h2>How the tools work</h2>
+<p>Everything runs from your browser against public pages, exactly the way any visitor's browser would. When a server side fetch is genuinely needed, it requests only the URL you entered and keeps nothing afterwards. The analysis itself is deterministic: real rules, real measurements and statistics you can inspect, not a language model asked for an opinion. That is why two runs on the same site produce the same report.</p>
 <h2>Who it is for</h2>
-<p>Website owners doing their own maintenance, freelancers checking client sites before a handover, publishers preparing ad network applications, and anyone curious about how a site is built. If a result ever looks wrong, tell us through the <a href="/contact">contact page</a> with the URL you checked.</p>`
+<p>Website owners who do their own maintenance, freelancers checking client sites before a handover, publishers preparing ad network applications, and the simply curious. If a result ever looks wrong, tell us through the <a href="/contact">contact page</a> with the URL you checked, and we will take a look.</p>`
     },
     Contact: {
       title: 'Contact',
       heading: 'Contact',
       description: 'Contact the Huvanti team about a bug, a feature request or a question about the free website tools.',
-      html: `<p>The fastest way to reach us is email. Write to <a href="mailto:hello@huvanti.com">hello@huvanti.com</a> and we will read every word.</p>
-<h2>Reporting a bug</h2>
+      html: `<div class="contact-wrap"><div>
+<h2>Say hello</h2>
+<p>Questions, bug reports and feature ideas are all welcome. Write to <a href="mailto:hello@huvanti.com">hello@huvanti.com</a> or use the form, and we will read every word.</p>
+<h2>What makes a good bug report?</h2>
 <p>Three details get a much faster answer: the tool you were using, the URL you were checking, and what you expected versus what happened. If the tool showed an error message, copy the exact text into your email.</p>
-<h2>Suggesting a feature</h2>
-<p>The best feature requests describe a problem rather than a solution. Tell us what you were trying to accomplish when a tool fell short, and we will work out the cleanest way to get you there.</p>
 <h2>What we do not do</h2>
-<p>We do not offer paid placement, link exchanges, guest posts or sponsored reviews, and we cannot intercede with Google or any ad network on your behalf. Questions about eligibility requirements are answered by the checkers themselves.</p>`
+<p>We do not offer paid placement, link exchanges, guest posts or sponsored reviews, and we cannot intercede with Google or any ad network on your behalf. Questions about eligibility requirements are answered by the checkers themselves.</p>
+</div>
+<form class="contact-form" id="contact-form" novalidate>
+  <label>Your name <input type="text" id="contact-name" autocomplete="name" placeholder="Jane Doe" required></label>
+  <label>Your email <input type="email" id="contact-email" autocomplete="email" placeholder="jane@example.com" required></label>
+  <label>Topic
+    <select id="contact-topic">
+      <option>Bug report</option>
+      <option>Feature idea</option>
+      <option>Question about a tool</option>
+      <option>Something else</option>
+    </select>
+  </label>
+  <label>Message <textarea id="contact-message" placeholder="Tell us what happened, and include the URL you were checking." required></textarea></label>
+  <button class="btn" type="submit"><span class="material-icons" aria-hidden="true">send</span>Send message</button>
+  <p class="contact-note" id="contact-note">The form opens your email app with the message ready to send. Nothing is stored on our servers.</p>
+</form></div>`
     },
     Privacy: {
       title: 'Privacy Policy',
@@ -966,7 +983,7 @@ function page(name) {
     ['Are the tools really free?', 'Yes, every tool on the site is free to use with no account.'],
     ['Where can I ask a question?', 'Email <a href="mailto:hello@huvanti.com">hello@huvanti.com</a>. Bug reports that include the tool name, the URL checked and what happened get the fastest replies.']
   ];
-  return layout(p.title, `<div class="container page"><h1 class="page-title">${esc(p.heading)}</h1><div class="paper paper-padded page-copy" style="max-width:860px">${p.html}</div></div>${faqSection(faqs, 'Quick Questions')}`, {
+  return layout(p.title, `<div class="container page"><h1 class="page-title">${esc(p.heading)}</h1><div class="paper paper-padded page-copy" style="max-width:860px">${p.html}</div></div>${faqSection(faqs)}`, {
     canonical: 'https://huvanti.com/' + name.toLowerCase(),
     description: p.description,
     scripts: ['/assets/js/progress.js','/assets/js/common.js'],
