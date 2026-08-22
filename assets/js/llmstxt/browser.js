@@ -118,13 +118,17 @@
       var sub = new AbortController();
       if (opt.signal) opt.signal.addEventListener('abort', function () { sub.abort(); }, { once: true });
       var relays = transports.slice(1);
-      var winner = null, remaining = relays.length;
+      var winner = null, remaining = relays.length, SKIP = { skip: true };
       return new Promise(function (resolve, reject) {
         relays.forEach(function (t) {
-          t(url, opt).then(function (r) {
-            if (winner || !usable(r)) { if (!winner) throw new Error('not usable'); return; }
+          Promise.resolve().then(function () { return t(url, opt); }).then(function (r) {
+            if (winner) return;
+            if (!usable(r)) throw SKIP;
             winner = r; sub.abort(); resolve(r);
-          }, function () {}).catch(function () { remaining--; if (remaining === 0 && !winner) { sub.abort(); reject(challenged ? err('challenge', 'The site is behind bot protection.') : err('unreachable', 'Could not fetch the resource through the browser fallback relays.')); } });
+          }).catch(function () {
+            remaining--;
+            if (remaining === 0 && !winner) { sub.abort(); reject(challenged ? err('challenge', 'The site is behind bot protection.') : err('unreachable', 'Could not fetch the resource through the browser fallback relays.')); }
+          });
         });
       });
     }

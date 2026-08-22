@@ -123,6 +123,15 @@
    * refused, so the next transport/IP is worth trying) and not a challenge
    * wall. A 404 is a legitimate answer and is returned immediately.
    */
+  function usableTransport(res, cap) {
+    if (!res) return false;
+    var text = res.text || '';
+    if (text.length > cap) text = text.slice(0, cap);
+    res.text = text; res.bytes = text.length;
+    if (looksLikeChallenge(res.status, text)) return false;
+    if (RETRY_STATUSES.indexOf(res.status) >= 0) return false;
+    return true;
+  }
   function fetchOnce(url, opt) {
     opt = opt || {};
     var cap = opt.cap || MAX_HTML;
@@ -130,38 +139,45 @@
     fetchCount++;
     var attempts = [];
     var sawChallenge = false;
-    var idx = 0;
-    function attempt() {
-      if (idx >= TRANSPORTS.length) {
-        if (sawChallenge) return Promise.reject(makeError('challenge', 'The site is protected by a bot challenge that defeats every transport (direct fetch + public relays).'));
-        return Promise.reject(makeError('blocked', 'Every transport was refused (direct fetch + public relays' + (attempts.length ? '; last status ' + attempts[attempts.length - 1].status : '') + ').'));
-      }
-      var fn = TRANSPORTS[idx++];
-      return fn(url, opt, opt.signal).then(function (res) {
-        var text = res.text || '';
-        if (text.length > cap) text = text.slice(0, cap);
-        res.text = text;
-        res.bytes = text.length;
-        // A challenge wall is a challenge wall whatever status it ships with ,
-        // remember it and try the next transport/IP.
-        if (looksLikeChallenge(res.status, text)) {
-          sawChallenge = true;
-          attempts.push({ via: res.via, status: res.status });
-          if (idx < TRANSPORTS.length) return attempt();
-          return Promise.reject(makeError('challenge', 'The site is protected by a bot challenge that defeats every transport (direct fetch + public relays).'));
-        }
-        if (RETRY_STATUSES.indexOf(res.status) >= 0) {
-          attempts.push({ via: res.via, status: res.status });
-          return attempt(); // refused on this path → next transport
-        }
-        return res;
-      }, function (err) {
-        if (opt.signal && opt.signal.aborted) return Promise.reject(makeError('cancelled', 'Scan cancelled.'));
-        attempts.push({ via: 'transport', status: 0, err: relayError(err) });
-        return attempt();
+    /* Direct first (fastest and truthful when CORS allows), then the public
+       relays raced in parallel so one slow relay cannot stall the scan. */
+    function raceRelays() {
+      if (opt.signal && opt.signal.aborted) return Promise.reject(makeError('cancelled', 'Scan cancelled.'));
+      var sub = new AbortController();
+      if (opt.signal) opt.signal.addEventListener('abort', function () { sub.abort(); }, { once: true });
+      var relays = TRANSPORTS.slice(1);
+      var winner = null, remaining = relays.length;
+      var SKIP = { skip: true };
+      return new Promise(function (resolve, reject) {
+        relays.forEach(function (fn) {
+          Promise.resolve().then(function () { return fn(url, opt, sub.signal); }).then(function (res) {
+            if (winner) return;
+            if (usableTransport(res, cap)) { winner = res; sub.abort(); resolve(res); return; }
+            attempts.push({ via: res.via, status: res.status });
+            if (looksLikeChallenge(res.status, res.text)) sawChallenge = true;
+            throw SKIP;
+          }).catch(function (err) {
+            if (err !== SKIP) attempts.push({ via: 'transport', status: 0, err: relayError(err) });
+            remaining--;
+            if (remaining === 0 && !winner) {
+              sub.abort();
+              if (sawChallenge) reject(makeError('challenge', 'The site is protected by a bot challenge that defeats every transport (direct fetch + public relays).'));
+              else reject(makeError('blocked', 'Every transport was refused (direct fetch + public relays' + (attempts.length ? '; last status ' + attempts[attempts.length - 1].status : '') + ').'));
+            }
+          });
+        });
       });
     }
-    return attempt();
+    return TRANSPORTS[0](url, opt, opt.signal).then(function (res) {
+      if (usableTransport(res, cap)) return res;
+      if (looksLikeChallenge(res.status, res.text)) sawChallenge = true;
+      attempts.push({ via: res.via, status: res.status });
+      return raceRelays();
+    }, function (err) {
+      if (opt.signal && opt.signal.aborted) return Promise.reject(makeError('cancelled', 'Scan cancelled.'));
+      attempts.push({ via: 'transport', status: 0, err: relayError(err) });
+      return raceRelays();
+    });
   }
 
   function looksLikeChallenge(status, text) {

@@ -27,10 +27,14 @@ function get(url,opt){opt=opt||{}; if(fetches++>MAX_FETCHES)return Promise.rejec
   function tryRelays(challenged){
     if(opt.signal&&opt.signal.aborted)return Promise.reject(err('cancelled','The crawl was cancelled.'));
     var sub=new AbortController(); if(opt.signal)opt.signal.addEventListener('abort',function(){sub.abort();},{once:true});
-    var relays=transports.slice(1), winner=null, remaining=relays.length;
+    var relays=transports.slice(1), winner=null, remaining=relays.length, SKIP={skip:true};
     return new Promise(function(resolve,reject){
       relays.forEach(function(t){
-        t(url,opt).then(function(r){ if(winner||!usable(r,opt)){ if(!winner)throw new Error('skip'); return;} winner=r; sub.abort(); resolve(r); },function(){}).catch(function(){ remaining--; if(remaining===0&&!winner){ sub.abort(); reject(challenged?err('challenge','The site is behind bot protection.'):err('unreachable','Could not fetch the resource through the browser fallback relays.')); } });
+        Promise.resolve().then(function(){ return t(url,opt); }).then(function(r){
+          if(winner)return;
+          if(!usable(r,opt))throw SKIP;
+          winner=r; sub.abort(); resolve(r);
+        }).catch(function(){ remaining--; if(remaining===0&&!winner){ sub.abort(); reject(challenged?err('challenge','The site is behind bot protection.'):err('unreachable','Could not fetch the resource through the browser fallback relays.')); } });
       });
     });
   }

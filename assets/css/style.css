@@ -84,8 +84,8 @@
 .progress-list{list-style:none;padding:0;margin:12px 0;display:grid;gap:8px}
 .progress-list li{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--chip-bg);border-radius:8px;font-size:.92rem}
 .progress-list .material-icons{font-size:20px}
-.progress-list .pi-done{color:#2e7d32}.progress-list .pi-active{color:var(--primary);animation:spin 1.4s linear infinite}.progress-list .pi-wait{color:var(--text-secondary);opacity:.55}
-@keyframes spin{to{transform:rotate(360deg)}}
+.progress-list .pi-done{color:#2e7d32}.progress-list .pi-active{color:var(--primary)}.progress-list .pi-wait{color:var(--text-secondary);opacity:.55}
+
 .progress-bar{height:6px;background:var(--chip-bg);border-radius:99px;overflow:hidden;margin:10px 0}
 .progress-bar i{display:block;height:100%;width:0;background:var(--primary);transition:width .3s}
 .adsense-progress h3{margin:0 0 4px}
@@ -102,7 +102,7 @@
 .feature-grid .card-content p{font-size:.92rem;line-height:1.55}
 button.btn .material-icons{font-size:18px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#323232;color:#fff;padding:12px 18px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.3);z-index:3000;font-size:.9rem;animation:toastin .2s ease}
-@keyframes toastin{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+to{opacity:1;transform:translate(-50%,0)}}
 .muted{color:var(--text-secondary);font-size:.9rem}
 @media(max-width:800px){.tools-menu-panel{left:auto;right:-40px;min-width:280px}.adsense-home h1{font-size:2.2rem!important}.cat-row>summary{flex-wrap:wrap}.cat-row .cat-meta{flex-basis:calc(100% - 70px)}}
 @media print{.appbar,.footer,.report-actions,.filter-row,.adsense-home,.crumbs,.tabs,#issue-search{display:none!important}.audit-results{margin:0}.audit-panel,.score-card,.insight-card,.cat-row{box-shadow:none!important;border:1px solid #ddd!important}}
@@ -242,7 +242,7 @@ button.btn .material-icons{font-size:18px}
 
 /* Domain Information Checker — reuses the existing design system; no new color scheme */
 .domaincheck-home{background:var(--hero-bg)!important}
-.domaincheck-progress .material-icons{animation:spin 2s linear infinite}
+.domaincheck-progress .material-icons{}
 .domaincheck-results{overflow-x:clip;min-width:0}
 .dc-report{display:block}
 .dc-report>*+*{margin-top:16px}
