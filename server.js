@@ -14,7 +14,19 @@ const botblockerApi = require('./lib/botblocker/api');
 const cwvApi = require('./lib/cwv/api');
 const rssApi = require('./lib/rss/api');
 
+const crypto = require('crypto');
 const criticalCss = fs.readFileSync(path.join(__dirname, 'assets/css/style.css'), 'utf8');
+/* Content hashed asset URLs: browsers can cache assets forever, and every
+   deploy instantly invalidates the cache because the URL changes. */
+const ASSET_VER = new Map();
+function verOf(p) {
+  if (ASSET_VER.has(p)) return ASSET_VER.get(p);
+  let v = '0';
+  try { v = crypto.createHash('sha1').update(fs.readFileSync(path.join(__dirname, p))).digest('hex').slice(0, 8); } catch (e) {}
+  ASSET_VER.set(p, v);
+  return v;
+}
+const ver = p => p + '?v=' + verOf(p.startsWith('/') ? p.slice(1) : p);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
 const icon = name => `<span class="material-icons" aria-hidden="true">${esc(name)}</span>`;
 const FAVICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231976d2'/%3E%3Ccircle cx='27' cy='27' r='13' fill='none' stroke='white' stroke-width='6'/%3E%3Cpath d='M37 37L51 51' stroke='white' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E";
@@ -46,10 +58,10 @@ const CATEGORIES = [
 ];
 
 function otherToolsMenu(active) {
-  const col = cat => '<div class="tools-cat' + (cat.tools.length > 2 ? '' : '') + '">' +
+  const col = cat => '<div class="tools-cat">' +
     '<div class="tools-cat-head">' + icon(cat.icon) + esc(cat.name) + '</div>' +
     cat.tools.map(k => { const t = TOOLS[k];
-      return `<a href="${t.path}" role="menuitem" class="${active===k?'is-active':''}">${icon(t.icon)}<span><b>${t.name}</b><small>${t.short}</small></span></a>`; }).join('') + '</div>';
+      return `<a href="${t.path}" role="menuitem" class="${active===k?'is-active':''}">${icon(t.icon)}<b>${t.name}</b></a>`; }).join('') + '</div>';
   return `<details class="tools-menu"><summary>${icon('category')}<span>Tools</span>${icon('arrow_drop_down')}</summary>
     <div class="tools-menu-panel" role="menu">${CATEGORIES.map(col).join('')}</div></details>`;
 }
@@ -85,7 +97,7 @@ const cards = (heading, headingIcon, cells) =>
   `<div class="container section"><div class="section-heading-row">${icon(headingIcon)}<h4 style="margin:0;">${heading}</h4></div>` +
   `<div class="grid feature-grid">${cells.map(([ic, title, text]) =>
     `<div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon(ic)}${title}</h6><p>${text}</p></div></div></div>`).join('')}</div></div>`;
-const faqSection = (items, heading = 'Common Questions', ic = 'quiz') =>
+const faqSection = (items, heading = 'Common Questions', ic = 'help') =>
   `<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon(ic)}<h4 style="margin:0;">${heading}</h4></div>` +
   `<div class="faq-accordion">${items.map(([q, a]) => `<details><summary><b>${q}</b></summary><p>${a}</p></details>`).join('')}</div></div>`;
 const faqLd = items => ({ '@context':'https://schema.org', '@type':'FAQPage', mainEntity: items.map(([q, a]) =>
@@ -111,7 +123,7 @@ function layout(title, body, opts) {
     `<meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}"><meta property="og:type" content="website"><meta name="twitter:card" content="summary">`;
   const jsonLd = opts.jsonLd ? `<script type="application/ld+json">${JSON.stringify(opts.jsonLd)}</script>` : '';
   const toolLd = { '@context':'https://schema.org', '@type':'WebSite', name:'Huvanti', url:'https://huvanti.com/' };
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="color-scheme" content="light dark"><meta name="theme-color" content="#1976d2" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">${meta}<title>${esc(title)}</title><link rel="canonical" href="${opts.canonical||'https://huvanti.com/'}"><link rel="icon" href="${FAVICON}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><script>try{var t=localStorage.getItem('theme-mode');if(t==='dark'||(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Icons&display=swap" rel="stylesheet"><style>${criticalCss}</style>${jsonLd}<script type="application/ld+json">${JSON.stringify(toolLd)}</script></head><body><a class="skip-link" href="#main">Skip to content</a><div class="app"><header class="appbar"><div class="toolbar"><a class="brand" href="/">${icon('query_stats')}<span class="brand-name">Huvanti</span></a><nav class="desktop-nav" aria-label="Primary"><a href="/">${icon('home')}<span>Home</span></a>${otherToolsMenu(active)}<a href="/about">${icon('info')}<span>About</span></a><a href="/contact">${icon('mail')}<span>Contact</span></a></nav><button type="button" class="icon-button theme-toggle" aria-label="Switch to dark mode" id="theme-toggle"><span class="material-icons">dark_mode</span></button></div></header><main id="main">${body}${relatedTools(active)}</main><footer class="footer"><div class="container footer-grid"><div><div class="footer-brand">Huvanti</div><p class="footer-about">Free browser based tools for website owners: SEO auditing, ad network readiness, sitemaps, feeds, domain intelligence and bot control. No account, nothing to install.</p></div><div><div class="footer-heading">Tools</div><div class="footer-links">${Object.values(TOOLS).map(t => `<a href="${t.path}">${t.name}</a>`).join('')}</div></div><div><div class="footer-heading">Pages</div><div class="footer-links"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div></div></div><div class="footer-bottom"><div class="container footer-copyright" style="margin:0;padding:0;text-align:left">&copy; 2026 Huvanti</div><p class="footer-note">Huvanti is an independent project. It is not affiliated with Google, AdSense, Ezoic, Mediavine or Raptive, and approval decisions always belong to those platforms.</p></div></footer></div>${scripts.map(s=>`<script src="${s}" defer></script>`).join('')}</body></html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="color-scheme" content="light dark"><meta name="theme-color" content="#1976d2" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">${meta}<title>${esc(title)}</title><link rel="canonical" href="${opts.canonical||'https://huvanti.com/'}"><link rel="icon" href="${FAVICON}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><script>try{var t=localStorage.getItem('theme-mode');if(t==='dark'||(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Icons&display=swap" rel="stylesheet"><style>${criticalCss}</style>${jsonLd}<script type="application/ld+json">${JSON.stringify(toolLd)}</script></head><body><a class="skip-link" href="#main">Skip to content</a><div class="app"><header class="appbar"><div class="toolbar"><a class="brand" href="/"><span class="brand-logo">${icon('rocket_launch')}</span><span class="brand-name">Huvanti.com</span></a><nav class="desktop-nav" aria-label="Primary"><a href="/">${icon('home')}<span>Home</span></a>${otherToolsMenu(active)}<a href="/about">${icon('info')}<span>About</span></a><a href="/contact">${icon('mail')}<span>Contact</span></a></nav><button type="button" class="icon-button theme-toggle" aria-label="Switch to dark mode" id="theme-toggle"><span class="material-icons">dark_mode</span></button></div></header><main id="main">${body}${relatedTools(active)}</main><footer class="footer"><div class="container footer-grid"><div><div class="footer-brand">Huvanti</div><p class="footer-about">Free browser based tools for website owners: SEO auditing, ad network readiness, sitemaps, feeds, domain intelligence and bot control. No account, nothing to install.</p></div><div><div class="footer-heading">Tools</div><div class="footer-links">${Object.values(TOOLS).map(t => `<a href="${t.path}">${t.name}</a>`).join('')}</div></div><div><div class="footer-heading">Pages</div><div class="footer-links"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div></div></div><div class="footer-bottom"><div class="container footer-copyright" style="margin:0;padding:0;text-align:left">&copy; 2026 Huvanti</div><p class="footer-note">Huvanti is an independent project. It is not affiliated with Google, AdSense, Ezoic, Mediavine or Raptive, and approval decisions always belong to those platforms.</p></div></footer></div>${scripts.map(s=>`<script src="${ver(s)}" defer></script>`).join('')}</body></html>`;
 }
 
 /* gzip aware response helper with sensible caching */
@@ -177,13 +189,13 @@ function home() {
   ];
   const body = `<section class="hero audit-home"><span class="material-icons hero-icon" aria-hidden="true">travel_explore</span><h1>Deep SEO Auditor</h1><p class="hero-subtitle">A free deep SEO audit for any public website, up to 200 pages</p>
 <form id="audit-form" class="search-field audit-search" role="search" aria-label="Deep SEO audit"><input id="audit-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL">${crawlSelect('crawl-limit','Crawl limit',['1','6','15','30','50','100','200'],'15')}<button class="btn" type="submit">Audit</button></form>
-${chips([['person_off','No account'],['settings_input_component','Technical'],['description','On page'],['article','Content'],['image','Images'],['speed','Performance']])}</section>
+${chips([['person_outline','No account'],['settings_input_component','Technical'],['description','On page'],['article','Content'],['image','Images'],['speed','Performance']])}</section>
 <div id="audit-results" class="audit-results"></div>
 ${cards('What the audit checks', 'verified', cardsList)}
 <div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('route')}<h4 style="margin:0;">How the audit works</h4></div>${lede('One honest pipeline, run the same way every time: a real crawl, measurable checks, transparent scoring and a fix list in priority order.')}${guideGrid(howItWorks)}</div>
 <div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('checklist')}<h4 style="margin:0;">What to fix first</h4></div>${lede('A long report is only useful if you know where to start. This is the order experienced auditors usually work in, and it maps directly to the priority list in your report.')}${guideGrid(fixFirst)}
 <p class="prose-block">Once the technical layer is clean, go deeper: the <a href="/core-web-vitals-auditor">Core Web Vitals auditor</a> measures real loading and interaction speed, and the <a href="/broken-link-checker">broken link checker</a> verifies every link on the site.</p></div>
-<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('apps')}<h4 style="margin:0;">Explore the full toolkit</h4></div>${lede('Thirteen focused tools in four categories, all free, all without an account.')}<div class="toolcats">${CATEGORIES.map(cat => `<div class="toolcat"><div class="toolcat-head">${icon(cat.icon)}<h5>${cat.name}</h5></div><p>${cat.desc}</p><div class="toolcat-links">${cat.tools.map(k => { const t = TOOLS[k]; return `<a href="${t.path}"><span class="material-icons" aria-hidden="true">${t.icon}</span><span>${t.name}<small>${t.short}</small></span></a>`; }).join('')}</div></div>`).join('')}</div></div>
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('apps')}<h4 style="margin:0;">Explore the full toolkit</h4></div>${lede('Thirteen focused tools in four categories, all free, all without an account.')}<div class="toolcats">${CATEGORIES.map(cat => `<div class="toolcat"><div class="toolcat-head">${icon(cat.icon)}<h5>${cat.name}</h5></div><div class="toolcat-links">${cat.tools.map(k => { const t = TOOLS[k]; return `<a href="${t.path}"><span class="material-icons" aria-hidden="true">${t.icon}</span><span>${t.name}</span></a>`; }).join('')}</div></div>`).join('')}</div></div>
 ${faqSection(faqs)}`;
   return layout('Deep SEO Auditor | Free Technical SEO Audit | Huvanti', body, {
     active:'seo', canonical:'https://huvanti.com/',
@@ -893,26 +905,26 @@ function page(name) {
     About: {
       title: 'About Huvanti',
       heading: 'About Huvanti',
-      description: 'Huvanti builds free, no account website tools: SEO auditing, ad network readiness, sitemaps, feeds, domain intelligence and AI bot control, all running in your browser.',
-      html: `<p>Huvanti started with a simple frustration: most website tools either want an account before they show you anything, or they hide the method behind a score. So we built tools that do the opposite. You paste a URL, the tool does real work, and it shows you exactly what was measured and how.</p>
-<h2>What we make</h2>
-<p>The <a href="/">SEO Audit</a> is the centerpiece: a full technical review of any public site. Around it sit twelve focused tools. Four check ad network readiness for <a href="/adsense-eligibility-checker">AdSense</a>, <a href="/ezoic-eligibility-checker">Ezoic</a>, <a href="/mediavine-eligibility-checker">Mediavine</a> and <a href="/raptive-eligibility-checker">Raptive</a>. The <a href="/wordpress-theme-detector">theme detector</a> and the <a href="/domain-information-checker">domain checker</a> look at how a site is built and hosted. The <a href="/xml-sitemap-generator">sitemap</a>, <a href="/rss-feed-generator">RSS</a> and <a href="/llms-txt-generator">llms.txt</a> generators cover discovery formats. The <a href="/broken-link-checker">broken link checker</a>, the <a href="/core-web-vitals-auditor">Core Web Vitals auditor</a> and the <a href="/ai-crawler-blocker">AI bot blocker</a> handle maintenance, speed and access control.</p>
-<h2>How the tools work</h2>
-<p>Everything runs from your browser against public pages, the way any visitor's browser would. When a server side fetch is genuinely needed, it requests only the URL you entered and keeps nothing. The analysis itself is deterministic: rules, measurements and statistics you can inspect, not a language model asked for an opinion. When a tool cannot verify something, it says so instead of inventing an answer, because a wrong confident answer is worse than an honest gap.</p>
+      description: 'Huvanti.com builds free, no account website tools: deep SEO auditing, ad network readiness, sitemaps, feeds, domain intelligence and AI bot control.',
+      html: `<p>Huvanti exists because most website tools want an account before they show you anything, or they hide the method behind a score. Our tools do the opposite. You paste a URL, real work happens, and the report shows exactly what was measured.</p>
+<h2>The tools</h2>
+<p>The <a href="/">Deep SEO Auditor</a> leads the collection: a technical review of up to 200 pages on any public site. Around it are twelve focused tools. Four of them check ad network readiness for <a href="/adsense-eligibility-checker">AdSense</a>, <a href="/ezoic-eligibility-checker">Ezoic</a>, <a href="/mediavine-eligibility-checker">Mediavine</a> and <a href="/raptive-eligibility-checker">Raptive</a>. The <a href="/wordpress-theme-detector">theme detector</a> and the <a href="/domain-information-checker">domain checker</a> look at how a site is built and hosted. The <a href="/xml-sitemap-generator">sitemap</a>, <a href="/rss-feed-generator">RSS</a> and <a href="/llms-txt-generator">llms.txt</a> generators cover the discovery formats, while the <a href="/broken-link-checker">broken link checker</a>, the <a href="/core-web-vitals-auditor">Core Web Vitals auditor</a> and the <a href="/ai-crawler-blocker">AI bot blocker</a> handle maintenance, speed and access control.</p>
+<h2>How everything works</h2>
+<p>The tools run from your browser against public pages, exactly the way any visitor's browser would. When a server side fetch is genuinely needed, it requests only the URL you entered and keeps nothing. The analysis is deterministic: rules, measurements and statistics you can inspect. When something cannot be verified, the report says so, because a wrong confident answer is worse than an honest gap.</p>
 <h2>Who it is for</h2>
-<p>Website owners doing their own maintenance, freelancers checking client sites before a handover, publishers preparing ad network applications, and the curious who simply want to know what a site is made of. If something breaks or a result looks wrong, tell us through the <a href="/contact">contact page</a> with the URL you checked and what you expected.</p>`
+<p>Website owners doing their own maintenance, freelancers checking client sites before a handover, publishers preparing ad network applications, and anyone curious about how a site is built. If a result ever looks wrong, tell us through the <a href="/contact">contact page</a> with the URL you checked.</p>`
     },
     Contact: {
       title: 'Contact',
       heading: 'Contact',
       description: 'Contact the Huvanti team about a bug, a feature request or a question about the free website tools.',
-      html: `<p>The fastest way to reach us is email at <a href="mailto:hello@huvanti.com">hello@huvanti.com</a>. We read everything.</p>
+      html: `<p>The fastest way to reach us is email. Write to <a href="mailto:hello@huvanti.com">hello@huvanti.com</a> and we will read every word.</p>
 <h2>Reporting a bug</h2>
-<p>Include three things and you will get a much faster answer: the tool you were using, the URL you were checking, and what you expected versus what happened. If the tool showed an error code, send that too.</p>
+<p>Three details get a much faster answer: the tool you were using, the URL you were checking, and what you expected versus what happened. If the tool showed an error message, copy the exact text into your email.</p>
 <h2>Suggesting a feature</h2>
-<p>The best feature requests describe a problem rather than a solution. Tell us what you were trying to accomplish when the tool fell short, and we will work out the cleanest way to get you there.</p>
+<p>The best feature requests describe a problem rather than a solution. Tell us what you were trying to accomplish when a tool fell short, and we will work out the cleanest way to get you there.</p>
 <h2>What we do not do</h2>
-<p>We do not offer paid placement, link exchanges, guest posts or sponsored reviews, and we cannot intercede with Google, AdSense or any ad network on your behalf. Questions about eligibility requirements are answered by the checkers themselves.</p>`
+<p>We do not offer paid placement, link exchanges, guest posts or sponsored reviews, and we cannot intercede with Google or any ad network on your behalf. Questions about eligibility requirements are answered by the checkers themselves.</p>`
     },
     Privacy: {
       title: 'Privacy Policy',
@@ -954,7 +966,7 @@ function page(name) {
     ['Are the tools really free?', 'Yes, every tool on the site is free to use with no account.'],
     ['Where can I ask a question?', 'Email <a href="mailto:hello@huvanti.com">hello@huvanti.com</a>. Bug reports that include the tool name, the URL checked and what happened get the fastest replies.']
   ];
-  return layout(p.title, `<div class="container page"><h1 class="page-title">${esc(p.heading)}</h1><div class="paper paper-padded page-copy" style="max-width:860px">${p.html}</div></div>${faqSection(faqs, 'Quick Questions', 'help_center')}`, {
+  return layout(p.title, `<div class="container page"><h1 class="page-title">${esc(p.heading)}</h1><div class="paper paper-padded page-copy" style="max-width:860px">${p.html}</div></div>${faqSection(faqs, 'Quick Questions')}`, {
     canonical: 'https://huvanti.com/' + name.toLowerCase(),
     description: p.description,
     scripts: ['/assets/js/progress.js','/assets/js/common.js'],
@@ -1124,12 +1136,13 @@ http.createServer(async (req,res)=>{
     // Only expose the browser engine modules, not server-only or test files.
     if (p.startsWith('/lib/botblocker/') && /(selftest|uitest|api)\.js$/.test(p)) { res.statusCode = 404; res.end('Not found'); return; }
     if (p.startsWith('/lib/cwv/') && p !== '/lib/cwv/rewriter.js') { res.statusCode = 404; res.end('Not found'); return; }
-    const safe = path.normalize(p).replace(/^([.][.][/\\])+/, '');
+    const base = u.pathname;
+    const safe = path.normalize(base).replace(/^([.][.][/\\])+/, '');
     const f = path.join(process.cwd(), safe);
     if (fs.existsSync(f) && fs.statSync(f).isFile()) {
       const ext = path.extname(f).toLowerCase();
       const type = {'.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.mjs':'application/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.avif':'image/avif','.svg':'image/svg+xml'}[ext] || 'application/octet-stream';
-      send(req, res, 200, type, fs.readFileSync(f), 'public, max-age=86400');
+      send(req, res, 200, type, fs.readFileSync(f), 'public, max-age=31536000, immutable');
       return;
     }
     res.statusCode=404; res.end('Not found'); return;

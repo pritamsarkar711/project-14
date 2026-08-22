@@ -865,7 +865,11 @@ form.addEventListener('submit',async e=>{
   try{ const r=await audit(url,null,currentCtrl.signal); location.hash=''; render(r); }
   catch(err){
     if(err.name==='AbortError'){scan&&scan.fail('Audit cancelled'); out.innerHTML=`<div class="audit-error"><h3>Audit cancelled</h3><p>The audit was stopped.</p><button class="btn" onclick="document.getElementById('audit-form').requestSubmit()">Try again</button></div>`}
-    else {scan&&scan.fail('Audit failed'); out.innerHTML=`<div class="audit-error"><h3>${esc(err.name==='NoPagesError'?'No readable pages found':'Audit could not run')}</h3><p>${esc(err.message)}</p></div>`}
+    else {
+      scan&&scan.fail('Audit failed');
+      const tech=((err.stack||'').split('\n')[1]||'').trim();
+      out.innerHTML=`<div class="audit-error"><h3>${esc(err.name==='NoPagesError'?'No readable pages found':'Audit could not run')}</h3><p>${esc(err.message)}</p>${tech?`<p class="muted error-tech">${esc(tech)}</p>`:''}</div>`;
+    }
   }
   finally{currentCtrl=null; scan=null; out._scan=null;}
 });

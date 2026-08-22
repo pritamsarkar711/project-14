@@ -1028,3 +1028,76 @@ html,body{max-width:100%;overflow-x:clip}
 /* Related tool cards align with the centered layout */
 .alltools-item{justify-content:center;text-align:center}
 .alltools-grid{justify-items:stretch}
+
+/* ============================================================
+   Refinement pass: compact centered errors, chip and select
+   redesign, brand mark, chevron icons, white autofill.
+   ============================================================ */
+
+/* Errors: no left accent bar, centered, compact, with an alert icon */
+.audit-error,.adsense-error,.cwv-error{border-left:0!important;border:1px solid rgba(211,47,47,.35);border-radius:8px;text-align:center;padding:18px 20px 16px}
+.audit-error::before,.adsense-error::before,.cwv-error::before{content:"";display:block;width:34px;height:34px;margin:0 auto 8px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%23d32f2f'/%3E%3Crect x='10.9' y='6' width='2.2' height='8' rx='1.1' fill='%23fff'/%3E%3Ccircle cx='12' cy='17' r='1.4' fill='%23fff'/%3E%3C/svg%3E") center/contain no-repeat}
+.audit-error h3,.adsense-error h3,.cwv-error h3{font-size:1.15rem;margin:0 0 6px}
+.audit-error p,.adsense-error p,.cwv-error p{font-size:.92rem}
+.audit-error .btn,.adsense-error .btn,.cwv-error .btn{margin-top:10px}
+
+/* Priority fixes: soft card with a status icon instead of a side bar */
+.priority{border-left:0;border:1px solid var(--divider);border-radius:8px;padding:11px 12px 11px 40px;position:relative}
+.priority::before{content:"";position:absolute;left:11px;top:13px;width:19px;height:19px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%23ed6c02'/%3E%3Crect x='10.9' y='6' width='2.2' height='8' rx='1.1' fill='%23fff'/%3E%3Ccircle cx='12' cy='17' r='1.4' fill='%23fff'/%3E%3C/svg%3E") center/contain no-repeat}
+.priority.fail::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%23d32f2f'/%3E%3Crect x='10.9' y='6' width='2.2' height='8' rx='1.1' fill='%23fff'/%3E%3Ccircle cx='12' cy='17' r='1.4' fill='%23fff'/%3E%3C/svg%3E")}
+.priority.pass{background:rgba(46,125,50,.06)}
+.priority.pass::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%232e7d32'/%3E%3Cpath d='M7 12.2l3.4 3.4L17 9' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")}
+
+/* Warning notes lose the side bar too */
+.llmstxt-warn,.rss-warn,.sitemap-detected,.compare-box,.cwv-inline-issue,.dc-conflict{border-left:0;border:1px solid rgba(237,108,2,.35);border-radius:8px}
+
+/* Chips: calm icons, each icon sits in its own soft box inside the chip */
+.audit-trust span{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);border-radius:8px;padding:5px 12px 5px 5px;font-size:.86rem;font-weight:500;box-shadow:none}
+.audit-trust span .material-icons{font-size:17px;font-weight:normal;-webkit-text-stroke:0;background:rgba(255,255,255,.22);border-radius:6px;padding:5px}
+.audit-trust span{display:inline-flex;align-items:center;gap:8px}
+
+/* Page picker inside the search bar: clean inset pill, no overlap */
+.crawl-select{height:46px;border:0;border-radius:8px;padding:0 34px 0 12px;background:#f2f5f9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23546e7a' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") right 10px center/14px no-repeat;color:#263238;font:inherit;font-weight:500;outline:none;-webkit-appearance:none;appearance:none;margin:0 6px;min-width:104px;cursor:pointer;flex:0 0 auto}
+.crawl-select:hover{background-color:#e9eef5}
+.crawl-select option{color:#222;background:#fff}
+.audit-search .btn{margin-right:8px}
+.audit-search input{min-width:0}
+@media(max-width:800px){.crawl-select{margin:0;width:100%;text-align-last:center}}
+
+/* Pasted or autofilled URLs stay white inside the search field */
+.search-field input,.search-field input:focus{background:transparent}
+.search-field input:-webkit-autofill,.search-field input:-webkit-autofill:hover,.search-field input:-webkit-autofill:focus,.search-field input:-webkit-autofill:active{-webkit-box-shadow:0 0 0 1000px #fff inset;-webkit-text-fill-color:rgba(0,0,0,.87);caret-color:rgba(0,0,0,.87);transition:background-color 99999s ease-in-out 0s;border-radius:0}
+.text-input:-webkit-autofill,.text-input:-webkit-autofill:hover,.text-input:-webkit-autofill:focus{-webkit-box-shadow:0 0 0 1000px var(--paper) inset;-webkit-text-fill-color:var(--text-primary)}
+
+/* Brand mark: gradient logo chip + Huvanti.com wordmark */
+.brand{gap:10px}
+.brand-logo{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#42a5f5,#1565c0);box-shadow:0 2px 6px rgba(21,101,192,.45);flex:0 0 34px}
+.brand-logo .material-icons{color:#fff;font-size:20px}
+.brand-name{font-size:1.2rem;letter-spacing:.01em}
+
+/* Tools menu category labels: title case, not shouting */
+.tools-cat-head{text-transform:none;letter-spacing:.03em;font-size:.8rem;color:var(--text-secondary)}
+
+/* FAQ chevron: crisp SVG, rotates on open, no font dependency */
+.faq-accordion summary::after{content:"";width:20px;height:20px;flex:0 0 auto;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231976d2' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center/contain no-repeat;transition:transform .2s ease}
+.faq-accordion details[open] summary::after{transform:rotate(180deg)}
+
+/* Editorial prose gets breathing room */
+.prose-block{margin:32px auto 4px;padding:0 16px;max-width:760px}
+.guide-grid{margin-top:6px}
+
+/* Static pages (About, Contact, Privacy, Terms) */
+.page-copy{max-width:860px;margin:0 auto}
+.page-copy h2{font-size:1.35rem;margin:1.9em 0 .55em;text-align:center}
+.page-copy h2:first-child{margin-top:0}
+.page-copy p{text-align:center;font-size:1rem;line-height:1.75}
+.page-title{text-align:center}
+
+/* Category cards after removing descriptions */
+.toolcat{padding:20px}
+.toolcat-head{margin-bottom:12px}
+
+/* Informational boxes keep a calm blue outline, warnings stay warm */
+.sitemap-detected,.compare-box{border-color:rgba(25,118,210,.3)}
+.sitemap-detected{border-left:0}
+.error-tech{font-size:.78rem;opacity:.75;word-break:break-word}
