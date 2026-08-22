@@ -42,33 +42,48 @@ async function fetchUrl(rawUrl, signal, timeoutMs=12000){
     return {url:rawUrl,finalUrl:res.url,status:res.status,ok:res.ok,redirected:res.redirected,
       headers:headersToObj(res.headers),text,via:'direct',ms:Math.round(performance.now()-t0)};
   }catch(e){attempts.push('direct:'+e.name); if(signal&&signal.aborted){clearTimeout(to);throw e}}
-  // 2) allorigins /get (status + content_type + contents)
-  try{
-    const res=await fetch('https://api.allorigins.win/get?url='+encodeURIComponent(rawUrl),{signal:ctrl.signal});
-    const j=await res.json();
-    const text=j.contents||'';
-    const h={}; if(j.status){if(j.status.content_type)h['content-type']=j.status.content_type; if(j.status.content_length)h['content-length']=String(j.status.content_length); if(j.status.http_code)h[':http']=String(j.status.http_code);}
-    const st=j.status?.http_code||200;
-    clearTimeout(to);
-    return {url:rawUrl,finalUrl:j.status?.url||rawUrl,status:st,ok:st<400,redirected:false,headers:h,text,via:'allorigins'};
-  }catch(e){attempts.push('allorigins:'+e.name); if(signal&&signal.aborted){clearTimeout(to);throw e}}
-  // 3) corsproxy.io raw
-  try{
-    const res=await fetch('https://corsproxy.io/?url='+encodeURIComponent(rawUrl),{signal:ctrl.signal});
-    const text=await res.text();
-    clearTimeout(to);
-    return {url:rawUrl,finalUrl:rawUrl,status:res.ok?200:res.status,ok:res.ok,redirected:false,headers:headersToObj(res.headers),text,via:'corsproxy'};
-  }catch(e){attempts.push('codetabs:'+e.name)}
-  // 4) codetabs raw
-  try{
-    const res=await fetch('https://api.codetabs.com/v1/proxy/?quest='+encodeURIComponent(rawUrl),{signal:ctrl.signal});
-    const text=await res.text();
-    clearTimeout(to);
-    if(/^[A-Za-z ]+Error/i.test(text.slice(0,80))) throw new Error(text.slice(0,80));
-    return {url:rawUrl,finalUrl:rawUrl,status:res.ok?200:res.status,ok:res.ok,redirected:false,headers:{},text,via:'codetabs'};
-  }catch(e){attempts.push('codetabs:'+e.name)}
+  // 2..N) Public relays raced in parallel: the first usable response wins and
+  //      the remaining relays are cancelled to avoid wasted relay requests.
+  const relays = [
+    { name: 'allorigins', run: async (sig) => {
+        const res = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(rawUrl), { signal: sig });
+        const j = await res.json();
+        const text = j.contents || '';
+        const h = {};
+        if (j.status) {
+          if (j.status.content_type) h['content-type'] = j.status.content_type;
+          if (j.status.content_length) h['content-length'] = String(j.status.content_length);
+          if (j.status.http_code) h[':http'] = String(j.status.http_code);
+        }
+        const st = j.status?.http_code || 200;
+        return { url: rawUrl, finalUrl: j.status?.url || rawUrl, status: st, ok: st < 400, redirected: false, headers: h, text, via: 'allorigins' };
+      } },
+    { name: 'corsproxy', run: async (sig) => {
+        const res = await fetch('https://corsproxy.io/?url=' + encodeURIComponent(rawUrl), { signal: sig });
+        const text = await res.text();
+        return { url: rawUrl, finalUrl: rawUrl, status: res.ok ? 200 : res.status, ok: res.ok, redirected: false, headers: headersToObj(res.headers), text, via: 'corsproxy' };
+      } },
+    { name: 'codetabs', run: async (sig) => {
+        const res = await fetch('https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(rawUrl), { signal: sig });
+        const text = await res.text();
+        if (/^[A-Za-z ]+Error/i.test(text.slice(0, 80))) throw new Error(text.slice(0, 80));
+        return { url: rawUrl, finalUrl: rawUrl, status: res.ok ? 200 : res.status, ok: res.ok, redirected: false, headers: {}, text, via: 'codetabs' };
+      } }
+  ];
+  const sub = new AbortController();
+  ctrl.signal.addEventListener('abort', () => sub.abort(), { once: true });
+  let winner = null;
+  let remaining = relays.length;
+  await new Promise(resolve => {
+    const finish = () => { if (winner || remaining === 0) resolve(); };
+    for (const r of relays) {
+      r.run(sub.signal).then(v => { if (!winner) winner = v; sub.abort(); finish(); },
+        e => { attempts.push(r.name + ':' + (e?.name || 'error')); remaining--; finish(); });
+    }
+  });
+  if (winner) { clearTimeout(to); return winner; }
   clearTimeout(to);
-  const err=new Error('Could not fetch '+rawUrl); err.attempts=attempts; throw err;
+  const err = new Error('Could not fetch ' + rawUrl); err.attempts = attempts; throw err;
 }
 
 // Lightweight reachability/status probe for links & images (HEAD where possible).
