@@ -97,7 +97,7 @@ const cards = (heading, headingIcon, cells) =>
   `<div class="container section"><div class="section-heading-row">${icon(headingIcon)}<h4 style="margin:0;">${heading}</h4></div>` +
   `<div class="grid feature-grid">${cells.map(([ic, title, text]) =>
     `<div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon(ic)}${title}</h6><p>${text}</p></div></div></div>`).join('')}</div></div>`;
-const faqSection = (items, heading = 'Common FAQs', ic = 'live_help') =>
+const faqSection = (items, heading = 'Common Asked Questions', ic = 'live_help') =>
   `<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon(ic)}<h4 style="margin:0;">${heading}</h4></div>` +
   `<div class="faq-accordion">${items.map(([q, a]) => `<details><summary><b>${q}</b></summary><p>${a}</p></details>`).join('')}</div></div>`;
 const faqLd = items => ({ '@context':'https://schema.org', '@type':'FAQPage', mainEntity: items.map(([q, a]) =>
@@ -279,7 +279,7 @@ function ezoicPage() {
     ['query_stats','Verify the audience question first','The one requirement public tools cannot check is monthly active users. Look at your Analytics before anything else: if the number is far below the documented expectation, spend the next quarter on growth and revisit the application later.'],
     ['edit_note','Deepen content before applying','Ezoic reviewers read the site like any other network. Pages that exist only to host ads, recycled introductions and image galleries without text are the common culprits. Rewrite the weakest pages instead of publishing new weak ones.'],
     ['link','Connect the standard pages','About, Contact and Privacy pages with real information, plus a working ads.txt once you are integrated. These are small jobs that remove easy objections.'],
-    ['monitoring','Keep analytics healthy','A clean GA4 install is part of the application, not an afterthought. Check that the tag fires on every page, that key events are configured, and grant read access promptly when Ezoic asks.'],
+    ['query_stats','Keep analytics healthy','A clean GA4 install is part of the application, not an afterthought. Check that the tag fires on every page, that key events are configured, and grant read access promptly when Ezoic asks.'],
     ['compare','Compare the networks with real numbers','Run the same site through the <a href="/mediavine-eligibility-checker">Mediavine</a>, <a href="/raptive-eligibility-checker">Raptive</a> and <a href="/adsense-eligibility-checker">AdSense</a> checkers. Seeing all four readiness reports side by side makes the sensible next step obvious.']
   ];
   const body = `<section class="hero audit-home ezoic-home"><span class="material-icons hero-icon" aria-hidden="true">paid</span><h1>Ezoic Eligibility Checker</h1><p class="hero-subtitle">Check how your site lines up with Ezoic before you apply</p>
@@ -523,7 +523,7 @@ function sitemapPage() {
     ['content_cut','One URL, one canonical entry','Each page should appear once, in its canonical form, without parameters and duplicate trailing slash variants. The generator normalises and deduplicates before writing the file, so you ship one clean list.'],
     ['event_repeat','Keep it honest and current','An outdated sitemap wastes crawler attention on dead URLs. Regenerate after removing pages, and when you analyse your existing file here, fix every broken and redirected entry it reports before resubmitting.'],
     ['anchor','Connect it to robots.txt','One line, Sitemap: https://yoursite.com/sitemap.xml, makes the file discoverable to every major crawler, not only the one where you submitted it. The generator reminds you of the exact line to add.'],
-    ['monitoring','Submit, then verify coverage','After submitting in Search Console, watch the Pages report for coverage. If indexed counts sit far below submitted counts, the URL explorer shows which entries were excluded and why, which is usually the whole story.'],
+    ['query_stats','Submit, then verify coverage','After submitting in Search Console, watch the Pages report for coverage. If indexed counts sit far below submitted counts, the URL explorer shows which entries were excluded and why, which is usually the whole story.'],
     ['hub','Pair with the related generators','Many sites publish a feed alongside a sitemap. The <a href="/rss-feed-generator">RSS feed generator</a> and the <a href="/llms-txt-generator">LLMs.txt generator</a> cover the other discovery formats from the same crawl, and the <a href="/broken-link-checker">broken link checker</a> verifies what the sitemap points at.']
   ];
   const body = `<section class="hero audit-home sitemap-home"><span class="material-icons hero-icon" aria-hidden="true">account_tree</span><h1>XML Sitemap Generator</h1><p class="hero-subtitle">Generate a clean sitemap or audit the one you already have</p>
@@ -573,7 +573,7 @@ function brokenlinkPage() {
   ];
   const guides = [
     ['format_list_numbered','Work the confirmed list top down','Start with internal 404s, because those are fully under your control and they block authority from reaching live pages. External rot comes second, and restricted or protected endpoints last, since those are often just policy, not breakage.'],
-    ['redirect','Fix causes, not symptoms','If an internal URL 404s, decide whether to restore the page, redirect it to the nearest real equivalent, or remove links to it. The right answer is usually the redirect map you wish you had made during the migration.'],
+    ['alt_route','Fix causes, not symptoms','If an internal URL 404s, decide whether to restore the page, redirect it to the nearest real equivalent, or remove links to it. A tidy redirect map is usually the right answer.'],
     ['link','Tidy anchors while you are in there','Links to page sections break silently when someone renames an id. The anchor check lists every heading target that no longer exists, which takes minutes to fix and improves navigation for everyone.'],
     ['map','Keep the redirect map short','After a big cleanup, chains tend to accumulate: old URL to new URL to newer URL. Collapse each chain to a single hop and update internal links to point at the final destination.'],
     ['event_repeat','Make it a routine, not a rescue','Link rot returns. A quarterly scan catches rot while it is small, keeps crawl budget on real pages, and gives you a health score trend instead of an annual archaeology project.'],
@@ -606,7 +606,7 @@ function brokenlinkPage() {
     </div>
   </details>
 </form>
-${chips([['fact_check','Accurate classes'],['security','SSRF safe'],['rule','Robots respected'],['loop','Redirect chains'],['retry','Retry verification'],['grading','Health score']])}</section>
+${chips([['fact_check','Accurate classes'],['security','SSRF safe'],['rule','Robots respected'],['loop','Redirect chains'],['autorenew','Retry verification'],['grading','Health score']])}</section>
 <div id="brokenlink-results" class="audit-results brokenlink-results"></div>
 ${cards('What does the scan cover?', 'verified', cardsList)}
 <div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">Fixing links the professional way</h4></div>${lede('A link report is only as good as the fixes that follow. This is the order that returns the most value for the effort.')}${guideGrid(guides)}

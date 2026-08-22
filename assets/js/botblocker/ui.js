@@ -480,7 +480,7 @@
       '<div class="botblocker-simrow">' +
       '<input type="text" id="botblocker-existing-url" class="text-input" placeholder="https://example.com/robots.txt">' +
       '<button type="button" class="btn" id="botblocker-existing-fetch">' + icon('cloud_download') + ' Fetch (external request)</button>' +
-      '<button type="button" class="btn" id="botblocker-existing-analyze">' + icon('analyze') + ' Analyze pasted text</button>' +
+      '<button type="button" class="btn" id="botblocker-existing-analyze">' + icon('manage_search') + ' Analyze pasted text</button>' +
       '</div>' +
       '<textarea id="botblocker-existing-text" class="text-input botblocker-textarea" placeholder="Paste your current robots.txt here, or fetch it by URL…">' + esc(state.existing.text || '') + '</textarea>' +
       '<div id="botblocker-existing-result"></div>' +
