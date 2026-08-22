@@ -812,18 +812,18 @@
   }
 
   /* ---------------- main submit ---------------- */
+  function cloneProfile(id) { return JSON.parse(JSON.stringify(PROFILES[id] || PROFILES.mobile)); }
+  function selectedProfiles() {
+    var sel = document.getElementById('cwv-profile');
+    var v = sel ? sel.value : 'both';
+    if (v === 'mobile') return [cloneProfile('mobile')];
+    if (v === 'desktop') return [cloneProfile('desktop')];
+    return [cloneProfile('mobile'), cloneProfile('desktop')];
+  }
   function currentProfile() {
     var sel = document.getElementById('cwv-profile');
-    var id = sel ? sel.value : 'mobile';
-    var p = JSON.parse(JSON.stringify(PROFILES[id] || PROFILES.mobile));
-    if (id === 'custom') {
-      var w = parseInt(document.getElementById('cwv-cw').value, 10) || 1280;
-      var h = parseInt(document.getElementById('cwv-ch').value, 10) || 800;
-      p.viewport = { w: Math.max(320, Math.min(2560, w)), h: Math.max(320, Math.min(1800, h)) };
-      var net = NETWORKS.find(function (n) { return n.id === (document.getElementById('cwv-net').value || 'none'); }) || NETWORKS[0];
-      p.network = net.latencyMs ? { label: net.label, latencyMs: net.latencyMs, downKbps: net.downKbps } : null;
-    }
-    return p;
+    var v = sel ? sel.value : 'both';
+    return cloneProfile(v === 'desktop' ? 'desktop' : 'mobile');
   }
 
   form.addEventListener('submit', function (ev) {
@@ -834,13 +834,7 @@
       return;
     }
     var url = checked.url;
-    var profile = currentProfile();
-    var alsoOther = document.getElementById('cwv-both') && document.getElementById('cwv-both').checked;
-    var profiles = [profile];
-    if (alsoOther) {
-      var otherId = profile.id === 'desktop' ? 'mobile' : 'desktop';
-      profiles.push(JSON.parse(JSON.stringify(PROFILES[otherId])));
-    }
+    var profiles = selectedProfiles();
     state = { reports: {}, order: [], crawl: null, currentProfile: null };
     CWV._internalLinks = null;
 
@@ -868,15 +862,6 @@
         '<button class="btn" type="button" onclick="location.reload()">Try Again</button></div>';
     });
   });
-
-  // Profile select → custom fields visibility
-  var profileSel = document.getElementById('cwv-profile');
-  if (profileSel) {
-    profileSel.addEventListener('change', function () {
-      var custom = document.getElementById('cwv-custom-fields');
-      if (custom) custom.hidden = profileSel.value !== 'custom';
-    });
-  }
 
   // Prefill from ?url=
   try {

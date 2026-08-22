@@ -734,10 +734,11 @@
   }
 
   /* ---------- submit ---------- */
+  function isSitemapUrl(u) { return /\.xml(?:[?#]|$)/i.test(String(u == null ? '' : u).trim()); }
   function readOptions() {
     var fd = new FormData(form);
     return {
-      mode: (fd.get('mode') || 'website'),
+      mode: isSitemapUrl(fd.get('url')) ? 'sitemap' : 'website',
       maxPages: Number(fd.get('maxPages') || 60),
       maxDepth: fd.get('maxDepth') || 3,
       maxItems: Number(fd.get('maxItems') || 20),

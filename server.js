@@ -528,11 +528,8 @@ function sitemapPage() {
   ];
   const body = `<section class="hero audit-home sitemap-home"><span class="material-icons hero-icon" aria-hidden="true">account_tree</span><h1>XML Sitemap Generator</h1><p class="hero-subtitle">Generate a clean sitemap or audit the one you already have</p>
 <form id="sitemap-form" class="sitemap-form" aria-label="XML sitemap generator">
-  <div class="mode-tabs" role="radiogroup" aria-label="Mode"><label><input type="radio" name="sitemap-mode" value="generate" checked> Generate New Sitemap</label><label><input type="radio" name="sitemap-mode" value="analyze"> Analyze Existing Sitemap</label></div>
-  <div class="search-field audit-search"><input name="url" id="sitemap-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website or sitemap URL"><button class="btn" type="submit">Generate Sitemap</button></div>
-  <details class="sitemap-options sitemap-advanced"><summary>${icon('tune')} Advanced crawl settings</summary>
-    <div class="sitemap-option-row"><label>Maximum URLs <select name="maxUrls" class="select"><option value="100">100</option><option value="500" selected>500</option><option value="1000">1,000</option><option value="5000">5,000</option></select></label><label>Crawl depth <select name="depth" class="select"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="5">5</option></select></label><label><input type="checkbox" name="includeImages"> Include images</label></div>
-  </details>
+  <div class="search-field audit-search"><input name="url" id="sitemap-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com — or paste your sitemap.xml to analyze it" required aria-label="Website or sitemap URL"><button class="btn" type="submit">Generate Sitemap</button></div>
+  <p class="hero-hint">Paste a website to generate a new sitemap, or paste the address of an existing <code>sitemap.xml</code> to audit it. No settings needed — sensible defaults are used.</p>
 </form>
 ${chips([['rule','Robots respected'],['link','Canonicals checked'],['do_not_disturb_on','Noindex excluded'],['code','XML validated'],['download','Download ready']])}</section>
 <div id="sitemap-results" class="audit-results sitemap-results"></div>
@@ -581,30 +578,8 @@ function brokenlinkPage() {
   ];
   const body = `<section class="hero audit-home brokenlink-home"><span class="material-icons hero-icon" aria-hidden="true">search_off</span><h1>Broken Link Checker</h1><p class="hero-subtitle">Crawl a site and verify every link, with no false alarms</p>
 <form id="brokenlink-form" class="brokenlink-form" aria-label="Broken link checker">
-  <div class="search-field audit-search" style="flex-wrap:wrap;gap:8px;padding:10px;max-width:900px">
-    <input id="bl-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL" style="flex:1;min-width:200px">
-    <button class="btn" type="submit">Start Scan</button>
-  </div>
-  <details class="sitemap-options sitemap-advanced" style="max-width:900px;margin:18px auto 0"><summary>${icon('tune')} Scan settings</summary>
-    <div class="sitemap-option-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
-      <label>Maximum pages
-        <select id="bl-max-pages" class="select"><option value="100">100</option><option value="500" selected>500</option><option value="1000">1,000</option><option value="5000">5,000</option></select>
-      </label>
-      <label>Maximum crawl depth
-        <select id="bl-max-depth" class="select"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="5" selected>5</option><option value="10">10</option></select>
-      </label>
-      <label>Scan scope
-        <select id="bl-scan-scope" class="select"><option value="internal+external" selected>Internal and external</option><option value="internal">Internal only</option></select>
-      </label>
-    </div>
-    <div class="sitemap-option-row" style="display:flex;flex-wrap:wrap;gap:16px;margin-top:12px">
-      <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="bl-check-external" checked> Check external links</label>
-      <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="bl-check-images"> Check images</label>
-      <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="bl-check-docs"> Check documents</label>
-      <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="bl-check-anchors"> Check section anchors</label>
-      <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="bl-respect-robots" checked> Respect robots.txt</label>
-    </div>
-  </details>
+  <div class="search-field audit-search"><input id="bl-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL"><button class="btn" type="submit">Start Scan</button></div>
+  <p class="hero-hint">The scan checks up to 500 pages and every internal and external link, respecting robots.txt. Retries and careful classification mean timeouts are not mistaken for broken links.</p>
 </form>
 ${chips([['fact_check','Accurate classes'],['security','SSRF safe'],['rule','Robots respected'],['loop','Redirect chains'],['autorenew','Retry verification'],['grading','Health score']])}</section>
 <div id="brokenlink-results" class="audit-results brokenlink-results"></div>
@@ -652,10 +627,8 @@ function llmstxtPage() {
   const body = `<section class="hero audit-home llmstxt-home"><span class="material-icons hero-icon" aria-hidden="true">auto_stories</span><h1>LLMs.txt Generator</h1><p class="hero-subtitle">Turn your best pages into a clean llms.txt for AI tools</p>
 <form id="llmstxt-form" class="llmstxt-form" aria-label="LLMs.txt generator">
   <div class="search-field audit-search"><input name="url" id="llmstxt-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL"><button class="btn" type="submit">Generate llms.txt</button></div>
-  <details class="sitemap-options sitemap-advanced"><summary>${icon('tune')} Crawl settings</summary>
-    <div class="sitemap-option-row"><label>Maximum pages <select name="maxPages" class="select"><option value="100">100</option><option value="500" selected>500</option><option value="1000">1,000</option><option value="5000">5,000</option></select></label><label>Crawl depth <select name="maxDepth" class="select"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="5">5</option></select></label></div>
-    <input type="hidden" name="includePdfs" value="1"><input type="hidden" name="includeBlog" value="1"><input type="hidden" name="includeDocs" value="1">
-  </details>
+  <p class="hero-hint">The generator crawls up to 500 pages, picks your strongest content and writes descriptions from your own meta data. You can edit every entry before downloading.</p>
+  <input type="hidden" name="includePdfs" value="1"><input type="hidden" name="includeBlog" value="1"><input type="hidden" name="includeDocs" value="1">
 </form>
 ${chips([['rule','Robots respected'],['auto_awesome','Deterministic scoring'],['link','Canonicals handled'],['code','Output validated'],['download','Download ready']])}</section>
 <div id="llmstxt-results" class="audit-results llmstxt-results"></div>
@@ -704,22 +677,9 @@ function botblockerPage() {
   ];
   const body = `<section class="hero audit-home botblocker-home"><span class="material-icons hero-icon" aria-hidden="true">security</span><h1>AI Crawler &amp; LLM Bot Blocker</h1><p class="hero-subtitle">Choose which AI bots may access your site, then generate the rules</p>
 <form id="botblocker-form" class="botblocker-form" aria-label="AI Crawler and LLM Bot Blocker">
-  <div class="search-field audit-search"><input id="botblocker-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" aria-label="Website URL"><button class="btn" type="submit">Generate Protection Rules</button></div>
-  <div class="botblocker-formrow">
-    <label class="botblocker-modelabel" for="botblocker-mode">Protection mode</label>
-    <select id="botblocker-mode" class="select botblocker-modeselect" aria-label="Protection mode">
-      <option value="block-all">Block all known AI crawlers</option>
-      <option value="block-training">Block AI training crawlers only</option>
-      <option value="block-search">Block AI search crawlers only</option>
-      <option value="block-extraction">Block content extraction crawlers</option>
-      <option value="allow-all">Allow all AI crawlers</option>
-      <option value="allow-selected">Allow selected crawlers, block the rest</option>
-      <option value="custom">Custom per crawler rules</option>
-      <option value="advanced">Advanced configuration</option>
-    </select>
-    <small class="muted botblocker-mode-desc" id="botblocker-mode-desc"></small>
-  </div>
-  <details class="botblocker-advanced-sub"><summary>${icon('tune')} Advanced options: paths, exceptions, formats</summary>
+  <div class="search-field audit-search"><input id="botblocker-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com (optional)" aria-label="Website URL"><select id="botblocker-mode" class="crawl-select" aria-label="Protection mode"><option value="block-all" selected>Block all AI crawlers</option><option value="block-training">Block AI training only</option><option value="block-search">Block AI search only</option><option value="allow-all">Allow all AI crawlers</option><option value="custom">Custom per crawler</option></select><button class="btn" type="submit">Generate Rules</button></div>
+  <small class="botblocker-mode-desc" id="botblocker-mode-desc"></small>
+  <details class="botblocker-advanced-sub"><summary>${icon('tune')} Advanced: paths, defaults and output formats</summary>
     <div class="botblocker-optgroup">
       <fieldset class="botblocker-fieldset"><legend>Apply rules to</legend>
         <label class="botblocker-radio"><input type="radio" name="botblocker-scope" id="botblocker-scope-entire" value="entire" checked> Entire website <code>/</code></label>
@@ -727,27 +687,18 @@ function botblockerPage() {
         <div id="botblocker-pathchips" class="botblocker-chiprow" aria-label="Blocked paths"></div>
         <div class="botblocker-addrow"><input type="text" id="botblocker-path-input" class="text-input" placeholder="Add custom path, such as /private-content/"><button type="button" class="btn" id="botblocker-path-add">${icon('add')} Add</button></div>
       </fieldset>
-      <fieldset class="botblocker-fieldset"><legend>Block everywhere except these paths</legend>
-        <label class="botblocker-radio"><input type="checkbox" id="botblocker-exceptions-on"> Enable exception paths</label>
-        <div id="botblocker-exceptionchips" class="botblocker-chiprow" aria-label="Allowed exception paths"></div>
-        <div class="botblocker-addrow"><input type="text" id="botblocker-exc-input" class="text-input" placeholder="Add allow path, such as /public/"><button type="button" class="btn" id="botblocker-exc-add">${icon('add')} Add</button></div>
-      </fieldset>
-    </div>
-    <div class="botblocker-optgroup">
-      <fieldset class="botblocker-fieldset"><legend>Default group, for all other crawlers</legend>
+      <fieldset class="botblocker-fieldset"><legend>Default group for all other crawlers</legend>
         <select id="botblocker-default-group" class="select" aria-label="Default wildcard group">
           <option value="allow" selected>Allow everything</option>
           <option value="none">No wildcard group</option>
           <option value="mirror">Apply the same path rules to all other crawlers</option>
-          <option value="block-others">Block all other crawlers, high impact</option>
+          <option value="block-others">Block all other crawlers</option>
         </select>
-      </fieldset>
-      <fieldset class="botblocker-fieldset"><legend>Sitemap, optional</legend>
-        <input type="text" id="botblocker-sitemap" class="text-input" placeholder="https://example.com/sitemap.xml" spellcheck="false">
+        <p class="botblocker-fieldset-note">Pick “Block all other crawlers” to allow only the crawlers you explicitly allow in the results table below.</p>
       </fieldset>
     </div>
     <div class="botblocker-optgroup">
-      <fieldset class="botblocker-fieldset"><legend>Output formats, robots.txt is always generated</legend>
+      <fieldset class="botblocker-fieldset"><legend>Server rule formats — robots.txt is always generated</legend>
         <div class="botblocker-checkrow">
           <label><input type="checkbox" id="botblocker-out-nginx" checked> Nginx</label>
           <label><input type="checkbox" id="botblocker-out-apache"> Apache</label>
@@ -816,20 +767,8 @@ function cwvPage() {
   ];
   const body = `<section class="hero audit-home cwv-home"><span class="material-icons hero-icon" aria-hidden="true">speed</span><h1>Core Web Vitals &amp; INP Auditor</h1><p class="hero-subtitle">Real browser measurement of LCP, INP, CLS, FCP and TTFB</p>
 <form id="cwv-form" class="cwv-form" aria-label="Core Web Vitals and INP auditor">
-  <div class="search-field audit-search"><input id="cwv-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL"><button class="btn" type="submit">Analyze Website</button></div>
-  <div class="cwv-formrow">
-    <label for="cwv-profile">Device profile
-      <select id="cwv-profile" class="select"><option value="mobile" selected>Mobile, 412 by 823, slow 4G</option><option value="desktop">Desktop, 1350 by 940, no throttle</option><option value="custom">Custom</option></select>
-    </label>
-    <label class="cwv-check"><input type="checkbox" id="cwv-both" checked> Also measure the other device profile</label>
-  </div>
-  <div id="cwv-custom-fields" hidden class="cwv-formrow">
-    <label>Viewport width <input id="cwv-cw" class="cwv-num" type="number" min="320" max="2560" value="1280"></label>
-    <label>Viewport height <input id="cwv-ch" class="cwv-num" type="number" min="320" max="1800" value="800"></label>
-    <label>Network
-      <select id="cwv-net" class="select"><option value="none" selected>No throttle</option><option value="slow4g">Slow 4G</option><option value="fast3g">Fast 3G</option></select>
-    </label>
-  </div>
+  <div class="search-field audit-search"><input id="cwv-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL"><select id="cwv-profile" class="crawl-select" aria-label="Device profiles"><option value="both" selected>Both profiles</option><option value="mobile">Mobile only</option><option value="desktop">Desktop only</option></select><button class="btn" type="submit">Analyze Website</button></div>
+  <p class="hero-hint">Mobile is measured on an emulated 412 px viewport with slow 4G throttling, desktop at 1350 px with no throttle. Both reports include element and script attribution.</p>
 </form>
 ${chips([['speed','Real measurements'],['touch_app','INP interactions'],['image','LCP phases'],['swap_vert','CLS windows'],['waterfall_chart','Waterfall'],['key_off','No API keys']])}</section>
 <div id="cwv-results" class="audit-results cwv-results"></div>
@@ -877,13 +816,9 @@ function rssPage() {
   ];
   const body = `<section class="hero audit-home rss-home"><span class="material-icons hero-icon" aria-hidden="true">rss_feed</span><h1>RSS Feed Generator</h1><p class="hero-subtitle">Turn your published content into a validated RSS feed</p>
 <form id="rss-form" class="rss-form" aria-label="RSS feed generator">
-  <div class="mode-tabs" role="radiogroup" aria-label="Mode"><label><input type="radio" name="mode" value="website" checked> Generate from website</label><label><input type="radio" name="mode" value="sitemap"> Generate from sitemap</label></div>
-  <div class="search-field audit-search"><input id="rss-url" name="url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL or sitemap URL"><button class="btn" type="submit">Generate RSS Feed</button></div>
-  <details class="sitemap-options rss-options"><summary>${icon('tune')} Feed settings</summary>
-    <div class="sitemap-option-row"><label>Number of items <select name="maxItems" class="select"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option><option value="100">100</option></select></label><label>Item content <select name="contentMode" class="select"><option value="excerpt" selected>Excerpt</option><option value="full">Full content</option><option value="description">Description only</option></select></label><label>Feed format <select name="feedMode" class="select"><option value="standard" selected>Standard RSS 2.0</option><option value="news">News feed</option><option value="podcast">Podcast mode</option></select></label></div>
-    <div class="sitemap-option-row"><label><input type="checkbox" name="incImages" checked> Include images</label><label><input type="checkbox" name="incAuthors" checked> Include authors</label><label><input type="checkbox" name="incCategories" checked> Include categories</label><label><input type="checkbox" name="incDates" checked> Include dates</label></div>
-    <input type="hidden" name="excUndated" value="1"><input type="hidden" name="sortOrder" value="newest">
-  </details>
+  <div class="search-field audit-search"><input id="rss-url" name="url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com — or paste a sitemap.xml" required aria-label="Website or sitemap URL"><button class="btn" type="submit">Generate Feed</button></div>
+  <p class="hero-hint">The generator finds your real articles, extracts accurate titles, dates and descriptions, and validates the XML before you download. You can adjust item count, content and format afterwards.</p>
+  <input type="hidden" name="excUndated" value="1"><input type="hidden" name="sortOrder" value="newest">
 </form>
 ${chips([['rss_feed','Existing feed detection'],['data_object','Accurate metadata'],['link','Canonical URLs'],['code','XML validated'],['download','Download ready']])}</section>
 <div id="rss-results" class="audit-results rss-results"></div>

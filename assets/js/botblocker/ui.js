@@ -97,7 +97,10 @@
   function writeConfig(cfg) {
     cfg = BB.index.normalizeConfig(cfg);
     el('botblocker-url').value = cfg.website || '';
-    el('botblocker-mode').value = cfg.mode;
+    var modeEl = el('botblocker-mode');
+    var modeOpts = modeEl.options ? Array.prototype.map.call(modeEl.options, function (o) { return o.value; }) : null;
+    if (modeOpts && modeOpts.indexOf(cfg.mode) === -1) cfg.mode = 'custom'; // legacy modes map to the per-crawler editor
+    modeEl.value = cfg.mode;
     if (el('botblocker-mode-desc')) el('botblocker-mode-desc').textContent = (classifier.MODES.find(function (m) { return m.id === cfg.mode; }) || {}).desc || '';
     state.paths = (cfg.paths && cfg.paths.list || []).slice();
     state.exceptions = (cfg.exceptions && cfg.exceptions.list || []).slice();
@@ -264,7 +267,7 @@
       '<div class="botblocker-profile-row">' +
       '<input type="text" id="botblocker-profilename" class="text-input botblocker-inline-profile" placeholder="Profile name (e.g. Strict, Training Only, Search Only, Custom)" maxlength="40">' +
       '<button type="button" class="btn" id="botblocker-profile-save">' + icon('save') + ' Save current</button>' +
-      '<select id="botblocker-profile-load" class="select botblocker-profile-select">' + (names.length ? names.map(function (n) { return '<option value="' + esc(n) + '">' + esc(n) + '</option>'; }).join('') : '<option value="">, no saved profiles ,</option>') + '</select>' +
+      '<select id="botblocker-profile-load" class="select botblocker-profile-select">' + (names.length ? names.map(function (n) { return '<option value="' + esc(n) + '">' + esc(n) + '</option>'; }).join('') : '<option value="">No saved profiles</option>') + '</select>' +
       '<button type="button" class="btn" id="botblocker-profile-loadbtn" ' + (names.length ? '' : 'disabled') + '>' + icon('upload') + ' Load</button>' +
       '<button type="button" class="btn" id="botblocker-profile-del" ' + (names.length ? '' : 'disabled') + '>' + icon('delete') + ' Delete</button>' +
       '<button type="button" class="btn" id="botblocker-profile-export">' + icon('download') + ' Export JSON</button>' +
