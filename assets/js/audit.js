@@ -306,7 +306,7 @@ function startScan(url){
 async function audit(rawUrl,progress,signal){
   let start=rawUrl.trim(); if(!/^https?:\/\//i.test(start))start='https://'+start;
   const startUrl=new URL(start), origin=startUrl.origin;
-  const limit=clamp(parseInt(limitSel?.value||'6',10)||6,1,50);
+  const limit=clamp(parseInt(limitSel?.value||'15',10)||15,1,200);
 
   scan.set({connect:'active'},'Connecting to '+startUrl.hostname,4);
   const robotsTxt=await fetchRobots(origin,signal);
@@ -356,7 +356,7 @@ async function audit(rawUrl,progress,signal){
         page.status=info.status; page.finalUrl=info.finalUrl; page.via=info.via;
         pages.push(page);
         for(const l of page.links){
-          if(l.internal&&!visited.has(l.href)&&!isAsset(l.href)&&!queue.includes(l.href)&&sameSite(l.href,origin)&&queue.length<limit*3)queue.push(l.href);
+          if(l.internal&&!visited.has(l.href)&&!isAsset(l.href)&&!queue.includes(l.href)&&sameSite(l.href,origin)&&queue.length<limit*4)queue.push(l.href);
         }
       }
       scan.label('crawl',`Crawling pages (${pages.length}/${Math.min(limit,visited.size+queue.length)})`);
@@ -366,7 +366,12 @@ async function audit(rawUrl,progress,signal){
   }
   const workers=Math.min(4, Math.max(1, limit));
   await Promise.all(Array.from({length:workers},()=>crawlWorker()));
-  if(!pages.length&&errors.length)throw new Error('No pages could be read. '+errors[0].error);
+  if(!pages.length){
+    const detail=errors.length?(' '+errors[0].error):'';
+    const e=new Error('No readable pages were returned for this address.'+detail+' The site may block public readers, need JavaScript, or serve no HTML content.');
+    e.name='NoPagesError';
+    throw e;
+  }
   const home=pages[0];
 
   scan.set({crawl:'done',images:'active'},`${pages.length} page${pages.length===1?'':'s'} crawled`,62);
@@ -860,7 +865,7 @@ form.addEventListener('submit',async e=>{
   try{ const r=await audit(url,null,currentCtrl.signal); location.hash=''; render(r); }
   catch(err){
     if(err.name==='AbortError'){scan&&scan.fail('Audit cancelled'); out.innerHTML=`<div class="audit-error"><h3>Audit cancelled</h3><p>The audit was stopped.</p><button class="btn" onclick="document.getElementById('audit-form').requestSubmit()">Try again</button></div>`}
-    else {scan&&scan.fail('Audit failed'); out.innerHTML=`<div class="audit-error"><h3>Audit could not run</h3><p>${esc(err.message)}</p><p class="muted">The site may block public readers, or the URL could not be reached. Try the exact https:// address.</p></div>`}
+    else {scan&&scan.fail('Audit failed'); out.innerHTML=`<div class="audit-error"><h3>${esc(err.name==='NoPagesError'?'No readable pages found':'Audit could not run')}</h3><p>${esc(err.message)}</p></div>`}
   }
   finally{currentCtrl=null; scan=null; out._scan=null;}
 });

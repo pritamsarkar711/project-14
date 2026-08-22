@@ -22,7 +22,7 @@ const FAVICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
 /* Central registry of tools: powers the Other Tools menu, related links,
    the footer and the XML sitemap from one source of truth. */
 const TOOLS = {
-  seo:        { name:'SEO Audit', icon:'travel_explore', path:'/', short:'Technical, content and performance audit' },
+  seo:        { name:'Deep SEO Auditor', icon:'travel_explore', path:'/', short:'Deep technical, content and performance audit' },
   adsense:    { name:'AdSense Eligibility Checker', icon:'monetization_on', path:'/adsense-eligibility-checker', short:'Website readiness for AdSense' },
   ezoic:      { name:'Ezoic Eligibility Checker', icon:'insights', path:'/ezoic-eligibility-checker', short:'Website readiness for Ezoic' },
   mediavine:  { name:'Mediavine Eligibility Checker', icon:'trending_up', path:'/mediavine-eligibility-checker', short:'Website readiness for Mediavine' },
@@ -37,11 +37,21 @@ const TOOLS = {
   rss:        { name:'RSS Feed Generator', icon:'rss_feed', path:'/rss-feed-generator', short:'Discover content and generate valid RSS' }
 };
 
+/* Tool categories: drive the Tools menu and the homepage directory. */
+const CATEGORIES = [
+  { key:'seo', icon:'travel_explore', name:'SEO and Site Health', desc:'Crawl deep, fix what search engines see first.', tools:['seo','sitemap','brokenlink','cwv'] },
+  { key:'ads', icon:'monetization_on', name:'Ad Network Readiness', desc:'Check a site against the requirements of each major ad network.', tools:['adsense','ezoic','mediavine','raptive'] },
+  { key:'intel', icon:'dns', name:'Domain and Platform Intelligence', desc:'Look behind a site: the stack, the host and the domain record.', tools:['domaincheck','wptheme'] },
+  { key:'content', icon:'rss_feed', name:'Content and AI Discovery', desc:'Feeds, AI readable files and control over AI crawlers.', tools:['rss','llmstxt','botblocker'] }
+];
+
 function otherToolsMenu(active) {
-  return `<details class="tools-menu"><summary>${icon('build')}<span>Other Tools</span>${icon('arrow_drop_down')}</summary>
-    <div class="tools-menu-panel" role="menu">${Object.entries(TOOLS).map(([key, t]) =>
-      `<a href="${t.path}" role="menuitem" class="${active===key?'is-active':''}">${icon(t.icon)}<span><b>${t.name}</b><small>${t.short}</small></span></a>`).join('')}
-    </div></details>`;
+  const col = cat => '<div class="tools-cat' + (cat.tools.length > 2 ? '' : '') + '">' +
+    '<div class="tools-cat-head">' + icon(cat.icon) + esc(cat.name) + '</div>' +
+    cat.tools.map(k => { const t = TOOLS[k];
+      return `<a href="${t.path}" role="menuitem" class="${active===k?'is-active':''}">${icon(t.icon)}<span><b>${t.name}</b><small>${t.short}</small></span></a>`; }).join('') + '</div>';
+  return `<details class="tools-menu"><summary>${icon('category')}<span>Tools</span>${icon('arrow_drop_down')}</summary>
+    <div class="tools-menu-panel" role="menu">${CATEGORIES.map(col).join('')}</div></details>`;
 }
 
 function relatedTools(active) {
@@ -81,8 +91,8 @@ const faqSection = (items, heading = 'Common Questions', ic = 'quiz') =>
 const faqLd = items => ({ '@context':'https://schema.org', '@type':'FAQPage', mainEntity: items.map(([q, a]) =>
   ({ '@type':'Question', name:q, acceptedAnswer:{ '@type':'Answer', text:String(a).replace(/<[^>]+>/g, '') } })) });
 
-const searchForm = (id, { inputId, placeholder = 'https://yourwebsite.com', button = 'Audit', extra = '', icon: ic = 'link' }) =>
-  `<form id="${id}" class="search-field audit-search" role="search"><span class="material-icons" aria-hidden="true">${ic}</span>` +
+const searchForm = (id, { inputId, placeholder = 'https://yourwebsite.com', button = 'Audit', extra = '' }) =>
+  `<form id="${id}" class="search-field audit-search" role="search">` +
   `<input id="${inputId}" name="url" type="url" placeholder="${placeholder}" required aria-label="Website URL">${extra}` +
   `<button class="btn" type="submit">${button}</button></form>`;
 
@@ -129,7 +139,7 @@ function home() {
     ['What is an SEO audit?', 'An SEO audit reviews a website the way a search engine sees it. It checks technical fundamentals such as redirects, canonical tags and indexability, plus on page elements like titles and headings, content quality, images, linking and security headers. The goal is to find the specific issues that hold a site back and to put them in an order you can actually fix.'],
     ['Is this SEO audit tool really free?', 'Yes. There is no account, no trial and no credit card. Paste a URL, run the audit and read the report. The tool supports itself with ads, the same model most free web tools use.'],
     ['How does the audit crawl my site?', 'It starts from the URL you enter, reads robots.txt and any sitemaps it finds, then follows internal links page by page. Each page is parsed in your browser, so nothing is uploaded to a server you do not control. A live progress panel shows exactly which page is being read at any moment.'],
-    ['How many pages can the audit check at once?', 'You choose the crawl size when you start: 1 page for a quick single page review, up to 50 pages for a deeper look. Larger sites can be covered by running the audit on important sections, one subfolder at a time.'],
+    ['How many pages can the audit check at once?', 'You choose the crawl size when you start, from a single page up to a 200 page deep crawl. For very large sites, run the auditor on one section or subfolder at a time and compare the reports.'],
     ['What is a good SEO audit score?', 'Scores of 90 and above mean the measured checks are clean. Between 75 and 89 the site is in good shape with room to improve. Below that, the priority list will usually contain a handful of fixes that move the needle quickly. Treat the score as a progress tracker for your own site rather than a comparison against others.'],
     ['How often should I run an SEO audit?', 'Most site owners audit once a quarter, and after any big change such as a redesign, a migration or a new theme. The compare feature stores your recent audits in your own browser, so you can see whether scores move up or down between runs.'],
     ['Why does the audit show fewer pages than my website has?', 'The crawl stops at the page limit you set, and it only follows links it can actually read. Pages hidden behind JavaScript menus, blocked by robots.txt or linked only from pages outside the crawl will not appear. This is also useful information: if an important page cannot be reached by a simple crawl, search engines may struggle with it too.'],
@@ -165,19 +175,20 @@ function home() {
     ['content_paste','Remove thin and duplicate content','Pages with little text, or several pages covering the same topic, split your authority. Merge them, expand them or set a clear canonical, then let the audit confirm the duplicates are gone.'],
     ['image','Speed up images','Missing alt text, oversized files and unsized images appear in most first audits. They are quick to fix and they help accessibility, loading speed and layout stability at the same time.']
   ];
-  const body = `<section class="hero audit-home"><span class="material-icons hero-icon" aria-hidden="true">travel_explore</span><h1>SEO Audit</h1><p class="hero-subtitle">A free technical SEO audit for any public website</p>
-<form id="audit-form" class="search-field audit-search" role="search" aria-label="SEO audit"><span class="material-icons" aria-hidden="true">link</span><input id="audit-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL">${crawlSelect('crawl-limit','Crawl limit',['1','6','15','30','50'],'6')}<button class="btn" type="submit">Audit</button></form>
+  const body = `<section class="hero audit-home"><span class="material-icons hero-icon" aria-hidden="true">travel_explore</span><h1>Deep SEO Auditor</h1><p class="hero-subtitle">A free deep SEO audit for any public website, up to 200 pages</p>
+<form id="audit-form" class="search-field audit-search" role="search" aria-label="Deep SEO audit"><input id="audit-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL">${crawlSelect('crawl-limit','Crawl limit',['1','6','15','30','50','100','200'],'15')}<button class="btn" type="submit">Audit</button></form>
 ${chips([['person_off','No account'],['settings_input_component','Technical'],['description','On page'],['article','Content'],['image','Images'],['speed','Performance']])}</section>
 <div id="audit-results" class="audit-results"></div>
 ${cards('What the audit checks', 'verified', cardsList)}
-<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('route')}<h4 style="margin:0;">How the audit works</h4></div>${lede('No two audits should feel the same, because no two sites are. Here is what actually happens between the moment you press Audit and the moment the report appears.')}${guideGrid(howItWorks)}</div>
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('route')}<h4 style="margin:0;">How the audit works</h4></div>${lede('One honest pipeline, run the same way every time: a real crawl, measurable checks, transparent scoring and a fix list in priority order.')}${guideGrid(howItWorks)}</div>
 <div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('checklist')}<h4 style="margin:0;">What to fix first</h4></div>${lede('A long report is only useful if you know where to start. This is the order experienced auditors usually work in, and it maps directly to the priority list in your report.')}${guideGrid(fixFirst)}
-<p class="prose-block">When the technical layer is clean, two of our other tools pick up where this audit stops. The <a href="/core-web-vitals-auditor">Core Web Vitals auditor</a> measures real loading and interaction speed in a browser, and the <a href="/broken-link-checker">broken link checker</a> verifies every internal and external link on a site, not just the sample this audit probes.</p></div>
+<p class="prose-block">Once the technical layer is clean, go deeper: the <a href="/core-web-vitals-auditor">Core Web Vitals auditor</a> measures real loading and interaction speed, and the <a href="/broken-link-checker">broken link checker</a> verifies every link on the site.</p></div>
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('apps')}<h4 style="margin:0;">Explore the full toolkit</h4></div>${lede('Thirteen focused tools in four categories, all free, all without an account.')}<div class="toolcats">${CATEGORIES.map(cat => `<div class="toolcat"><div class="toolcat-head">${icon(cat.icon)}<h5>${cat.name}</h5></div><p>${cat.desc}</p><div class="toolcat-links">${cat.tools.map(k => { const t = TOOLS[k]; return `<a href="${t.path}"><span class="material-icons" aria-hidden="true">${t.icon}</span><span>${t.name}<small>${t.short}</small></span></a>`; }).join('')}</div></div>`).join('')}</div></div>
 ${faqSection(faqs)}`;
-  return layout('Free SEO Audit Tool | Huvanti', body, {
+  return layout('Deep SEO Auditor | Free Technical SEO Audit | Huvanti', body, {
     active:'seo', canonical:'https://huvanti.com/',
-    description:'Free SEO audit for any public website. Over two hundred checks across technical SEO, on page elements, content, images, links and security, with a prioritised fix list. No account.',
-    jsonLd:[{'@context':'https://schema.org','@type':'WebApplication',name:'Huvanti SEO Audit',applicationCategory:'SEOApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free technical SEO audit with content, image, performance, mobile, schema, link and security checks.'}, faqLd(faqs)]
+    description:'Free deep SEO auditor for any public website. Crawl up to 200 pages and check technical SEO, on page elements, content, images, links and security, with a prioritised fix list. No account.',
+    jsonLd:[{'@context':'https://schema.org','@type':'WebApplication',name:'Huvanti Deep SEO Auditor',applicationCategory:'SEOApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free deep technical SEO audit with content, image, performance, mobile, schema, link and security checks, up to 200 pages.'}, faqLd(faqs)]
   });
 }
 
@@ -214,12 +225,12 @@ function adsensePage() {
     ['loop','Treat the score as a pre flight check','Run the checker, fix what it finds, then apply. If the verdict still says Needs Improvement, the report shows which category is holding you back, so you know exactly what to work on before a human reviewer arrives.']
   ];
   const body = `<section class="hero audit-home adsense-home"><span class="material-icons hero-icon" aria-hidden="true">monetization_on</span><h1>AdSense Eligibility Checker</h1><p class="hero-subtitle">See how ready your site is before Google reviews it</p>
-<form id="adsense-form" class="search-field audit-search" role="search" aria-label="AdSense eligibility check"><span class="material-icons" aria-hidden="true">link</span><input id="adsense-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL">${crawlSelect('adsense-limit','Crawl limit',['10','25','50','100','250'],'50')}<button class="btn" type="submit">Check Eligibility</button></form>
+<form id="adsense-form" class="search-field audit-search" role="search" aria-label="AdSense eligibility check"><input id="adsense-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL">${crawlSelect('adsense-limit','Crawl limit',['10','25','50','100','250'],'50')}<button class="btn" type="submit">Check Eligibility</button></form>
 ${chips([['article','Content quality'],['verified_user','Trust pages'],['gpp_maybe','Policy risk'],['touch_app','User experience'],['build','Technical'],['speed','Performance']])}</section>
 <div id="adsense-results" class="audit-results adsense-results"></div>
 ${cards('What the checker measures', 'rule_folder', cardsList)}
 <div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">How to get a site ready for AdSense</h4></div>${lede('Most AdSense rejections are avoidable. These are the steps publishers who get approved on the first or second attempt tend to follow.')}${guideGrid(guides)}
-<p class="prose-block">If AdSense feels like the wrong fit for your traffic level, the sister tools check the requirements of the larger networks: <a href="/ezoic-eligibility-checker">Ezoic</a>, <a href="/mediavine-eligibility-checker">Mediavine</a> and <a href="/raptive-eligibility-checker">Raptive</a>. A full <a href="/">SEO audit</a> is also a sensible base before any network application.</p></div>
+<p class="prose-block">If AdSense feels like the wrong fit for your traffic level, the sister tools check the requirements of the larger networks: <a href="/ezoic-eligibility-checker">Ezoic</a>, <a href="/mediavine-eligibility-checker">Mediavine</a> and <a href="/raptive-eligibility-checker">Raptive</a>. A full <a href="/">Deep SEO audit</a> is also a sensible base before any network application.</p></div>
 ${faqSection(faqs, 'People Often Ask')}`;
   return layout('AdSense Eligibility Checker | Free Website Readiness Score | Huvanti', body, {
     active:'adsense', canonical:'https://huvanti.com/adsense-eligibility-checker',
@@ -260,7 +271,7 @@ function ezoicPage() {
     ['compare','Compare the networks with real numbers','Run the same site through the <a href="/mediavine-eligibility-checker">Mediavine</a>, <a href="/raptive-eligibility-checker">Raptive</a> and <a href="/adsense-eligibility-checker">AdSense</a> checkers. Seeing all four readiness reports side by side makes the sensible next step obvious.']
   ];
   const body = `<section class="hero audit-home ezoic-home"><span class="material-icons hero-icon" aria-hidden="true">insights</span><h1>Ezoic Eligibility Checker</h1><p class="hero-subtitle">Check how your site lines up with Ezoic before you apply</p>
-<form id="ezoic-form" class="search-field audit-search" role="search" aria-label="Ezoic eligibility check"><span class="material-icons" aria-hidden="true">link</span><input id="ezoic-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL">${crawlSelect('ezoic-limit','Crawl limit',['10','25','50','100','250'],'50')}<button class="btn" type="submit">Check Eligibility</button></form>
+<form id="ezoic-form" class="search-field audit-search" role="search" aria-label="Ezoic eligibility check"><input id="ezoic-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL">${crawlSelect('ezoic-limit','Crawl limit',['10','25','50','100','250'],'50')}<button class="btn" type="submit">Check Eligibility</button></form>
 ${chips([['verified','Official requirements'],['article','Content quality'],['merge_type','Duplicates'],['verified_user','Trust pages'],['gpp_maybe','Policy risk'],['ads_click','Monetization']])}</section>
 <div id="ezoic-results" class="audit-results ezoic-results"></div>
 ${cards('What the checker measures', 'rule_folder', cardsList)}
@@ -307,7 +318,7 @@ function mediavinePage() {
     ['trending_up','Grow sessions deliberately','Journey starts at 1,000 sessions but earnings feel real closer to 10,000. Double down on the posts that already earn traffic, refresh the rest, and let internal links from strong pages lift the weak ones. The <a href="/">SEO audit</a> shows which pages have that untapped potential.']
   ];
   const body = `<section class="hero audit-home mediavine-home"><span class="material-icons hero-icon" aria-hidden="true">trending_up</span><h1>Mediavine Eligibility Checker</h1><p class="hero-subtitle">Score your site against Mediavine Official and Journey</p>
-<form id="mediavine-form" class="search-field audit-search" role="search" aria-label="Mediavine eligibility check"><span class="material-icons" aria-hidden="true">link</span><input id="mediavine-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL"><select id="mediavine-program" class="crawl-select" aria-label="Program"><option value="both" selected>Both programs</option><option value="official">Mediavine Official</option><option value="journey">Journey by Mediavine</option></select>${crawlSelect('mediavine-limit','Crawl limit',['10','25','50','100','250'],'50')}<button class="btn" type="submit">Check Eligibility</button></form>
+<form id="mediavine-form" class="search-field audit-search" role="search" aria-label="Mediavine eligibility check"><input id="mediavine-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL"><select id="mediavine-program" class="crawl-select" aria-label="Program"><option value="both" selected>Both programs</option><option value="official">Mediavine Official</option><option value="journey">Journey by Mediavine</option></select>${crawlSelect('mediavine-limit','Crawl limit',['10','25','50','100','250'],'50')}<button class="btn" type="submit">Check Eligibility</button></form>
 ${chips([['verified','Official and Journey'],['article','Original content'],['gpp_maybe','Brand safety'],['touch_app','Reader experience'],['build','Technical'],['verified_user','Trust pages']])}</section>
 <div id="mediavine-results" class="audit-results mediavine-results"></div>
 ${cards('What the checker measures', 'rule_folder', cardsList)}
@@ -353,7 +364,7 @@ function raptivePage() {
     ['compare','Benchmark against the alternatives','Run the <a href="/mediavine-eligibility-checker">Mediavine</a> and <a href="/ezoic-eligibility-checker">Ezoic</a> checkers on the same crawl. The overlap in their reports is the genuine work list, whichever network you choose.']
   ];
   const body = `<section class="hero audit-home raptive-home"><span class="material-icons hero-icon" aria-hidden="true">campaign</span><h1>Raptive Eligibility Checker</h1><p class="hero-subtitle">See how your site scores against current Raptive requirements</p>
-<form id="raptive-form" class="search-field audit-search" role="search" aria-label="Raptive eligibility check"><span class="material-icons" aria-hidden="true">link</span><input id="raptive-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL">${crawlSelect('raptive-limit','Crawl limit',['10','25','50','100','250'],'50')}<button class="btn" type="submit">Check Eligibility</button></form>
+<form id="raptive-form" class="search-field audit-search" role="search" aria-label="Raptive eligibility check"><input id="raptive-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL">${crawlSelect('raptive-limit','Crawl limit',['10','25','50','100','250'],'50')}<button class="btn" type="submit">Check Eligibility</button></form>
 <details class="raptive-optional container"><summary>Optional: add verified Analytics figures</summary>
 <div class="raptive-optional-grid">
 <label>Monthly pageviews <input id="raptive-pageviews" class="text-input" type="number" min="0" step="1" placeholder="32000" inputmode="numeric"></label>
@@ -408,12 +419,12 @@ function wpthemePage() {
     ['dns','Dig further with the other tools','Once you know the stack, the <a href="/domain-information-checker">domain information checker</a> shows hosting, DNS and certificates behind the site, and the <a href="/">SEO audit</a> scores the content itself.']
   ];
   const body = `<section class="hero audit-home wptheme-home"><span class="material-icons hero-icon" aria-hidden="true">palette</span><h1>WordPress Theme Detector</h1><p class="hero-subtitle">Find the active WordPress theme behind any public site</p>
-<form id="wptheme-form" class="search-field audit-search" role="search" aria-label="WordPress theme detection"><span class="material-icons" aria-hidden="true">link</span><input id="wptheme-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL"><button class="btn" type="submit">Detect Theme</button></form>
+<form id="wptheme-form" class="search-field audit-search" role="search" aria-label="WordPress theme detection"><input id="wptheme-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL"><button class="btn" type="submit">Detect Theme</button></form>
 ${chips([['wordpress','Theme name and slug'],['history','Version'],['account_tree','Child and parent'],['fingerprint','Fingerprints'],['verified','Evidence based']])}</section>
 <div id="wptheme-results" class="audit-results wptheme-results"></div>
 ${cards('How detection works', 'rule_folder', cardsList)}
 <div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">Getting value from theme detection</h4></div>${lede('A theme name is a starting point, not an answer. Here is how experienced builders use that information.')}${guideGrid(guides)}
-<p class="prose-block">Detection is one page of the picture. A full <a href="/">SEO audit</a> of the same site shows how well the theme is actually configured, and the <a href="/broken-link-checker">broken link checker</a> confirms the maintenance discipline behind it.</p></div>
+<p class="prose-block">Detection is one page of the picture. A full <a href="/">Deep SEO audit</a> of the same site shows how well the theme is actually configured, and the <a href="/broken-link-checker">broken link checker</a> confirms the maintenance discipline behind it.</p></div>
 ${faqSection(faqs)}`;
   return layout('WordPress Theme Detector | Find the Theme Behind Any Site | Huvanti', body, {
     active:'wptheme', canonical:'https://huvanti.com/wordpress-theme-detector',
@@ -456,7 +467,7 @@ function domainInfoPage() {
     ['hub','Pair it with the site level tools','The domain report covers infrastructure. For the site itself, run the <a href="/">SEO audit</a>, the <a href="/wordpress-theme-detector">theme detector</a> and the <a href="/core-web-vitals-auditor">performance auditor</a> to review what visitors actually experience.']
   ];
   const body = `<section class="hero audit-home domaincheck-home"><span class="material-icons hero-icon" aria-hidden="true">dns</span><h1>Domain Information Checker</h1><p class="hero-subtitle">Registration, DNS, hosting, SSL and email records in one report</p>
-<form id="domaincheck-form" class="search-field audit-search" role="search" aria-label="Domain information check"><span class="material-icons" aria-hidden="true">dns</span><input id="domaincheck-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="example.com or https://example.com" required aria-label="Domain name or URL"><button class="btn" type="submit">Check Domain</button></form>
+<form id="domaincheck-form" class="search-field audit-search" role="search" aria-label="Domain information check"><input id="domaincheck-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="example.com or https://example.com" required aria-label="Domain name or URL"><button class="btn" type="submit">Check Domain</button></form>
 ${chips([['assignment','RDAP and WHOIS'],['storage','DNS and DNSSEC'],['router','Hosting and ASN'],['lock','SSL and TLS'],['mail','Email security'],['verified','Evidence based']])}</section>
 <div id="domaincheck-results" class="audit-results domaincheck-results"></div>
 ${cards('What the report covers', 'rule_folder', cardsList)}
@@ -506,7 +517,7 @@ function sitemapPage() {
   const body = `<section class="hero audit-home sitemap-home"><span class="material-icons hero-icon" aria-hidden="true">account_tree</span><h1>XML Sitemap Generator</h1><p class="hero-subtitle">Generate a clean sitemap or audit the one you already have</p>
 <form id="sitemap-form" class="sitemap-form" aria-label="XML sitemap generator">
   <div class="mode-tabs" role="radiogroup" aria-label="Mode"><label><input type="radio" name="sitemap-mode" value="generate" checked> Generate New Sitemap</label><label><input type="radio" name="sitemap-mode" value="analyze"> Analyze Existing Sitemap</label></div>
-  <div class="search-field audit-search"><span class="material-icons" aria-hidden="true">link</span><input name="url" id="sitemap-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website or sitemap URL"><button class="btn" type="submit">Generate Sitemap</button></div>
+  <div class="search-field audit-search"><input name="url" id="sitemap-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website or sitemap URL"><button class="btn" type="submit">Generate Sitemap</button></div>
   <details class="sitemap-options sitemap-advanced"><summary>${icon('tune')} Advanced crawl settings</summary>
     <div class="sitemap-option-row"><label>Maximum URLs <select name="maxUrls" class="select"><option value="100">100</option><option value="500" selected>500</option><option value="1000">1,000</option><option value="5000">5,000</option></select></label><label>Crawl depth <select name="depth" class="select"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="5">5</option></select></label><label><input type="checkbox" name="includeImages"> Include images</label></div>
   </details>
@@ -559,7 +570,6 @@ function brokenlinkPage() {
   const body = `<section class="hero audit-home brokenlink-home"><span class="material-icons hero-icon" aria-hidden="true">link_off</span><h1>Broken Link Checker</h1><p class="hero-subtitle">Crawl a site and verify every link, with no false alarms</p>
 <form id="brokenlink-form" class="brokenlink-form" aria-label="Broken link checker">
   <div class="search-field audit-search" style="flex-wrap:wrap;gap:8px;padding:10px;max-width:900px">
-    <span class="material-icons" aria-hidden="true">link</span>
     <input id="bl-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL" style="flex:1;min-width:200px">
     <button class="btn" type="submit">Start Scan</button>
   </div>
@@ -629,7 +639,7 @@ function llmstxtPage() {
   ];
   const body = `<section class="hero audit-home llmstxt-home"><span class="material-icons hero-icon" aria-hidden="true">auto_stories</span><h1>LLMs.txt Generator</h1><p class="hero-subtitle">Turn your best pages into a clean llms.txt for AI tools</p>
 <form id="llmstxt-form" class="llmstxt-form" aria-label="LLMs.txt generator">
-  <div class="search-field audit-search"><span class="material-icons" aria-hidden="true">link</span><input name="url" id="llmstxt-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL"><button class="btn" type="submit">Generate llms.txt</button></div>
+  <div class="search-field audit-search"><input name="url" id="llmstxt-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL"><button class="btn" type="submit">Generate llms.txt</button></div>
   <details class="sitemap-options sitemap-advanced"><summary>${icon('tune')} Crawl settings</summary>
     <div class="sitemap-option-row"><label>Maximum pages <select name="maxPages" class="select"><option value="100">100</option><option value="500" selected>500</option><option value="1000">1,000</option><option value="5000">5,000</option></select></label><label>Crawl depth <select name="maxDepth" class="select"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="5">5</option></select></label></div>
     <input type="hidden" name="includePdfs" value="1"><input type="hidden" name="includeBlog" value="1"><input type="hidden" name="includeDocs" value="1">
@@ -682,7 +692,7 @@ function botblockerPage() {
   ];
   const body = `<section class="hero audit-home botblocker-home"><span class="material-icons hero-icon" aria-hidden="true">security</span><h1>AI Crawler &amp; LLM Bot Blocker</h1><p class="hero-subtitle">Choose which AI bots may access your site, then generate the rules</p>
 <form id="botblocker-form" class="botblocker-form" aria-label="AI Crawler and LLM Bot Blocker">
-  <div class="search-field audit-search"><span class="material-icons" aria-hidden="true">link</span><input id="botblocker-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" aria-label="Website URL"><button class="btn" type="submit">Generate Protection Rules</button></div>
+  <div class="search-field audit-search"><input id="botblocker-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" aria-label="Website URL"><button class="btn" type="submit">Generate Protection Rules</button></div>
   <div class="botblocker-formrow">
     <label class="botblocker-modelabel" for="botblocker-mode">Protection mode</label>
     <select id="botblocker-mode" class="select botblocker-modeselect" aria-label="Protection mode">
@@ -794,7 +804,7 @@ function cwvPage() {
   ];
   const body = `<section class="hero audit-home cwv-home"><span class="material-icons hero-icon" aria-hidden="true">speed</span><h1>Core Web Vitals &amp; INP Auditor</h1><p class="hero-subtitle">Real browser measurement of LCP, INP, CLS, FCP and TTFB</p>
 <form id="cwv-form" class="cwv-form" aria-label="Core Web Vitals and INP auditor">
-  <div class="search-field audit-search"><span class="material-icons" aria-hidden="true">link</span><input id="cwv-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL"><button class="btn" type="submit">Analyze Website</button></div>
+  <div class="search-field audit-search"><input id="cwv-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL"><button class="btn" type="submit">Analyze Website</button></div>
   <div class="cwv-formrow">
     <label for="cwv-profile">Device profile
       <select id="cwv-profile" class="select"><option value="mobile" selected>Mobile, 412 by 823, slow 4G</option><option value="desktop">Desktop, 1350 by 940, no throttle</option><option value="custom">Custom</option></select>
@@ -856,7 +866,7 @@ function rssPage() {
   const body = `<section class="hero audit-home rss-home"><span class="material-icons hero-icon" aria-hidden="true">rss_feed</span><h1>RSS Feed Generator</h1><p class="hero-subtitle">Turn your published content into a validated RSS feed</p>
 <form id="rss-form" class="rss-form" aria-label="RSS feed generator">
   <div class="mode-tabs" role="radiogroup" aria-label="Mode"><label><input type="radio" name="mode" value="website" checked> Generate from website</label><label><input type="radio" name="mode" value="sitemap"> Generate from sitemap</label></div>
-  <div class="search-field audit-search"><span class="material-icons" aria-hidden="true">link</span><input id="rss-url" name="url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL or sitemap URL"><button class="btn" type="submit">Generate RSS Feed</button></div>
+  <div class="search-field audit-search"><input id="rss-url" name="url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL or sitemap URL"><button class="btn" type="submit">Generate RSS Feed</button></div>
   <details class="sitemap-options rss-options"><summary>${icon('tune')} Feed settings</summary>
     <div class="sitemap-option-row"><label>Number of items <select name="maxItems" class="select"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option><option value="100">100</option></select></label><label>Item content <select name="contentMode" class="select"><option value="excerpt" selected>Excerpt</option><option value="full">Full content</option><option value="description">Description only</option></select></label><label>Feed format <select name="feedMode" class="select"><option value="standard" selected>Standard RSS 2.0</option><option value="news">News feed</option><option value="podcast">Podcast mode</option></select></label></div>
     <div class="sitemap-option-row"><label><input type="checkbox" name="incImages" checked> Include images</label><label><input type="checkbox" name="incAuthors" checked> Include authors</label><label><input type="checkbox" name="incCategories" checked> Include categories</label><label><input type="checkbox" name="incDates" checked> Include dates</label></div>
