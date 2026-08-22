@@ -1,4 +1,4 @@
-/* AI Crawler & LLM Bot Blocker — UI. Inherits the huvanti design system.
+/* AI Crawler & LLM Bot Blocker: UI. Inherits the huvanti design system.
  * Deterministic, fully local pipeline (bot database → classification → mode →
  * robots.txt + server configs → validation → conflicts → simulator →
  * coverage → score → export). The only network calls are the two the user
@@ -53,7 +53,7 @@
       document.body.appendChild(a); a.click();
       setTimeout(function () { try { document.body.removeChild(a); URL.revokeObjectURL(a.href); } catch (e) { } }, 1500);
       toast('Downloading ' + name);
-    } catch (e) { copy(text); toast('Download was blocked — content copied to clipboard instead.'); }
+    } catch (e) { copy(text); toast('Download was blocked, content copied to clipboard instead.'); }
   }
   function el(id) { return document.getElementById(id); }
   function chip(label, on, attr) {
@@ -173,7 +173,7 @@
     html += panel('Advisory control vs technical blocking', 'info', advisoryTable(), ' botblocker-security');
 
     /* score */
-    html += '<div class="score-card"><div class="score-ring" style="--score:' + r.score.score + '"><b>' + r.score.score + '</b></div><div class="score-summary"><h2>AI Crawler Protection Score</h2><span class="source-chip">Tool-generated diagnostic score — not a Google score, not an official security score</span><p>' + esc(r.score.label) + '. Based on known-crawler coverage, rule consistency, robots.txt correctness, server-level configuration, bot-specific controls and path coverage.</p></div></div>';
+    html += '<div class="score-card"><div class="score-ring" style="--score:' + r.score.score + '"><b>' + r.score.score + '</b></div><div class="score-summary"><h2>AI Crawler Protection Score</h2><span class="source-chip">Tool-generated diagnostic score, not a Google score, not an official security score</span><p>' + esc(r.score.label) + '. Based on known-crawler coverage, rule consistency, robots.txt correctness, server-level configuration, bot-specific controls and path coverage.</p></div></div>';
     html += panel('Score breakdown', 'grading', r.score.components.map(function (c) {
       return '<div class="calc-line"><span>' + esc(c.name) + '</span><b>' + c.points + ' / ' + c.max + '</b></div><p class="muted botblocker-scorenote">' + esc(c.note) + '</p>';
     }).join(''));
@@ -191,8 +191,8 @@
     /* validation */
     var v = r.validation;
     var validInner = (v.productionReady
-      ? '<div class="llmstxt-valid-ok">' + icon('check_circle') + ' Validated — configuration is syntactically clean and logically consistent.</div>'
-      : '<div class="llmstxt-valid-bad">' + icon('error') + ' Not production-ready — fix the errors below.</div>') +
+      ? '<div class="llmstxt-valid-ok">' + icon('check_circle') + ' Validated, configuration is syntactically clean and logically consistent.</div>'
+      : '<div class="llmstxt-valid-bad">' + icon('error') + ' Not production-ready, fix the errors below.</div>') +
       '<div class="llmstxt-reasons">' + v.checks.map(function (c) {
         return '<span class="chip">' + icon(c.status === 'pass' ? 'check' : 'info') + ' <b>' + esc(c.name) + ':</b> ' + esc(c.message) + '</span>';
       }).join('') + '</div>';
@@ -225,7 +225,7 @@
         '<div class="audit-stat"><strong>' + esc(r.config.rateLimit.requestsPerMinute) + '</strong><span>Requests / minute (recommendation)</span></div>' +
         '<div class="audit-stat"><strong>' + esc(r.config.rateLimit.requestsPerSecond) + '</strong><span>Requests / second (recommendation)</span></div>' +
         '<div class="audit-stat"><strong>' + esc(r.config.rateLimit.burst) + '</strong><span>Burst limit (recommendation)</span></div>' +
-        '</div><p class="muted">These values are embedded as commented recommendations in the generated server configurations. Rate limiting is sometimes preferable to outright blocking — it keeps AI visibility while controlling load. Tune to your real traffic before enabling; the tool never generates unsafe server configurations.</p>');
+        '</div><p class="muted">These values are embedded as commented recommendations in the generated server configurations. Rate limiting is sometimes preferable to outright blocking, it keeps AI visibility while controlling load. Tune to your real traffic before enabling; the tool never generates unsafe server configurations.</p>');
     }
 
     /* bot table */
@@ -246,8 +246,8 @@
 
   function advisoryTable() {
     return '<div class="botblocker-advisory">' +
-      '<div class="botblocker-advisory-col"><h4>' + icon('description') + ' Advisory control — robots.txt</h4><p>Requests compliant crawlers not to access these paths. Well-behaved AI crawlers usually honor it; malicious ones can ignore it. This tool never claims “robots.txt will completely block AI bots”.</p></div>' +
-      '<div class="botblocker-advisory-col"><h4>' + icon('dns') + ' Technical blocking — server / CDN</h4><p>Nginx, Apache, Cloudflare WAF, CDN rules, application middleware and firewall rules reject requests at server level (403). Stronger enforcement — but User-Agent values can still be spoofed, so combine with IP verification where available.</p></div>' +
+      '<div class="botblocker-advisory-col"><h4>' + icon('description') + ' Advisory control, robots.txt</h4><p>Requests compliant crawlers not to access these paths. Well-behaved AI crawlers usually honor it; malicious ones can ignore it. This tool never claims “robots.txt will completely block AI bots”.</p></div>' +
+      '<div class="botblocker-advisory-col"><h4>' + icon('dns') + ' Technical blocking, server / CDN</h4><p>Nginx, Apache, Cloudflare WAF, CDN rules, application middleware and firewall rules reject requests at server level (403). Stronger enforcement, but User-Agent values can still be spoofed, so combine with IP verification where available.</p></div>' +
       '</div>';
   }
 
@@ -256,15 +256,15 @@
   function loadProfiles() {
     try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch (e) { return {}; }
   }
-  function storeProfiles(p) { try { localStorage.setItem(LS_KEY, JSON.stringify(p)); } catch (e) { toast('Local storage unavailable — profiles kept for this session only.'); } }
+  function storeProfiles(p) { try { localStorage.setItem(LS_KEY, JSON.stringify(p)); } catch (e) { toast('Local storage unavailable, profiles kept for this session only.'); } }
   function profilesBar() {
     var profiles = loadProfiles();
     var names = Object.keys(profiles);
-    return '<div class="paper paper-padded botblocker-profiles"><h3>' + icon('folder') + ' Configuration Profiles <small class="muted">(stored only in this browser — no account, nothing sent anywhere)</small></h3>' +
+    return '<div class="paper paper-padded botblocker-profiles"><h3>' + icon('folder') + ' Configuration Profiles <small class="muted">(stored only in this browser, no account, nothing sent anywhere)</small></h3>' +
       '<div class="botblocker-profile-row">' +
       '<input type="text" id="botblocker-profilename" class="text-input botblocker-inline-profile" placeholder="Profile name (e.g. Strict, Training Only, Search Only, Custom)" maxlength="40">' +
       '<button type="button" class="btn" id="botblocker-profile-save">' + icon('save') + ' Save current</button>' +
-      '<select id="botblocker-profile-load" class="select botblocker-profile-select">' + (names.length ? names.map(function (n) { return '<option value="' + esc(n) + '">' + esc(n) + '</option>'; }).join('') : '<option value="">— no saved profiles —</option>') + '</select>' +
+      '<select id="botblocker-profile-load" class="select botblocker-profile-select">' + (names.length ? names.map(function (n) { return '<option value="' + esc(n) + '">' + esc(n) + '</option>'; }).join('') : '<option value="">, no saved profiles ,</option>') + '</select>' +
       '<button type="button" class="btn" id="botblocker-profile-loadbtn" ' + (names.length ? '' : 'disabled') + '>' + icon('upload') + ' Load</button>' +
       '<button type="button" class="btn" id="botblocker-profile-del" ' + (names.length ? '' : 'disabled') + '>' + icon('delete') + ' Delete</button>' +
       '<button type="button" class="btn" id="botblocker-profile-export">' + icon('download') + ' Export JSON</button>' +
@@ -293,9 +293,9 @@
       '<button type="button" class="btn" id="botblocker-download">' + icon('download') + ' Download ' + esc(ext) + '</button>' +
       '</div></div>' +
       '<pre class="botblocker-code" id="botblocker-codetext">' + esc(o.text) + '</pre>' +
-      '<div class="botblocker-install"><b>' + icon('build') + ' Installation — ' + esc(o.label) + '</b>' +
+      '<div class="botblocker-install"><b>' + icon('build') + ' Installation, ' + esc(o.label) + '</b>' +
       '<ul class="llmstxt-install">' + (o.placement || []).map(function (p) { return '<li>' + esc(p) + '</li>'; }).join('') + '</ul>' +
-      '<p class="muted">This tool generates configuration — it never installs anything on your server.</p></div>';
+      '<p class="muted">This tool generates configuration, it never installs anything on your server.</p></div>';
     return panel('Generated Configuration', 'code', inner, ' botblocker-configtabs');
   }
 
@@ -317,7 +317,7 @@
     var inner = '<div class="report-actions">' + buttons +
       '<button type="button" class="btn" id="botblocker-dl-json">' + icon('data_object') + ' JSON configuration</button>' +
       '<button type="button" class="btn" id="botblocker-dl-all">' + icon('download_done') + ' Download All (selected formats only)</button>' +
-      '</div><p class="muted">“Download All” bundles only the formats you selected — nothing else. The JSON configuration reproduces this exact setup (import it from the Profiles panel later).</p>';
+      '</div><p class="muted">“Download All” bundles only the formats you selected, nothing else. The JSON configuration reproduces this exact setup (import it from the Profiles panel later).</p>';
     return { html: panel('Export', 'save_alt', inner), files: files };
   }
 
@@ -381,7 +381,7 @@
       }).join('') + '</div></div>' +
       '<div class="page-table-wrap botblocker-tablewrap"><table class="mini-table botblocker-table"><thead><tr><th>Bot</th><th>Organization</th><th>Category</th><th>Purpose</th><th>Default</th><th>Action</th></tr></thead><tbody>' + tableRows + '</tbody></table></div>' +
       '<div class="botblocker-cards">' + cards + '</div>' +
-      '<p class="muted">Click a row for full details (documentation, robots.txt support, verification notes, confidence, last verified). “Default” = no explicit rule — the crawler follows the default (*) group or is allowed when nothing matches.</p>' +
+      '<p class="muted">Click a row for full details (documentation, robots.txt support, verification notes, confidence, last verified). “Default” = no explicit rule, the crawler follows the default (*) group or is allowed when nothing matches.</p>' +
       '<details class="botblocker-custombox"><summary>' + icon('add') + ' Add a custom bot</summary>' +
       '<div class="botblocker-customform">' +
       '<input type="text" id="botblocker-custom-name" class="text-input" placeholder="Bot name (e.g. MyCorpBot)">' +
@@ -392,11 +392,11 @@
       '<button type="button" class="btn" id="botblocker-custom-add">' + icon('add_circle') + ' Add bot</button>' +
       '</div><div id="botblocker-custom-warn" class="botblocker-customwarn"></div>' +
       (customList ? '<div class="botblocker-customlist"><b>Custom bots:</b> ' + customList + '</div>' : '') +
-      '<p class="muted">Custom User-Agent rules may produce false positives if the pattern is too broad — the tool validates tokens and rejects generic words like “AI” or “bot”.</p>' +
+      '<p class="muted">Custom User-Agent rules may produce false positives if the pattern is too broad, the tool validates tokens and rejects generic words like “AI” or “bot”.</p>' +
       '</details>';
 
     var detail = '<div id="botblocker-botdetail" class="botblocker-detail"></div>';
-    return panel('Bot Database — ' + db.stats().total + ' known crawlers (v' + db.DB_VERSION + ')', 'smart_toy', inner + detail, ' botblocker-botdb');
+    return panel('Bot Database, ' + db.stats().total + ' known crawlers (v' + db.DB_VERSION + ')', 'smart_toy', inner + detail, ' botblocker-botdb');
   }
 
   function botDetailHtml(res) {
@@ -406,7 +406,7 @@
       'documented-partial': 'Documented: partial / conditional',
       'documented-no': 'Documented: does not generally follow robots.txt',
       'reported-mixed': 'Reported inconsistently (no reliable documentation)',
-      'unknown': 'Unknown — no reliable documentation'
+      'unknown': 'Unknown, no reliable documentation'
     };
     return '<div class="paper paper-padded botblocker-detailbox" id="botblocker-detailbox">' +
       '<div class="botblocker-detailhead"><h4>' + esc(b.name) + '</h4><button type="button" class="btn botblocker-mini" id="botblocker-detail-close">' + icon('close') + ' Close</button></div>' +
@@ -420,7 +420,7 @@
       '<div class="calc-line"><span>robots.txt support</span><b>' + esc(robotsLabels[b.robotsSupport] || b.robotsSupport) + '</b></div>' +
       '<div class="calc-line"><span>Technical blocking</span><b>' + esc(b.technicalBlockingNotes) + '</b></div>' +
       '<div class="calc-line"><span>Verification notes</span><b>' + esc(b.verificationNotes) + '</b></div>' +
-      '<div class="calc-line"><span>Official documentation</span><b>' + (b.officialDocumentation ? '<a class="botblocker-link" href="' + esc(b.officialDocumentation) + '" target="_blank" rel="noopener noreferrer">' + esc(b.officialDocumentation) + '</a>' : 'No official documentation found — kept as “unverified/low confidence” rather than guessing.') + '</b></div>' +
+      '<div class="calc-line"><span>Official documentation</span><b>' + (b.officialDocumentation ? '<a class="botblocker-link" href="' + esc(b.officialDocumentation) + '" target="_blank" rel="noopener noreferrer">' + esc(b.officialDocumentation) + '</a>' : 'No official documentation found, kept as “unverified/low confidence” rather than guessing.') + '</b></div>' +
       '<div class="calc-line"><span>Database last updated</span><b>' + (b.lastVerified ? esc(b.lastVerified) : 'unverified custom entry') + '</b></div>' +
       '<div class="calc-line"><span>Confidence</span><b>' + esc(b.confidence) + '</b></div>' +
       '<div class="calc-line"><span>Current action</span><b>' + (res.effective === 'block' ? 'Blocked' : res.effective === 'allow' ? 'Allowed' : 'Default') + (res.source === 'override' || res.source === 'custom' ? ' (your setting)' : ' (preset)') + '</b></div>' +
@@ -443,7 +443,7 @@
       '<label class="botblocker-simsrc"><input type="radio" name="botblocker-sim-src" value="generated" checked> Test the generated rules</label>' +
       '<label class="botblocker-simsrc"><input type="radio" name="botblocker-sim-src" value="existing"' + (state.existing.parsed ? '' : ' disabled') + '> Test the pasted existing robots.txt' + (state.existing.parsed ? '' : ' (paste one below first)') + '</label>' +
       '<div id="botblocker-sim-result"></div>' +
-      '<p class="muted">Deterministic rules simulator: exact User-agent group selection, wildcard (*) fallback, longest-pattern precedence and Allow tie-breaking — the same logic major crawlers document. It simulates robots.txt behavior only; it cannot prove what a real crawler does.</p>';
+      '<p class="muted">Deterministic rules simulator: exact User-agent group selection, wildcard (*) fallback, longest-pattern precedence and Allow tie-breaking, the same logic major crawlers document. It simulates robots.txt behavior only; it cannot prove what a real crawler does.</p>';
     return panel('Bot Access Simulator', 'science', inner, ' botblocker-simulator');
   }
 
@@ -455,7 +455,7 @@
     var srcRadio = document.querySelector('input[name="botblocker-sim-src"]:checked');
     var src = srcRadio ? srcRadio.value : 'generated';
     if (src === 'existing' && !state.existing.parsed) {
-      el('botblocker-sim-result').innerHTML = '<p class="calc-line neutral">Analyze the pasted robots.txt below first — then it can be selected as the simulation source.</p>';
+      el('botblocker-sim-result').innerHTML = '<p class="calc-line neutral">Analyze the pasted robots.txt below first, then it can be selected as the simulation source.</p>';
       return;
     }
     var parsed = src === 'existing' ? state.existing.parsed : state.report.parsed;
@@ -503,7 +503,7 @@
       '</div>';
     var issues = parsed.errors.map(function (e) { return ['bad', 'Line ' + e.line + ': ' + e.message]; })
       .concat(parsed.warnings.map(function (w) { return ['warn', 'Line ' + w.line + ': ' + w.message]; }))
-      .concat(cf.issues.map(function (i) { return [i.level === 'error' ? 'bad' : i.level === 'warning' ? 'warn' : 'info', i.title + ' — ' + i.detail]; }));
+      .concat(cf.issues.map(function (i) { return [i.level === 'error' ? 'bad' : i.level === 'warning' ? 'warn' : 'info', i.title + ', ' + i.detail]; }));
     if (issues.length) html += '<ul class="botblocker-issues">' + issues.map(function (x) { return '<li class="calc-line ' + (x[0] === 'bad' ? 'neg' : x[0] === 'warn' ? 'neutral' : '') + '">' + esc(x[1]) + '</li>'; }).join('') + '</ul>';
     else html += '<p class="calc-line pos">No syntax errors, conflicts or warnings detected.</p>';
 
@@ -534,7 +534,7 @@
       '<input type="text" id="botblocker-live-url" class="text-input" placeholder="https://example.com" value="' + esc(state.config ? state.config.website : '') + '">' +
       '<button type="button" class="btn" id="botblocker-live-run">' + icon('radar') + ' Check current protection</button>' +
       '</div>' +
-      '<div id="botblocker-live-result"><p class="muted">This makes one external request to the site you enter (robots.txt + homepage) from our server, with strict limits. The checker reports evidence only — it never claims a crawler is technically blocked unless a technical control was actually observed (robots.txt is not one).</p></div>';
+      '<div id="botblocker-live-result"><p class="muted">This makes one external request to the site you enter (robots.txt + homepage) from our server, with strict limits. The checker reports evidence only, it never claims a crawler is technically blocked unless a technical control was actually observed (robots.txt is not one).</p></div>';
     return panel('Live Website Checker (optional)', 'travel_explore', inner, ' botblocker-live');
   }
 
@@ -569,7 +569,7 @@
         if (ta) { ta.value = rep.robotsBody; analyzeExisting(); ta.scrollIntoView({ behavior: 'smooth' }); }
       };
     }).catch(function (e) {
-      box.innerHTML = '<p class="calc-line neg">Request failed: ' + esc(e && e.message || 'network error') + '. If this environment has no direct outbound access, the server-side check may be unavailable — paste the robots.txt instead.</p>';
+      box.innerHTML = '<p class="calc-line neg">Request failed: ' + esc(e && e.message || 'network error') + '. If this environment has no direct outbound access, the server-side check may be unavailable, paste the robots.txt instead.</p>';
     });
   }
 
@@ -645,7 +645,7 @@
       var cat = el('botblocker-custom-cat').value;
       var action = el('botblocker-custom-action').value;
       var warnBox = el('botblocker-custom-warn');
-      if (db.byToken(token)) { warnBox.innerHTML = '<p class="calc-line neg">“' + esc(token) + '” already exists in the database — set its action in the table instead of adding a duplicate.</p>'; return; }
+      if (db.byToken(token)) { warnBox.innerHTML = '<p class="calc-line neg">“' + esc(token) + '” already exists in the database, set its action in the table instead of adding a duplicate.</p>'; return; }
       var v = matcher.validateToken(token);
       if (!v.ok) { warnBox.innerHTML = '<p class="calc-line neg">' + v.errors.map(esc).join(' ') + '</p>'; return; }
       state.customBots.push({ id: 'custom-' + token.toLowerCase().replace(/[^a-z0-9]+/g, '-'), name: name || token, token: token, organization: org, category: cat, action: action });
@@ -667,7 +667,7 @@
     var ta = el('botblocker-existing-text');
     if (ta) ta.oninput = function () {
       state.existing.text = this.value;
-      state.existing.parsed = null; // pasted rules changed — require re-analysis before simulating
+      state.existing.parsed = null; // pasted rules changed, require re-analysis before simulating
     };
     var an = el('botblocker-existing-analyze');
     if (an) an.onclick = analyzeExisting;

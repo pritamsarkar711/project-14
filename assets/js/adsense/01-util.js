@@ -1,4 +1,4 @@
-/* huvanti AdSense checker — deterministic utilities. */
+/* huvanti AdSense checker, deterministic utilities. */
 (function (global) {
 'use strict';
 var A = global.Adsense = global.Adsense || {};
@@ -27,7 +27,7 @@ U.pathOf=function(u){try{return new URL(u).pathname||'/';}catch(e){return u;}};
 U.originOf=function(u){try{return new URL(u).origin;}catch(e){return '';}};
 U.isAsset=function(u){return /\.(jpe?g|png|webp|gif|svg|avif|ico|bmp|css|js|mjs|json|xml|pdf|zip|woff2?|ttf|eot|mp4|webm|mp3|exe|dmg|apk)(\?|#|$)/i.test(u);};
 U.isHtmlCtype=function(ct){return /html|xml|text\/plain/i.test(ct||'')||!ct;};
-var INVALID=/^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[01])\.|::1|fc00|fd00|metadata\.google\.internal|169\.254\.169\.254)/i;
+var INVALID=/^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[01])\.|:1|fc00|fd00|metadata\.google\.internal|169\.254\.169\.254)/i;
 U.isPublicUrl=function(raw){
   try{var u=new URL(raw);
     if(!/^https?:$/.test(u.protocol)) return false;

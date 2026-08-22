@@ -1,4 +1,4 @@
-/* huvanti AdSense checker — per-category analyzers (deterministic). */
+/* huvanti AdSense checker, per-category analyzers (deterministic). */
 (function (global) {
 'use strict';
 var A = global.Adsense = global.Adsense || {};
@@ -84,7 +84,7 @@ A.analyzeTrust=function(pages,ctx){
 
 A.analyzePolicy=function(pages){
   return A.scanPolicy(pages).map(function(f){
-    return F('POLICY_FINDING',f.page,f.severity==='critical'?'critical':f.severity,f.label+': '+f.evidence+'. Context: "'+(f.context[0]||'').slice(0,140)+'"','This is a transparent rule-based screen of public content — it is NOT an official Google policy determination.','Review flagged content against Google Publisher Policies and remove/restrict as appropriate.',f.confidence/100,{policyCat:f.cat});
+    return F('POLICY_FINDING',f.page,f.severity==='critical'?'critical':f.severity,f.label+': '+f.evidence+'. Context: "'+(f.context[0]||'').slice(0,140)+'"','This is a transparent rule-based screen of public content, it is NOT an official Google policy determination.','Review flagged content against Google Publisher Policies and remove/restrict as appropriate.',f.confidence/100,{policyCat:f.cat});
   });
 };
 

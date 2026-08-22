@@ -1,4 +1,4 @@
-/* LLMs.txt Generator — UI. Inherits the existing huvanti design system.
+/* LLMs.txt Generator: UI. Inherits the existing huvanti design system.
  * Deterministic pipeline renderer: coverage, quality, preview, validation,
  * editable URL table, download + installation instructions. No AI, no account. */
 (function () {
@@ -35,7 +35,7 @@
       setTimeout(function () { try { document.body.removeChild(a); URL.revokeObjectURL(a.href); } catch (e) {} }, 1500);
     } catch (e) {
       copy(text);
-      toast('Download was blocked — content copied to clipboard instead.');
+      toast('Download was blocked, content copied to clipboard instead.');
     }
   }
 
@@ -52,20 +52,22 @@
   ];
   var stageIndex = { validate: 0, connect: 0, robots: 1, sitemaps: 2, crawl: 3, external: 4, metadata: 4, generate: 6, validate: 7, done: 8 };
 
-  function progressUI(s) {
+    function progressUI(s) {
+    var ICONS = {'validate': 'rule', 'robots': 'rule', 'sitemaps': 'account_tree', 'crawl': 'travel_explore', 'metadata': 'data_object', 'generate': 'code', 'validate_x': 'verified', 'done': 'radio_button_unchecked'};
+    var KEYS = ['validate', 'robots', 'sitemaps', 'crawl', 'metadata', 'generate', 'validate2', 'done2'];
+    var LABELS = { validate2: 'llms.txt generated', done2: 'Output validated' };
+    var stageIndex = { validate: 0, connect: 0, robots: 1, sitemaps: 2, crawl: 3, external: 4, metadata: 4, generate: 6, validate: 7, done: 8 };
     var cur = stageIndex[s.stage] != null ? stageIndex[s.stage] : 0;
     var done = s.stage === 'done';
-    out.innerHTML = '<div class="paper paper-padded sitemap-progress llmstxt-progress"><h3>' + icon('auto_stories') + ' Generating llms.txt…</h3><ul class="progress-list">' +
-      STEPS.map(function (x, i) {
-        var st = done || i < cur ? 'done' : i === cur ? 'active' : 'wait';
-        var ic = st === 'done' ? 'check_circle' : st === 'active' ? 'autorenew' : 'hourglass_empty';
-        return '<li class="pi-' + st + '"><span class="material-icons pi-' + st + '">' + ic + '</span>' + esc(x[1]) + '</li>';
-      }).join('') +
-      '</ul><p class="muted">' + esc(s.message || 'Working…') + '</p>' +
-      (s.discovered != null ? '<p class="muted">' + esc(s.discovered) + ' discovered · ' + esc(s.crawled || 0) + ' analyzed</p>' : '') +
-      '<button class="btn" type="button" id="llmstxt-cancel">Cancel</button></div>';
-    var b = document.getElementById('llmstxt-cancel');
-    if (b) b.onclick = function () { if (abortCtrl) abortCtrl.abort(); };
+    var steps = KEYS.map(function (k, i) { return { key: k, label: LABELS[k] || STEPS[i][1], icon: ICONS[k] || 'radio_button_unchecked' }; });
+    var states = {};
+    steps.forEach(function (st, i) { states[st.key] = (done || i < cur) ? 'done' : i === cur ? 'active' : 'wait'; });
+    var p = window.ScanProgress.reuse(out, {
+      title: 'Generating llms.txt', target: (document.getElementById('llmstxt-url') || {}).value || '', icon: 'auto_stories', steps: steps,
+      note: s.message || 'Working\u2026',
+      onCancel: function () { if (abortCtrl) abortCtrl.abort(); }
+    });
+    p.set(states, (s.message || 'Working\u2026') + (s.discovered != null ? ' \u00b7 ' + s.discovered + ' discovered, ' + (s.crawled || 0) + ' analyzed' : ''), 8 + Math.round((done ? KEYS.length : cur) / KEYS.length * 88));
   }
 
   function errorUI(e) {
@@ -79,7 +81,7 @@
     else if (code === 'invalid_url' || code === 'invalid_input') title = 'Invalid website URL';
     else if (code === 'busy') title = 'Generator busy';
     else if (code === 'ratelimit') title = 'Too many requests';
-    var hint = 'The tool reports access restrictions, bot protection, DNS, SSL, timeout and robots.txt errors accurately — it never claims the site has no pages when the crawler was blocked.';
+    var hint = 'The tool reports access restrictions, bot protection, DNS, SSL, timeout and robots.txt errors accurately, it never claims the site has no pages when the crawler was blocked.';
     if (code === 'unreachable' || code === 'challenge' || code === 'timeout' || code === 'budget') {
       hint = 'This environment cannot reach the site directly, and the browser fallback was also unable to fetch it. The website may be blocking automated access (Cloudflare, CAPTCHA), require a login, or be temporarily unreachable. Try again, or check the URL.';
     }
@@ -144,7 +146,7 @@
     }
 
     // Coverage + score
-    html += '<div class="score-card"><div class="score-ring" style="--score:' + esc(r.quality) + '"><b>' + esc(r.quality) + '</b></div><div class="score-summary"><h2>LLMs.txt Quality Score</h2><span class="source-chip">Internal diagnostic score — not a Google or official OpenAI score</span><p>Based on valid URLs, duplicates, metadata completeness, description quality, important-page coverage, category organisation and canonical consistency.</p></div></div>';
+    html += '<div class="score-card"><div class="score-ring" style="--score:' + esc(r.quality) + '"><b>' + esc(r.quality) + '</b></div><div class="score-summary"><h2>LLMs.txt Quality Score</h2><span class="source-chip">Internal diagnostic score, not a Google or official OpenAI score</span><p>Based on valid URLs, duplicates, metadata completeness, description quality, important-page coverage, category organisation and canonical consistency.</p></div></div>';
 
     html += '<div class="audit-stats">' +
       stat('Pages discovered', r.stats.pagesDiscovered != null ? r.stats.pagesDiscovered : r.pages.length) +
@@ -208,7 +210,7 @@
   function installPanel() {
     var host = '';
     try { host = new URL(state.url).host; } catch (e) { host = 'example.com'; }
-    return '<div class="audit-panel wide"><h3>' + icon('publish') + ' Installation</h3><ol class="llmstxt-install"><li><b>Download</b> — click <b>Download llms.txt</b> above.</li><li><b>Upload</b> — place it at <code>' + esc('https://' + host + '/llms.txt') + '</code>.</li><li><b>Verify</b> — open <code>' + esc('https://' + host + '/llms.txt') + '</code> and confirm it loads as plain Markdown.</li></ol><p class="muted">Publishing an llms.txt never guarantees AI visibility, citations, rankings, indexing or traffic.</p></div>';
+    return '<div class="audit-panel wide"><h3>' + icon('publish') + ' Installation</h3><ol class="llmstxt-install"><li><b>Download</b>, click <b>Download llms.txt</b> above.</li><li><b>Upload</b>, place it at <code>' + esc('https://' + host + '/llms.txt') + '</code>.</li><li><b>Verify</b>, open <code>' + esc('https://' + host + '/llms.txt') + '</code> and confirm it loads as plain Markdown.</li></ol><p class="muted">Publishing an llms.txt never guarantees AI visibility, citations, rankings, indexing or traffic.</p></div>';
   }
 
   /* ---------- table ---------- */
@@ -248,22 +250,22 @@
     var rows = visiblePages().slice(0, 400);
     tb.innerHTML = rows.map(function (p) {
       var catOpts = CATEGORIES.map(function (c) { return '<option' + ((p.userCategory || p.category) === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('');
-      var statusTxt = p.blocked ? 'Blocked' : (p.status || '—');
-      var canonTxt = p.canonical && p.canonical !== p.url ? p.canonical : '—';
+      var statusTxt = p.blocked ? 'Blocked' : (p.status || ',');
+      var canonTxt = p.canonical && p.canonical !== p.url ? p.canonical : ',';
       return '<tr data-idx="' + p.order + '" class="' + (p.included ? 'llmstxt-row-in' : 'llmstxt-row-out') + '">' +
         '<td><label class="llmstxt-switch"><input type="checkbox" data-act="toggle" ' + (p.included ? 'checked' : '') + '><span></span></label></td>' +
         '<td class="url-cell"><a class="llmstxt-link" href="' + esc(p.url) + '" target="_blank" rel="noopener">' + esc(shortUrl(p.url)) + '</a>' + (p.external ? ' <span class="chip">external</span>' : '') + (p.isPdf ? ' <span class="chip">PDF</span>' : '') + '<input data-act="title" class="text-input llmstxt-inline" value="' + esc(p.userTitle || p.title) + '" placeholder="Title" title="Title"><input data-act="desc" class="text-input llmstxt-inline" value="' + esc(p.userDescription || p.description) + '" placeholder="Description" title="Description"></td>' +
         '<td><select data-act="cat" class="select llmstxt-cat">' + catOpts + '</select></td>' +
         '<td>' + esc(statusTxt) + '</td>' +
         '<td class="url-cell">' + esc(shortUrl(canonTxt)) + '</td>' +
-        '<td>' + esc(p.reason || '—') + '</td>' +
+        '<td>' + esc(p.reason || ',') + '</td>' +
         '<td class="llmstxt-row-actions"><button class="llmstxt-mini" data-act="up" title="Move up">' + icon('arrow_upward') + '</button><button class="llmstxt-mini" data-act="down" title="Move down">' + icon('arrow_downward') + '</button><button class="llmstxt-mini" data-act="remove" title="Remove">' + icon('close') + '</button></td>' +
         '</tr>';
     }).join('') || '<tr><td colspan="7">No matching pages.</td></tr>';
   }
 
   function shortUrl(u) {
-    if (!u) return '—';
+    if (!u) return ',';
     try {
       var x = new URL(u);
       var p = x.pathname + x.search;

@@ -1,4 +1,4 @@
-/* LLMs.txt Generator — browser fallback.
+/* LLMs.txt Generator, browser fallback.
  * Used only when the server cannot reach the site (e.g. sandboxed egress).
  * The visitor's browser fetches the pages through public read-only relays,
  * parses metadata with DOMParser, then POSTs the collected data to
@@ -9,7 +9,7 @@
   var RETRY = [401, 403, 429, 500, 502, 503, 504];
   var MAX_FETCHES = 90;
   var fetches = 0;
-  var PRIVATE = /^(localhost|127\.|0\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[01])\.|\[?::1\]?|fc00:|fd[0-9a-f]{2}:|fe80:|metadata\.google\.internal)/i;
+  var PRIVATE = /^(localhost|127\.|0\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[01])\.|\[?:1\]?|fc00:|fd[0-9a-f]{2}:|fe80:|metadata\.google\.internal)/i;
 
   function err(code, msg) { var e = new Error(msg); e.code = code; return e; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]; }); }
@@ -102,17 +102,36 @@
   function get(url, opt) {
     opt = opt || {};
     if (fetches++ > MAX_FETCHES) return Promise.reject(err('budget', 'Browser fallback request budget reached.'));
-    var i = 0, last = null;
-    function attempt() {
-      if (i >= transports.length) { if (last && last.challenge) throw err('challenge', 'The site is behind bot protection.'); throw err('unreachable', 'Could not fetch the resource through browser fallback transports.'); }
-      return transports[i++](url, opt).then(function (r) {
-        if (r.text && r.text.length > (opt.cap || 900000)) r.text = r.text.slice(0, opt.cap || 900000);
-        if (challenge(r.text)) { last = { challenge: true }; return attempt(); }
-        if (RETRY.indexOf(r.status) >= 0) { last = r; return attempt(); }
-        return r;
-      }, function (e) { last = e; if (opt.signal && opt.signal.aborted) throw err('cancelled', 'The crawl was cancelled.'); return attempt(); });
+    var CAP = opt.cap || 900000;
+    function usable(r) {
+      if (!r) return false;
+      if (r.text && r.text.length > CAP) r.text = r.text.slice(0, CAP);
+      if (challenge(r.text)) return false;
+      if (RETRY.indexOf(r.status) >= 0) return false;
+      return true;
     }
-    return attempt();
+    /* A direct request is tried first: it is fastest when the site allows it
+       and returns the true status and headers. Public relays are then raced
+       in parallel so one slow relay can no longer stall the whole crawl. */
+    function tryRelays(challenged) {
+      if (opt.signal && opt.signal.aborted) return Promise.reject(err('cancelled', 'The crawl was cancelled.'));
+      var sub = new AbortController();
+      if (opt.signal) opt.signal.addEventListener('abort', function () { sub.abort(); }, { once: true });
+      var relays = transports.slice(1);
+      var winner = null, remaining = relays.length;
+      return new Promise(function (resolve, reject) {
+        relays.forEach(function (t) {
+          t(url, opt).then(function (r) {
+            if (winner || !usable(r)) { if (!winner) throw new Error('not usable'); return; }
+            winner = r; sub.abort(); resolve(r);
+          }, function () {}).catch(function () { remaining--; if (remaining === 0 && !winner) { sub.abort(); reject(challenged ? err('challenge', 'The site is behind bot protection.') : err('unreachable', 'Could not fetch the resource through the browser fallback relays.')); } });
+        });
+      });
+    }
+    return direct(url, opt).then(function (r) {
+      if (usable(r)) return r;
+      return tryRelays(challenge(r && r.text));
+    }, function () { return tryRelays(false); });
   }
 
   function robotsParse(txt) {
@@ -327,12 +346,15 @@
 
     function record(p) { pages.push(p); onProgress({ stage: 'crawl', message: pages.length + ' pages analyzed', discovered: discovered, crawled: pages.length }); }
 
-    while (idx < queue.length && pages.length < maxPages) {
+        async function crawlNext() {
+      if (idx >= queue.length || pages.length >= maxPages) return;
       var item = queue[idx++];
-      if (!robots.allowed(item.url)) { record({ url: item.url, depth: item.depth, blocked: true, fromSitemap: !!item.fromSitemap, inSitemap: !!item.fromSitemap || !!sitemapSet[key(item.url)] }); continue; }
+
+      var item = queue[idx++];
+      if (!robots.allowed(item.url)) { record({ url: item.url, depth: item.depth, blocked: true, fromSitemap: !!item.fromSitemap, inSitemap: !!item.fromSitemap || !!sitemapSet[key(item.url)] }); return crawlNext(); }
       var res;
       try { res = await get(item.url, { accept: 'text/html,application/pdf,*/*', cap: 900000, signal: body.signal }); }
-      catch (e) { record({ url: item.url, depth: item.depth, status: 0, fromSitemap: !!item.fromSitemap, inSitemap: !!item.fromSitemap || !!sitemapSet[key(item.url)] }); continue; }
+      catch (e) { record({ url: item.url, depth: item.depth, status: 0, fromSitemap: !!item.fromSitemap, inSitemap: !!item.fromSitemap || !!sitemapSet[key(item.url)] }); return crawlNext(); }
       var ct = (res.ct || '').toLowerCase();
       var isHtml = ct.indexOf('text/html') >= 0 || ct === '' || ct === 'text/markdown';
       var isPdf = ct.indexOf('application/pdf') >= 0 || isPdfUrl(item.url);
@@ -362,7 +384,14 @@
       } else {
         record({ url: item.url, depth: item.depth, status: res.status, headers: { 'content-type': res.ct }, contentType: res.ct, isPdf: isPdf, title: '', wordCount: 0, types: [], h2: [], paragraphs: [], breadcrumbs: [], links: [], linkObjects: [], fromSitemap: !!item.fromSitemap, inSitemap: !!item.fromSitemap || !!sitemapSet[key(item.url)] });
       }
+    
+      await crawlNext();
     }
+    /* Small worker pool: several pages are fetched at once so relay
+       latency does not add up page by page. */
+    var crawlWorkers = [];
+    for (var w = 0; w < 3; w++) crawlWorkers.push(crawlNext());
+    await Promise.all(crawlWorkers);
 
     // Attach inlink signals.
     pages.forEach(function (p) {

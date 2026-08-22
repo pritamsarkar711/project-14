@@ -1,4 +1,4 @@
-/* huvanti WordPress Theme Detector — report UI (independent of the other tools). */
+/* huvanti WordPress Theme Detector, report UI (independent of the other tools). */
 (function () {
   'use strict';
   var form = document.getElementById('wptheme-form');
@@ -41,24 +41,19 @@
     var i = STEPS.findIndex(function (s) { return s[0] === k; });
     return i < 0 ? 0 : i;
   }
-  function progressUI(state) {
+    function progressUI(state) {
+    var ICONS = {'validate': 'rule', 'connect': 'power', 'wordpress': 'wordpress', 'theme': 'palette', 'stylesheet': 'description', 'parent': 'account_tree', 'fingerprints': 'fingerprint', 'exposure': 'visibility', 'report': 'grading'};
+    var steps = STEPS.map(function (s) { return { key: s[0], label: s[1], icon: ICONS[s[0]] || 'radio_button_unchecked' }; });
     var cur = stepIndex(state.stage);
     var doneAll = state.stage === 'done';
-    var items = STEPS.map(function (s, i) {
-      var st = doneAll || i < cur ? 'done' : i === cur ? 'active' : 'wait';
-      var icon = st === 'done' ? 'check_circle' : st === 'active' ? 'autorenew' : 'hourglass_empty';
-      return '<li class="pi-' + st + '"><span class="material-icons ' + (st === 'active' ? 'pi-active' : st === 'done' ? 'pi-done' : 'pi-wait') + '">' + icon + '</span>' + esc(s[1]) + '</li>';
-    }).join('');
-    out.innerHTML = '<div class="paper paper-padded adsense-progress wptheme-progress"><h3>Detecting the WordPress theme…</h3>'
-      + '<ul class="progress-list">' + items + '</ul>'
-      + '<p class="muted">' + esc(state.message || 'Working…') + '</p>'
-      + '<button class="btn" type="button" id="wptheme-cancel">Cancel</button></div>';
-    var b = document.getElementById('wptheme-cancel');
-    if (b) b.onclick = function () { if (abortCtrl) abortCtrl.abort(); };
-    if (state.stage === 'init') {
-      var first = out.querySelector('li');
-      if (first) first.className = 'pi-active';
-    }
+    var states = {};
+    STEPS.forEach(function (s, i) { states[s[0]] = doneAll || i < cur ? 'done' : i === cur ? 'active' : 'wait'; });
+    var p = window.ScanProgress.reuse(out, {
+      title: 'Detecting the WordPress theme', target: (urlInput && urlInput.value) || '', icon: 'palette', steps: steps,
+      note: state.message || 'Working\u2026',
+      onCancel: function () { if (abortCtrl) abortCtrl.abort(); }
+    });
+    p.set(states, state.message || 'Working\u2026', 8 + Math.round(Object.keys(states).filter(function (k) { return states[k] === 'done'; }).length / steps.length * 88));
   }
 
   /* ---------- errors ---------- */
@@ -70,14 +65,14 @@
       ssrf: 'That address cannot be scanned (private, local, or metadata target).',
       dns: 'The domain could not be resolved. Check the spelling or DNS.',
       ssl: 'The site’s HTTPS certificate could not be validated (expired, self-signed or incomplete chain). The scan cannot continue safely.',
-      tls_blocked: 'The scanner server could not open a secure connection to the site (the TLS handshake was reset). This can be the site refusing server-side scanners — or the scanner server having no direct outbound access. Retrying through your browser usually resolves it.',
+      tls_blocked: 'The scanner server could not open a secure connection to the site (the TLS handshake was reset). This can be the site refusing server-side scanners, or the scanner server having no direct outbound access. Retrying through your browser usually resolves it.',
       timeout: 'The website took too long to respond.',
       unreachable: 'The website could not be reached. It may be offline or blocking this scanner.',
-      blocked: 'The site’s firewall refuses automated readers — the direct connection, your browser, and the public relays all got 403. That is an access failure, not a “not WordPress” result. You can still get a result: open the site yourself and paste its page source (button below) — the detector runs on exactly what you paste.',
+      blocked: 'The site’s firewall refuses automated readers, the direct connection, your browser, and the public relays all got 403. That is an access failure, not a “not WordPress” result. You can still get a result: open the site yourself and paste its page source (button below), the detector runs on exactly what you paste.',
       rate_limited_target: 'The website rate-limited this scanner (429).',
       server_error: 'The website returned a server error (5xx).',
-      not_found: 'The page returned 404 — check the URL.',
-      challenge: 'The site is behind a bot challenge (e.g. Cloudflare) that defeats automated readers, including public relays. Status: Unable to Verify — not “not WordPress”. You can still get a result by pasting the page source (button below).',
+      not_found: 'The page returned 404, check the URL.',
+      challenge: 'The site is behind a bot challenge (e.g. Cloudflare) that defeats automated readers, including public relays. Status: Unable to Verify, not “not WordPress”. You can still get a result by pasting the page source (button below).',
       js_only: 'The page renders via JavaScript with almost no server HTML, so WordPress could not be verified from the initial response.',
       empty: 'The server returned an empty or non-HTML page.',
       redirect: 'Too many redirects or an unsafe redirect.',
@@ -165,10 +160,10 @@
   function scanDetailsMini(scan) {
     if (!scan) return '';
     return '<div class="ad-summary-grid" style="margin-top:8px">'
-      + '<div class="ad-stat"><span>URL analysed</span><b style="font-size:.9rem;word-break:break-all">' + esc(scan.url || '—') + '</b></div>'
-      + '<div class="ad-stat"><span>HTTP status</span><b>' + esc(scan.status || '—') + '</b></div>'
+      + '<div class="ad-stat"><span>URL analysed</span><b style="font-size:.9rem;word-break:break-all">' + esc(scan.url || ',') + '</b></div>'
+      + '<div class="ad-stat"><span>HTTP status</span><b>' + esc(scan.status || ',') + '</b></div>'
       + '<div class="ad-stat"><span>Requests</span><b>' + esc(scan.requests || 0) + '</b></div>'
-      + '<div class="ad-stat"><span>Scan time</span><b>' + (scan.durationMs ? Math.round(scan.durationMs / 100) / 10 + 's' : '—') + '</b></div>'
+      + '<div class="ad-stat"><span>Scan time</span><b>' + (scan.durationMs ? Math.round(scan.durationMs / 100) / 10 + 's' : ',') + '</b></div>'
       + '</div>';
   }
 
@@ -182,7 +177,7 @@
     var vc = r.status === 'detected' ? 'ready' : r.status === 'not_detected' ? 'improve' : 'unverifiable';
     var summary;
     if (r.status === 'detected') summary = 'WordPress is running on this website.';
-    else if (r.status === 'likely') summary = 'Strong WordPress signals found — not enough for a definitive verdict.';
+    else if (r.status === 'likely') summary = 'Strong WordPress signals found, not enough for a definitive verdict.';
     else if (r.status === 'not_detected') summary = 'No meaningful WordPress evidence was found.';
     else summary = r.reason ? r.reason.message : 'The website could not be scanned.';
     var stats = '';
@@ -192,7 +187,7 @@
         + '<div class="ad-stat"><span>Core version</span><b>' + (wp.version ? esc(wp.version) : 'not shown') + '</b></div>'
         + '<div class="ad-stat"><span>Signal families</span><b>' + esc((wp.families || []).length) + '</b></div>'
         + '<div class="ad-stat"><span>Signals</span><b>' + esc((wp.signals || []).length) + '</b></div>'
-        + '<div class="ad-stat"><span>Scan time</span><b>' + (r.scan && r.scan.durationMs ? Math.round(r.scan.durationMs / 100) / 10 + 's' : '—') + '</b></div>'
+        + '<div class="ad-stat"><span>Scan time</span><b>' + (r.scan && r.scan.durationMs ? Math.round(r.scan.durationMs / 100) / 10 + 's' : ',') + '</b></div>'
         + '</div>';
     }
     var plat = '';
@@ -209,7 +204,7 @@
       + '<h2>WordPress ' + (isDetected ? 'Detected' : r.status === 'likely' ? 'Likely' : r.status === 'not_detected' ? 'Not Detected' : 'Unverifiable') + '</h2>'
       + '<p>' + esc(summary) + '</p>'
       + '<div class="wp-chips"><span class="source-chip">Confidence ' + ring + '%</span><span class="source-chip">Evidence-based</span><span class="source-chip">No AI</span>' + (r.via === 'browser' ? '<span class="source-chip">Via your browser</span>' : '') + (r.manualPaste ? '<span class="source-chip">Source pasted manually</span>' : '') + (r.homeInner ? '<span class="source-chip">Inner page used</span>' : '') + (r.homeArchived ? '<span class="source-chip">Archived snapshot</span>' : '') + '</div>'
-      + (r.homeBlocked ? '<p class="calc-note"><span class="material-icons">block</span>Live homepage blocked (' + esc(r.homeBlocked.code === 'challenge' ? 'bot challenge' : 'HTTP ' + r.homeBlocked.status) + ') — verdict from other public endpoints.' + (r.homeInner ? '' : ' The theme could not be identified without page HTML — use “Identify by pasting the source” below.') + '</p>' : '')
+      + (r.homeBlocked ? '<p class="calc-note"><span class="material-icons">block</span>Live homepage blocked (' + esc(r.homeBlocked.code === 'challenge' ? 'bot challenge' : 'HTTP ' + r.homeBlocked.status) + '), verdict from other public endpoints.' + (r.homeInner ? '' : ' The theme could not be identified without page HTML, use “Identify by pasting the source” below.') + '</p>' : '')
       + (r.homeInner && !r.manualPaste ? '<p class="calc-note"><span class="material-icons">description</span>Homepage was blocked; a public inner page (' + esc(String(r.homeInner.url).slice(0, 80)) + ') supplied the HTML.</p>' : '')
       + (r.homeArchived ? '<p class="calc-note"><span class="material-icons">history</span>Discovery used an archived homepage snapshot (Wayback' + (r.homeArchived.timestamp ? ', ' + esc(r.homeArchived.timestamp.slice(0, 8)) : '') + '); theme files were read from the live site.</p>' : '')
       + (r.manualPaste ? '<p class="calc-note"><span class="material-icons">content_paste</span>Based on the page source you pasted; theme files read from the live site where possible.</p>' : '')
@@ -223,8 +218,8 @@
 
   function versionHTML(v) {
     if (!v) return 'Not publicly detectable';
-    if (v.label === 'exact') return '<b>' + esc(v.value) + '</b> <span class="muted">(exact — ' + esc(v.source) + ')</span>';
-    if (v.label === 'appears') return '<b>' + esc(v.value) + '</b> <span class="muted">(appears to be — ' + esc(v.source) + ')</span>';
+    if (v.label === 'exact') return '<b>' + esc(v.value) + '</b> <span class="muted">(exact, ' + esc(v.source) + ')</span>';
+    if (v.label === 'appears') return '<b>' + esc(v.value) + '</b> <span class="muted">(appears to be, ' + esc(v.source) + ')</span>';
     return esc(v.detail || 'Not publicly detectable');
   }
 
@@ -261,7 +256,7 @@
     fields += field('Version', versionHTML(t.version), t.version && t.version.value ? t.version.value : null, 'version');
     fields += field('Author', t.author ? esc(t.author) : null, t.author, 'author');
     fields += field('Theme type', typePill);
-    fields += field('Detection confidence', '<span class="conf">' + t.confidence + '% — ' + esc(t.confidenceLabel) + '</span>');
+    fields += field('Detection confidence', '<span class="conf">' + t.confidence + '%, ' + esc(t.confidenceLabel) + '</span>');
     if (t.themeUri) fields += field('Official theme URL', '<a href="' + esc(t.themeUri) + '" target="_blank" rel="noopener nofollow">' + esc(t.themeUri) + '</a>');
     if (t.license) fields += field('License', esc(t.license) + (t.licenseUri ? ' · <a href="' + esc(t.licenseUri) + '" target="_blank" rel="noopener nofollow">license text</a>' : ''));
 
@@ -290,11 +285,11 @@
     var fields = '';
     fields += '<div class="ad-stat"><span>Parent theme</span><b>' + esc(p.name) + ' ' + copyBtn(p.name, 'parent theme') + '</b></div>';
     fields += '<div class="ad-stat"><span>Parent slug</span><b><code>' + esc(p.slug) + '</code> ' + copyBtn(p.slug, 'parent slug') + '</b></div>';
-    fields += '<div class="ad-stat"><span>Parent version</span><b>' + (p.version && p.version.value ? esc(p.version.value) + ' <span class="muted">(' + esc(p.version.label + (p.version.source ? ' — ' + p.version.source : '')) + ')</span>' : 'not detectable') + '</b></div>';
+    fields += '<div class="ad-stat"><span>Parent version</span><b>' + (p.version && p.version.value ? esc(p.version.value) + ' <span class="muted">(' + esc(p.version.label + (p.version.source ? ', ' + p.version.source : '')) + ')</span>' : 'not detectable') + '</b></div>';
     fields += '<div class="ad-stat"><span>Parent author</span><b>' + (p.author ? esc(p.author) : 'unknown') + '</b></div>';
     fields += '<div class="ad-stat"><span>Parent style.css</span><b>' + esc(p.styleCssAccess) + '</b></div>';
     return '<div class="audit-panel wide"><h3>Parent theme</h3>'
-      + '<div class="verdict improve"><span class="material-icons">account_tree</span>Child theme detected — parent: ' + esc(p.name) + '</div>'
+      + '<div class="verdict improve"><span class="material-icons">account_tree</span>Child theme detected, parent: ' + esc(p.name) + '</div>'
       + '<div class="ad-summary-grid">' + fields + '</div>'
       + '<details class="audit-fold"><summary>Parent theme evidence <b>' + p.evidence.length + '</b></summary><div>'
       + p.evidence.map(function (e) { return '<div class="prog-line small"><span>' + esc(e) + '</span></div>'; }).join('')
@@ -334,7 +329,7 @@
       return '<div class="calc-line"><span>' + esc(s.detail) + ' <span class="muted">· family: ' + esc(s.family) + '</span></span><b>+' + s.weight + '</b></div>';
     }).join('');
     var tRows = r.theme && r.theme.evidence ? r.theme.evidence.map(function (e) {
-      return '<div class="calc-line"><span>' + esc(e.label) + ' — <span class="muted">' + esc(e.detail) + '</span> · method: ' + esc(e.method) + '</span><b>+' + (e.weight || 0) + '</b></div>';
+      return '<div class="calc-line"><span>' + esc(e.label) + ', <span class="muted">' + esc(e.detail) + '</span> · method: ' + esc(e.method) + '</span><b>+' + (e.weight || 0) + '</b></div>';
     }).join('') : '';
     var famChips = (wp.families || []).map(function (f) { return pill(f.label, 'low'); }).join(' ');
     return '<div class="audit-panel wide"><h3>Detection evidence</h3>'
@@ -349,14 +344,14 @@
     if (!r.exposure) return '';
     var iconFor = { exposed: 'visibility', not_found: 'visibility_off', unknown: 'help_outline' };
     var clsFor = { exposed: 'sev-info', not_found: 'sev-passed', unknown: 'sev-info' };
-    return '<div class="audit-panel wide"><h3>Theme exposure — publicly observable information</h3>'
+    return '<div class="audit-panel wide"><h3>Theme exposure, publicly observable information</h3>'
       + '<p class="muted">' + esc(r.exposure.summary) + '</p>'
       + r.exposure.items.map(function (i) {
         return '<div class="issue ' + clsFor[i.status] + '" style="border:0"><span class="material-icons issue-icon">' + iconFor[i.status] + '</span><div>'
           + '<h6>' + esc(i.label) + ' ' + pill(i.status === 'exposed' ? 'publicly visible' : i.status === 'not_found' ? 'not exposed' : 'unknown', i.status === 'exposed' ? 'info' : i.status === 'not_found' ? 'passed' : 'manual') + '</h6>'
           + '<p>' + esc(i.detail) + '</p></div></div>';
       }).join('')
-      + '<p class="muted" style="margin-top:8px">Informational only. This observes files a WordPress site normally makes public — it performs no exploitation or intrusive testing and makes no vulnerability claims.</p>'
+      + '<p class="muted" style="margin-top:8px">Informational only. This observes files a WordPress site normally makes public, it performs no exploitation or intrusive testing and makes no vulnerability claims.</p>'
       + '</div>';
   }
 
@@ -367,11 +362,11 @@
     return '<div class="audit-panel wide"><h3>Scan details</h3>'
       + '<div class="ad-summary-grid">'
       + '<div class="ad-stat"><span>URL analysed</span><b style="font-size:.85rem;word-break:break-all">' + esc(s.url) + '</b></div>'
-      + '<div class="ad-stat"><span>Final URL</span><b style="font-size:.85rem;word-break:break-all">' + esc(s.finalUrl || '—') + '</b></div>'
-      + '<div class="ad-stat"><span>HTTP status</span><b>' + esc(s.status || '—') + '</b></div>'
-      + '<div class="ad-stat"><span>Duration</span><b>' + (s.durationMs ? Math.round(s.durationMs / 100) / 10 + 's' : '—') + '</b></div>'
+      + '<div class="ad-stat"><span>Final URL</span><b style="font-size:.85rem;word-break:break-all">' + esc(s.finalUrl || ',') + '</b></div>'
+      + '<div class="ad-stat"><span>HTTP status</span><b>' + esc(s.status || ',') + '</b></div>'
+      + '<div class="ad-stat"><span>Duration</span><b>' + (s.durationMs ? Math.round(s.durationMs / 100) / 10 + 's' : ',') + '</b></div>'
       + '<div class="ad-stat"><span>Requests made</span><b>' + esc(s.requests) + '</b></div>'
-      + '<div class="ad-stat"><span>Data read</span><b>' + (s.bytes ? (s.bytes / 1024).toFixed(0) + ' KB' : '—') + '</b></div>'
+      + '<div class="ad-stat"><span>Data read</span><b>' + (s.bytes ? (s.bytes / 1024).toFixed(0) + ' KB' : ',') + '</b></div>'
       + '<div class="ad-stat"><span>Signals collected</span><b>' + esc(s.signals || 0) + '</b></div>'
       + '<div class="ad-stat"><span>Redirects</span><b>' + esc((s.redirects || []).length) + '</b></div>'
       + '</div>'

@@ -1,4 +1,4 @@
-/* Core Web Vitals & INP Auditor — measurement script.
+/* Core Web Vitals & INP Auditor, measurement script.
  *
  * Injected as the FIRST element of <head> in the sandboxed page (either
  * the server-proxied page or the browser-direct srcdoc fallback). It:
@@ -6,7 +6,7 @@
  *   - registers all PerformanceObservers before anything renders
  *   - measures LCP / CLS (raw shifts) / FCP / long tasks / INP interactions
  *   - runs SAFE synthetic interactions (menus, tabs, accordions, search,
- *     modal triggers — never forms, never destructive actions)
+ *     modal triggers, never forms, never destructive actions)
  *   - collects DOM / image / font / JS / CSS evidence
  *   - posts the raw measurement bundle to the parent page (same origin)
  *
@@ -276,7 +276,7 @@
       out.nav.domInteractive = round(nav.domInteractive, 1);
       out.nav.domContentLoaded = round(nav.domContentLoaded, 1);
       out.nav.load = round(nav.loadEventEnd, 1);
-      // The iframe navigation protocol is the auditor's own connection — it
+      // The iframe navigation protocol is the auditor's own connection, it
       // says nothing about the target site in relay/direct modes.
       if (!RELAY_MODE) out.meta.protocolDoc = nav.nextHopProtocol || null;
     }
@@ -529,7 +529,7 @@
     var pool = document.querySelectorAll('button, [role="tab"], [role="button"], summary, [aria-haspopup], [aria-expanded], [data-toggle], [data-bs-toggle], input[type="search"]');
     Array.prototype.forEach.call(pool, function (el) {
       if (inForm(el)) {
-        if (excluded.length < 12) excluded.push({ selector: sel(el), reason: 'Inside a <form> — never triggered (could submit).' });
+        if (excluded.length < 12) excluded.push({ selector: sel(el), reason: 'Inside a <form>, never triggered (could submit).' });
         return;
       }
       var type = (el.tagName.toLowerCase() === 'button' && /submit/i.test(el.type || '')) ? null : classifyTarget(el);
@@ -649,7 +649,7 @@
             presentation: Math.round(breakdown.presentation * 10) / 10,
             startTime: Math.round(t0 * 10) / 10,
             responded: responded(before, el) && !handled.a,
-            note: handled.a ? 'Target is a link — navigation was suppressed; only the handler ran.' : null,
+            note: handled.a ? 'Target is a link, navigation was suppressed; only the handler ran.' : null,
             measuredVia: breakdown.measuredVia
           };
           resolve(out2);
@@ -669,7 +669,7 @@
     var targets = found.targets;
     if (!targets.length) {
       out.vitals.inp.status = 'unavailable';
-      out.vitals.inp.reason = 'No safe interactive elements (menus, tabs, accordions, search controls, modal triggers) were found outside forms. INP was not measured — never guessed.';
+      out.vitals.inp.reason = 'No safe interactive elements (menus, tabs, accordions, search controls, modal triggers) were found outside forms. INP was not measured, never guessed.';
       return Promise.resolve();
     }
     var run = Promise.resolve();

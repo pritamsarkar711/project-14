@@ -1,11 +1,11 @@
-/* huvanti Raptive checker — browser crawler (independent of AdSense & Ezoic). */
+/* huvanti Raptive checker, browser crawler (independent of AdSense & Ezoic). */
 (function (global) {
   'use strict';
   var MV = global.RaptiveChecker = global.RaptiveChecker || {};
 
   var TRACKING = { utm_source:1, utm_medium:1, utm_campaign:1, utm_term:1, utm_content:1, gclid:1, fbclid:1, msclkid:1, _ga:1, _gl:1 };
   var ASSET = /\.(jpe?g|png|webp|gif|svg|avif|ico|bmp|css|js|mjs|json|pdf|zip|woff2?|ttf|eot|mp4|webm|mp3)(\?|#|$)/i;
-  var PRIVATE = /^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[01])\.|::1|metadata\.google\.internal)/i;
+  var PRIVATE = /^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[01])\.|:1|metadata\.google\.internal)/i;
   var TIMEOUT = 14000;
   var MAX_HTML = 180000;
 

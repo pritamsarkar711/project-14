@@ -1,4 +1,4 @@
-/* Core Web Vitals & INP Auditor — UI orchestration.
+/* Core Web Vitals & INP Auditor: UI orchestration.
  *
  * Flow: validate → server-proxied fetch (SSE) → measurement iframe →
  * (or: browser-direct relay fallback → srcdoc iframe) → measurement
@@ -35,7 +35,7 @@
       id: 'mobile', label: 'Mobile',
       viewport: { w: 412, h: 823 }, dpr: null,
       network: { label: 'Slow 4G (150 ms RTT, 1.6 Mbps via auditor proxy)', latencyMs: 150, downKbps: 1600 },
-      note: 'Emulated viewport + auditor-proxy network throttle. CPU is not throttled — this does not represent every real device.'
+      note: 'Emulated viewport + auditor-proxy network throttle. CPU is not throttled, this does not represent every real device.'
     },
     desktop: {
       id: 'desktop', label: 'Desktop',
@@ -82,30 +82,31 @@
     ['fonts', 'Fonts analyzed'],
     ['report', 'Performance report generated']
   ];
-  function progressUI(message) {
-    var items = STEPS.map(function (s, i) {
-      return '<li class="' + (i === 0 ? 'pi-done' : 'pi-wait') + '"><span class="material-icons ' + (i === 0 ? 'pi-done' : 'pi-wait') + '">' + (i === 0 ? 'check_circle' : 'hourglass_empty') + '</span>' + esc(s[1]) + '</li>';
-    }).join('');
-    out.innerHTML = '<div class="paper paper-padded cwv-progress"><h3>Analyzing the website…</h3>' +
-      '<ul class="progress-list">' + items + '</ul>' +
-      '<p class="muted" id="cwv-progress-msg">' + esc(message || 'Working…') + '</p>' +
-      '<button class="btn" type="button" id="cwv-cancel">Cancel</button></div>';
-    var b = document.getElementById('cwv-cancel');
-    if (b) b.onclick = function () { if (CWV.abort) CWV.abort(); };
+    function progressUI(message) {
+    var ICONS = {'loaded': 'download_done', 'captured': 'swap_vert', 'lcp': 'image', 'inp': 'touch_app', 'cls': 'swap_vert', 'js': 'code', 'images': 'image', 'fonts': 'text_fields', 'report': 'grading', 'validate': 'rule', 'browser': 'travel_explore'};
+    var steps = STEPS.map(function (s) { return { key: s[0], label: s[1], icon: ICONS[s[0]] || 'radio_button_unchecked' }; });
+    out._cwvScan = window.ScanProgress.create(out, {
+      title: 'Analyzing website performance', target: (urlInput && urlInput.value) || '', icon: 'speed', steps: steps,
+      note: message || 'Working\u2026',
+      onCancel: function () { if (CWV.abort) CWV.abort(); }
+    });
+    var states0 = {};
+    steps.forEach(function (s, i) { states0[s.key] = i === 0 ? 'active' : 'wait'; });
+    out._cwvScan.set(states0, message, 4);
   }
   function markStep(key) {
-    var lis = out.querySelectorAll('.progress-list li');
-    var idx = STEPS.findIndex(function (s) { return s[0] === key; });
-    for (var i = 0; i <= idx && i < lis.length; i++) {
-      if (lis[i].classList.contains('pi-done')) continue;
-      lis[i].className = 'pi-done';
-      var ic = lis[i].querySelector('.material-icons');
-      if (ic) { ic.textContent = 'check_circle'; ic.className = 'material-icons pi-done'; }
-    }
+    if (!out._cwvScan || !out._cwvScan.card || !out._cwvScan.card.isConnected) return;
+    var map = { browser: 'loaded', validate: 'loaded' };
+    var k = map[key] || key;
+    var idx = STEPS.findIndex(function (s) { return s[0] === k; });
+    if (idx < 0) return;
+    var states = {};
+    STEPS.forEach(function (s, i) { states[s[0]] = i < idx ? 'done' : i === idx ? 'active' : 'wait'; });
+    out._cwvScan.set(states, null, 8 + Math.round(idx / STEPS.length * 88));
   }
+
   function progressMsg(msg) {
-    var p = document.getElementById('cwv-progress-msg');
-    if (p) p.textContent = msg;
+    if (out._cwvScan && out._cwvScan.note) out._cwvScan.note(msg);
   }
 
   /* ---------------- transports ---------------- */
@@ -159,13 +160,13 @@
       });
     });
     // Overall deadline: a stalled SSE stream (proxy buffering, dropped
-    // connection) must not hang the audit — fail over to browser-direct.
+    // connection) must not hang the audit, fail over to browser-direct.
     return new Promise(function (resolve, reject) {
       var settled = false;
       var t = setTimeout(function () {
         if (!settled) {
           settled = true;
-          var e = new Error('The server did not respond in time — switching to browser-direct measurement.');
+          var e = new Error('The server did not respond in time, switching to browser-direct measurement.');
           e.code = 'empty';
           reject(e);
         }
@@ -203,7 +204,7 @@
       return rl.run(url, { signal: signal }).then(function (res) {
         if (relayUsable(res)) return { html: res.html, status: res.status, relay: rl.id, label: rl.label };
         if (tries > 0) return one(rl, tries - 1);
-        return null; // this relay produced junk — move on
+        return null; // this relay produced junk, move on
       }, function () {
         if (tries > 0) return one(rl, tries - 1);
         return null;
@@ -304,7 +305,7 @@
       payload.docHeaders = {};
       payload.docPhases = { relayMs: ctx.relayInfo.ms };
       payload.meta.notes = payload.meta.notes || [];
-      payload.meta.notes.push('HTML fetched through the public relay ' + (ctx.relayInfo.label || ctx.relayInfo.relay) + ' in ' + Math.round(ctx.relayInfo.ms) + ' ms (relay timing — not a TTFB measurement). Subresources loaded cross-origin; timing/sizes hidden by timing-allow-origin are marked unavailable.');
+      payload.meta.notes.push('HTML fetched through the public relay ' + (ctx.relayInfo.label || ctx.relayInfo.relay) + ' in ' + Math.round(ctx.relayInfo.ms) + ' ms (relay timing, not a TTFB measurement). Subresources loaded cross-origin; timing/sizes hidden by timing-allow-origin are marked unavailable.');
     }
     if (ctx.sessionMeta) {
       payload.resourceMeta = { mode: 'server-proxy', items: ctx.sessionMeta.resources || [] };
@@ -342,7 +343,7 @@
     }
   };
 
-  // Errors that are real audit results (target-site or usage problems) —
+  // Errors that are real audit results (target-site or usage problems) ,
   // anything else is transport trouble and triggers the browser-direct path.
   var HARD_CODES = ['ratelimit', 'busy', 'invalid_url', 'ssrf', 'not_found', 'blocked', 'challenge', 'not_html', 'dns'];
   var CHALLENGE_RE = /just a moment|attention required|cf-browser-verification|challenge-platform|cdn-cgi\/challenge|checking your browser|enable javascript and cookies|access denied|perimeterx|datadome/i;
@@ -352,13 +353,13 @@
     else if (stage === 'loaded') markStep('loaded');
     else if (stage === 'settled') { markStep('captured'); markStep('lcp'); }
     else if (stage === 'interactions') { markStep('inp'); markStep('cls'); progressMsg('Analyzing the captured data…'); }
-    else if (stage === 'timeout') progressMsg('The page did not finish loading — using partial data.');
+    else if (stage === 'timeout') progressMsg('The page did not finish loading, using partial data.');
   }
 
   // Browser-direct measurement through public relays (used when the server
   // transport is unavailable).
   function relayRun(url, profile, measureOpts, serverErr) {
-    progressMsg('The server could not reach the site — trying public relays from your browser…');
+    progressMsg('The server could not reach the site, trying public relays from your browser…');
     var t0 = performance.now();
     return relayFetch(url, abortCtl ? abortCtl.signal : null, function (msg) { progressMsg(msg); }).then(function (res) {
       if (abortCtl && abortCtl.signal.aborted) throw Object.assign(new Error('Cancelled.'), { code: 'cancelled' });
@@ -369,7 +370,7 @@
         if (payload && payload.internalLinks && payload.internalLinks.length && !CWV._internalLinks) CWV._internalLinks = payload.internalLinks;
         if (/^http:\/\//i.test(url)) {
           payload.meta.notes = payload.meta.notes || [];
-          payload.meta.notes.push('The page is HTTP-only. In browser-direct mode the browser may block its HTTP subresources as mixed content — results can be incomplete. The server-proxy transport (production) does not have this limitation.');
+          payload.meta.notes.push('The page is HTTP-only. In browser-direct mode the browser may block its HTTP subresources as mixed content, results can be incomplete. The server-proxy transport (production) does not have this limitation.');
         }
         return analyzeBundle(payload, {
           profile: profile,
@@ -381,9 +382,9 @@
         throw Object.assign(new Error('Cancelled.'), { code: 'cancelled' });
       }
       if (e.code === 'challenge') throw e;
-      // FINAL RESORT: direct iframe load (limited — cross-origin pages cannot
+      // FINAL RESORT: direct iframe load (limited, cross-origin pages cannot
       // be instrumented, but the load itself is a real measurement).
-      progressMsg('All relays failed — trying a direct (limited) page load…');
+      progressMsg('All relays failed, trying a direct (limited) page load…');
       return directLimitedRun(url, profile).then(function (payload) {
         if (payload.internalLinks && payload.internalLinks.length && !CWV._internalLinks) CWV._internalLinks = payload.internalLinks;
         payload.profile = {
@@ -395,7 +396,7 @@
         if (serverErr) payload.meta.notes.push('Server transport failed: ' + (serverErr.message || serverErr.code || 'unknown') + '. All public relays also failed (' + BROWSER_RELAYS.length + ' tried).');
         return analyzeBundle(payload, { profile: profile, relayInfo: null });
       }, function (e2) {
-        var msg = 'The page could not be loaded directly in an iframe either — the site may be unreachable or may block framing entirely.';
+        var msg = 'The page could not be loaded directly in an iframe either, the site may be unreachable or may block framing entirely.';
         throw Object.assign(new Error(msg), { code: e2.code || 'unreachable' });
       });
     });
@@ -439,11 +440,11 @@
           docPhases: null, docHeaders: {},
           nav: { ttfb: null, domInteractive: null, domContentLoaded: null, load: ms },
           vitals: {
-            lcp: { status: 'unavailable', value: null, entry: null, candidates: [], reason: 'Cross-origin page — cannot be instrumented from a direct iframe load.' },
-            fcp: { status: 'unavailable', value: null, reason: 'Cross-origin page — first paint cannot be observed from a direct iframe load.' },
-            cls: { status: 'unavailable', value: null, entries: [], excluded: [], reason: 'Cross-origin page — layout shifts cannot be observed from a direct iframe load.' },
-            inp: { status: 'unavailable', value: null, interactions: [], reason: 'Cross-origin page — interactions cannot be tested from a direct iframe load.' },
-            tbt: { status: 'unavailable', value: null, reason: 'Cross-origin page — main-thread tasks cannot be observed from a direct iframe load.' },
+            lcp: { status: 'unavailable', value: null, entry: null, candidates: [], reason: 'Cross-origin page, cannot be instrumented from a direct iframe load.' },
+            fcp: { status: 'unavailable', value: null, reason: 'Cross-origin page, first paint cannot be observed from a direct iframe load.' },
+            cls: { status: 'unavailable', value: null, entries: [], excluded: [], reason: 'Cross-origin page, layout shifts cannot be observed from a direct iframe load.' },
+            inp: { status: 'unavailable', value: null, interactions: [], reason: 'Cross-origin page, interactions cannot be tested from a direct iframe load.' },
+            tbt: { status: 'unavailable', value: null, reason: 'Cross-origin page, main-thread tasks cannot be observed from a direct iframe load.' },
             si: { status: 'unavailable', reason: 'Not measurable without screenshot/video capture.' }
           },
           longTasks: null, resources: [], dom: null, images: [], fonts: [], cssFiles: [], jsFiles: [],
@@ -481,7 +482,7 @@
       attempt
         .then(function (info) {
           if (signal.aborted) throw Object.assign(new Error('Cancelled.'), { code: 'cancelled' });
-          progressMsg('Browser sandbox initialized — loading the page…');
+          progressMsg('Browser sandbox initialized, loading the page…');
           return measurePage(info.pageUrl, profile, { onStage: mapStages, timeout: 80000 }).then(function (payload) {
             if (payload && payload.internalLinks && payload.internalLinks.length && !CWV._internalLinks) CWV._internalLinks = payload.internalLinks;
             return fetch('/api/cwv-meta?sid=' + encodeURIComponent(info.sid)).then(function (r) { return r.json(); }).catch(function () { return null; })
@@ -583,14 +584,14 @@
       html += '<p class="muted">No internal links were discovered on the audited page, so a multi-page crawl has nothing to test. A crawl is only started when you explicitly choose it.</p>';
       return html + '</section>';
     }
-    html += '<p class="muted">Optional multi-page mode: ' + state.crawl.queue.length + ' internal URL(s) discovered on the audited page. Each page gets its own lab measurement — nothing is merged into the single-page report above.</p>';
+    html += '<p class="muted">Optional multi-page mode: ' + state.crawl.queue.length + ' internal URL(s) discovered on the audited page. Each page gets its own lab measurement, nothing is merged into the single-page report above.</p>';
     html += '<div class="cwv-crawl-controls">' +
       '<label>Pages <select id="cwv-crawl-limit" class="select cwv-crawl-select"><option value="10">10 pages</option><option value="25">25 pages</option><option value="50">50 pages</option><option value="100">100 pages</option></select></label>' +
       '<button class="btn" type="button" id="cwv-crawl-start">' + (state.crawl.running ? 'Crawling…' : 'Crawl Website') + '</button>' +
       (state.crawl.running ? '<button class="btn" type="button" id="cwv-crawl-cancel">Stop</button>' : '') +
       '</div><div id="cwv-crawl-progress"></div>';
     if (state.crawl.summaries.length) html += '<div id="cwv-crawl-results">' + crawlTableHtml() + '</div>';
-    html += '<p class="muted">Crawl mode measures one page at a time with a reduced measurement window. "Worst" rows are the worst measured in this crawl — not a site-wide verdict.</p>';
+    html += '<p class="muted">Crawl mode measures one page at a time with a reduced measurement window. "Worst" rows are the worst measured in this crawl, not a site-wide verdict.</p>';
     return html + '</section>';
   }
 
@@ -615,7 +616,7 @@
       var checked = state.crawl.compare && state.crawl.compare.indexOf(s.url) >= 0;
       html += '<tr class="' + (isWorst ? 'cwv-worst' : '') + '"><td class="pt-url cwv-crawl-url" title="' + esc(s.url) + '">' + esc(short(s.url)) + '</td>' +
         metricCell(s.lcp, 'ms') + metricCell(s.inp, 'ms') + metricCell(s.cls, '') + metricCell(s.fcp, 'ms') + metricCell(s.ttfb, 'ms') +
-        '<td><b>' + (s.score != null ? s.score : '—') + '</b>' + (isWorst ? ' <span class="badge critical">worst</span>' : '') + '</td>' +
+        '<td><b>' + (s.score != null ? s.score : ',') + '</b>' + (isWorst ? ' <span class="badge critical">worst</span>' : '') + '</td>' +
         '<td><label class="cwv-compare-check"><input type="checkbox" data-cmp="' + esc(s.url) + '"' + (checked ? ' checked' : '') + '> compare</label> <button class="row-detail" type="button" data-url="' + esc(s.url) + '">Details</button></td></tr>';
     });
     html += '</tbody></table></div>';
@@ -638,7 +639,7 @@
   }
   function compareRow(label, a, b, dir) {
     var av = a && a.value != null ? a.value : null, bv = b && b.value != null ? b.value : null;
-    if (av == null || bv == null) return '<tr><td>' + esc(label) + '</td><td>' + (av == null ? 'n/a' : av) + '</td><td>' + (bv == null ? 'n/a' : bv) + '</td><td>—</td></tr>';
+    if (av == null || bv == null) return '<tr><td>' + esc(label) + '</td><td>' + (av == null ? 'n/a' : av) + '</td><td>' + (bv == null ? 'n/a' : bv) + '</td><td>,</td></tr>';
     var better = av === bv ? 'tie' : (av * dir > bv * dir ? 'a' : 'b');
     return '<tr><td>' + esc(label) + '</td><td class="' + (better === 'a' ? 'up' : '') + '">' + av + '</td><td class="' + (better === 'b' ? 'up' : '') + '">' + bv + '</td><td>' + (better === 'tie' ? 'tie' : better === 'a' ? 'first' : 'second') + '</td></tr>';
   }
@@ -739,7 +740,7 @@
       run = run.then(function () {
         if (state.crawl.abort) return null;
         var msg = out.querySelector('#cwv-crawl-msg');
-        if (msg) msg.textContent = 'Page ' + (state.crawl.progress.done + 1) + '/' + state.crawl.progress.total + ' — ' + short(u);
+        if (msg) msg.textContent = 'Page ' + (state.crawl.progress.done + 1) + '/' + state.crawl.progress.total + ', ' + short(u);
         return crawlOne(u, profile).then(function (summary) {
           state.crawl.progress.done++;
           state.crawl.summaries.push(summary);

@@ -1,9 +1,9 @@
-/* huvanti Domain Information Checker — UI.
+/* huvanti Domain Information Checker: UI.
  *
  * Renders the scan progress (SSE) and the full evidence-based report using
  * the site's existing design system (audit-panel, chips, pills, folds,
  * status colours). Every value carries its source; unavailable data is shown
- * as "Not publicly available" / "Unable to Verify" — never fabricated.
+ * as "Not publicly available" / "Unable to Verify", never fabricated.
  *
  * Browser relay: when the scanner server has no direct HTTPS egress, the page
  * collects the site's HTTP response through the visitor's browser (direct
@@ -205,7 +205,7 @@
         bundle.https = direct;
         return bundle;
       }
-      if (onStatus) onStatus('Direct fetch is blocked by CORS — trying public read-only relays…');
+      if (onStatus) onStatus('Direct fetch is blocked by CORS, trying public read-only relays…');
       return relaysFor(httpsUrl, 'https').then(function () {
         return relaysFor(httpUrl, 'http').then(function () {
           return bundle;
@@ -230,33 +230,24 @@
   }
 
   /* ---------------- progress UI ---------------- */
-  function renderProgress(container, message, completed) {
-    var items = [
-      ['domain_validated', 'Domain validated'],
-      ['rdap_completed', 'RDAP / WHOIS lookup completed'],
-      ['dns_retrieved', 'DNS records retrieved'],
-      ['ip_retrieved', 'IP information retrieved'],
-      ['ns_analyzed', 'Nameservers analyzed'],
-      ['ssl_analyzed', 'SSL analyzed'],
-      ['http_analyzed', 'HTTP analyzed'],
-      ['email_analyzed', 'Email records analyzed'],
-      ['dnssec_analyzed', 'DNSSEC checked'],
-      ['technology_completed', 'Technology detection completed'],
-      ['age_calculated', 'Domain age calculated']
-    ];
+    function renderProgress(container, message, completed) {
+    var ICONS = {'domain_validated': 'rule', 'rdap_completed': 'assignment', 'dns_retrieved': 'storage', 'ip_retrieved': 'router', 'ns_analyzed': 'dns', 'ssl_analyzed': 'lock', 'http_analyzed': 'http', 'email_analyzed': 'mail', 'dnssec_analyzed': 'security', 'technology_completed': 'memory', 'age_calculated': 'timeline'};
+    var KEYS = ["domain_validated", "rdap_completed", "dns_retrieved", "ip_retrieved", "ns_analyzed", "ssl_analyzed", "http_analyzed", "email_analyzed", "dnssec_analyzed", "technology_completed", "age_calculated"];
+    var LABELS = ["Domain validated", "RDAP / WHOIS lookup completed", "DNS records retrieved", "IP information retrieved", "Nameservers analyzed", "SSL certificate analyzed", "HTTP response analyzed", "Email records analyzed", "DNSSEC checked", "Technology detection completed", "Domain age calculated"];
+    var steps = KEYS.map(function (k, i) { return { key: k, label: LABELS[i], icon: ICONS[k] || 'radio_button_unchecked' }; });
     var done = completed || [];
-    var html = '<div class="audit-loading domaincheck-progress"><h3>' + icon('dns') + ' Checking ' + esc(currentInput()) + '</h3>' +
-      '<div class="progress-bar"><i style="width:' + Math.min(100, Math.round((done.length / items.length) * 100)) + '%"></i></div>' +
-      '<ul class="progress-list">';
-    for (var i = 0; i < items.length; i++) {
-      var isDone = done.indexOf(items[i][0]) !== -1;
-      html += '<li>' +
-        (isDone ? '<span class="material-icons pi-done">check_circle</span>'
-          : '<span class="material-icons ' + (done.length === i ? 'pi-active' : 'pi-wait') + '">' + (done.length === i ? 'sync' : 'radio_button_unchecked') + '</span>') +
-        items[i][1] + '</li>';
-    }
-    html += '</ul><p class="muted">' + esc(message || 'Working…') + '</p></div>';
-    container.innerHTML = html;
+    var states = {}; var activeSet = false;
+    steps.forEach(function (st, i) {
+      if (done.indexOf(st.key) !== -1) states[st.key] = 'done';
+      else if (!activeSet) { states[st.key] = 'active'; activeSet = true; }
+      else states[st.key] = 'wait';
+    });
+    if (done.length >= steps.length) steps.forEach(function (st) { states[st.key] = 'done'; });
+    var p = window.ScanProgress.reuse(container, {
+      title: 'Checking ' + currentInput(), icon: 'dns', steps: steps,
+      note: message || 'Working\u2026'
+    });
+    p.set(states, message || 'Working\u2026', Math.min(96, 8 + Math.round(done.length / steps.length * 88)));
   }
   var lastInput = '';
   function currentInput() { return lastInput; }
@@ -343,12 +334,12 @@
         if (!list.length) continue;
         html += '<div class="dc-status-group"><div class="dc-status-group-head">' + icon(order[i][2]) + esc(order[i][1]) + '</div>';
         for (var j = 0; j < list.length; j++) {
-          html += '<div class="dc-status-item"><span class="dc-mono">' + esc(list[j].code) + '</span> — ' + esc(list[j].label || list[j].code) +
+          html += '<div class="dc-status-item"><span class="dc-mono">' + esc(list[j].code) + '</span>, ' + esc(list[j].label || list[j].code) +
             '<p class="muted">' + esc(list[j].explanation || '') + '</p></div>';
         }
         html += '</div>';
       }
-      html += '<p class="muted">Standard registrar locks (such as clientTransferProhibited) are normal anti-hijacking settings — they are grouped under “Normal” and are not problems.</p>';
+      html += '<p class="muted">Standard registrar locks (such as clientTransferProhibited) are normal anti-hijacking settings, they are grouped under “Normal” and are not problems.</p>';
     } else {
       html += '<p class="muted">No status codes were returned by the registry.</p>';
     }
@@ -412,7 +403,7 @@
     html += statRow('Origin hosting', h.originHosting === 'identified' ? esc(h.provider || '') : (h.originHosting === 'not-determinable' ? NA('Not publicly determinable') : NA()));
     html += '</div>';
     if (cdn.status === 'detected') {
-      html += '<div class="calc-note">' + icon('layers') + '<span>The domain is served through the <b>' + esc(cdn.provider) + '</b> CDN/proxy. That network is the edge — it is NOT claimed as the origin host. ' +
+      html += '<div class="calc-note">' + icon('layers') + '<span>The domain is served through the <b>' + esc(cdn.provider) + '</b> CDN/proxy. That network is the edge, it is NOT claimed as the origin host. ' +
         (h.originHosting === 'identified' ? 'The origin appears to be hosted at ' + esc(h.provider) + '.' : 'The origin host is not publicly determinable.') + '</span></div>';
       if (cdn.evidence && cdn.evidence.length) {
         html += '<details class="audit-fold"><summary><span>CDN evidence</span><b>' + cdn.evidence.length + ' signals</b></summary><div style="padding:4px 14px 12px">';
@@ -441,13 +432,13 @@
         '<td><span class="dc-mono">' + (ip.network ? esc(ip.network) : NA()) + '</span></td>' +
         '<td>' + (ip.country ? esc(ip.country) : NA()) + '</td>' +
         '<td><span class="dc-mono">' + (ptr && ptr.length ? esc(ptr[0]) : NA()) + '</span></td>' +
-        '<td>' + (ip.confidence ? esc(ip.confidence) + '%' : '—') + '</td></tr>';
+        '<td>' + (ip.confidence ? esc(ip.confidence) + '%' : ',') + '</td></tr>';
       if (ip.conflicts && ip.conflicts.length) {
         html += '<tr><td colspan="8" class="dc-conflict">Conflicting data: ' + esc(ip.conflicts.map(function (c) { return c.subject + ' → ' + c.values.map(function (v) { return v.value + ' (' + v.source + ')'; }).join(' vs '); }).join('; ')) + '</td></tr>';
       }
     }
     html += '</tbody></table></div>';
-    html += '<p class="muted">Country-level network data only. No precise geolocation is claimed — a server can be managed from anywhere.</p>';
+    html += '<p class="muted">Country-level network data only. No precise geolocation is claimed, a server can be managed from anywhere.</p>';
     return section('IP Information', 'router', html, 'dc-ip');
   }
 
@@ -492,7 +483,7 @@
           var row = rows[j];
           var v = row.value;
           if (t === 'MX' && row.priority != null) v = 'Priority ' + row.priority + ' → ' + v;
-          html += '<tr><td><span class="dc-mono dc-wrap">' + esc(v) + '</span></td><td>' + esc(row.ttl != null ? row.ttl + 's' : '—') + '</td><td>' + copyBtn(row.value, t + ' record') + '</td></tr>';
+          html += '<tr><td><span class="dc-mono dc-wrap">' + esc(v) + '</span></td><td>' + esc(row.ttl != null ? row.ttl + 's' : ',') + '</td><td>' + copyBtn(row.value, t + ' record') + '</td></tr>';
         }
         html += '</tbody></table></div>';
       }
@@ -541,18 +532,18 @@
     }
     if (e.spf) {
       html += kv('SPF record', '<span class="dc-mono dc-wrap">' + esc(e.spf.raw) + '</span>');
-      if (e.spf.all) html += kv('SPF default', e.spf.hardFail ? 'Hard fail (-all) — spoofed mail from this domain is rejected by receivers that check SPF' : e.spf.softFail ? 'Soft fail (~all)' : e.spf.neutral ? 'Neutral (?all)' : 'Permissive (+all)');
+      if (e.spf.all) html += kv('SPF default', e.spf.hardFail ? 'Hard fail (-all), spoofed mail from this domain is rejected by receivers that check SPF' : e.spf.softFail ? 'Soft fail (~all)' : e.spf.neutral ? 'Neutral (?all)' : 'Permissive (+all)');
     }
     html += '<details class="audit-fold" open><summary><span>MX records</span><b>' + e.mx.length + '</b></summary><div style="padding:4px 14px 12px">';
     if (e.nullMx) {
       html += '<div class="calc-note">' + icon('info') + '<span>Null MX record (RFC 7505): this domain explicitly accepts no email.</span></div>';
     } else if (!e.mx.length) {
-      html += '<p class="muted">No MX records — the domain does not receive email via DNS-advertised mail servers (normal for many websites).</p>';
+      html += '<p class="muted">No MX records, the domain does not receive email via DNS-advertised mail servers (normal for many websites).</p>';
     } else {
       html += '<div class="table-scroll"><table class="mini-table"><thead><tr><th>Priority</th><th>Mail server</th><th>IPs</th><th>Provider</th></tr></thead><tbody>';
       for (var i = 0; i < e.mx.length; i++) {
         var m = e.mx[i];
-        html += '<tr><td>' + esc(m.priority) + '</td><td><span class="dc-mono">' + esc(m.host) + '</span></td><td><span class="dc-mono">' + (m.ips && (m.ips.a.length || m.ips.aaaa.length) ? m.ips.a.concat(m.ips.aaaa).slice(0, 4).join(', ') : NA()) + '</span></td><td>' + (m.provider ? esc(m.provider) : '—') + '</td></tr>';
+        html += '<tr><td>' + esc(m.priority) + '</td><td><span class="dc-mono">' + esc(m.host) + '</span></td><td><span class="dc-mono">' + (m.ips && (m.ips.a.length || m.ips.aaaa.length) ? m.ips.a.concat(m.ips.aaaa).slice(0, 4).join(', ') : NA()) + '</span></td><td>' + (m.provider ? esc(m.provider) : ',') + '</td></tr>';
       }
       html += '</tbody></table></div>';
     }
@@ -569,7 +560,7 @@
     if (e.notes && e.notes.length) {
       html += '<div class="dc-notes">' + e.notes.map(function (n) { return '<div class="calc-note">' + icon('info') + '<span>' + esc(n) + '</span></div>'; }).join('') + '</div>';
     }
-    html += '<p class="muted">SPF/DMARC presence does not mean email is “fully protected” — deliverability and filtering depend on the receiving side too.</p>';
+    html += '<p class="muted">SPF/DMARC presence does not mean email is “fully protected”, deliverability and filtering depend on the receiving side too.</p>';
     return section('Email Infrastructure', 'mail', html, 'dc-email');
   }
 
@@ -589,7 +580,7 @@
       html += '<details class="audit-fold"><summary><span>DNSKEY records</span><b>' + d.dnskeys.length + '</b></summary><pre class="dc-raw">' + esc(d.dnskeys.map(function (x) { return x.keyType + ' alg=' + x.algorithm + ' ' + x.publicKey; }).join('\n')) + '</pre></details>';
     }
     if (d.note) html += '<p class="muted">' + esc(d.note) + '</p>';
-    html += '<p class="muted">The absence of DNSSEC is not a vulnerability — most domains do not sign their zones.</p>';
+    html += '<p class="muted">The absence of DNSSEC is not a vulnerability, most domains do not sign their zones.</p>';
     return section('DNSSEC', 'verified_user', html, 'dc-dnssec');
   }
 
@@ -733,14 +724,14 @@
       statRow('TLD', '.' + esc(t.suffix || '')) +
       statRow('Type', t.type === 'ccTLD' ? 'Country-code TLD' : t.type === 'gTLD' ? 'Generic TLD' : esc(t.type || 'Unknown')) +
       statRow('Registry', t.registry ? esc(t.registry) : NA()) +
-      statRow('Country', t.country ? esc(t.country) : '—') +
+      statRow('Country', t.country ? esc(t.country) : ',') +
       '</div>';
     html += kv('IDN support', t.idn == null ? NA() : t.idn ? 'Yes' : 'No');
     html += kv('Registry RDAP endpoint', t.rdapEndpoint ? '<span class="dc-mono">' + esc(t.rdapEndpoint) + '</span>' : NA());
     html += kv('WHOIS server', t.whoisServer ? esc(t.whoisServer) : NA());
     if (t.note) html += '<p class="muted">' + esc(t.note) + '</p>';
     if (!r.domain.tldKnown) {
-      html += '<div class="calc-note">' + icon('info') + '<span>This suffix is outside the local public-suffix snapshot — the registrable-domain split may be approximate.</span></div>';
+      html += '<div class="calc-note">' + icon('info') + '<span>This suffix is outside the local public-suffix snapshot, the registrable-domain split may be approximate.</span></div>';
     }
     return section('TLD Information', 'public', html, 'dc-tld');
   }
@@ -750,18 +741,18 @@
     var st = d.structure || {};
     var html = '<div class="ad-summary-grid">' +
       statRow('Protocol', esc(st.protocol || 'https') + (st.protocolAssumed ? ' <span class="conf">assumed</span>' : '')) +
-      statRow('Subdomain', st.subdomain ? esc(st.subdomain) : '—') +
+      statRow('Subdomain', st.subdomain ? esc(st.subdomain) : ',') +
       statRow('Root domain', esc(st.rootDomain || '')) +
       statRow('TLD', '.' + esc(st.tld || '')) +
       '</div>';
-    html += kv('Port', st.port ? esc(st.port) : '—');
-    html += kv('Path', st.path ? '<span class="dc-mono dc-wrap">' + esc(st.path) + '</span>' : '—');
+    html += kv('Port', st.port ? esc(st.port) : ',');
+    html += kv('Path', st.path ? '<span class="dc-mono dc-wrap">' + esc(st.path) + '</span>' : ',');
     html += '<details class="audit-fold"><summary><span>IDN / Punycode</span><b>' + (d.isIdn ? 'IDN domain' : 'ASCII domain') + '</b></summary><div style="padding:4px 14px 12px">';
     if (d.isIdn) {
       html += kv('Unicode domain', esc(d.unicode || ''));
       html += kv('ASCII / Punycode domain', '<span class="dc-mono">' + esc(d.ascii) + '</span>' + copyBtn(d.ascii, 'Punycode domain'));
     } else {
-      html += '<p class="muted">This domain is plain ASCII — no internationalized (IDN) characters.</p>';
+      html += '<p class="muted">This domain is plain ASCII, no internationalized (IDN) characters.</p>';
     }
     html += '</div></details>';
     return section('Domain Structure', 'data_object', html, 'dc-structure');
@@ -783,7 +774,7 @@
     if (r.unverified && r.unverified.length) {
       html += '<h4 style="margin:14px 0 6px">Not publicly available / unable to verify</h4>';
       for (var k = 0; k < r.unverified.length; k++) {
-        html += '<div class="dc-unverified"><b>' + esc(r.unverified[k].subject) + '</b> — <span class="muted">' + esc(r.unverified[k].reason) + '</span></div>';
+        html += '<div class="dc-unverified"><b>' + esc(r.unverified[k].subject) + '</b>, <span class="muted">' + esc(r.unverified[k].reason) + '</span></div>';
       }
     }
     return section('Data Sources & Transparency', 'fact_check', html, 'dc-sources');
@@ -813,7 +804,7 @@
 
   function reportText(r) {
     var L = [];
-    L.push('Domain Information Report — ' + r.domain.ascii);
+    L.push('Domain Information Report, ' + r.domain.ascii);
     L.push('Generated: ' + r.generatedAt);
     L.push('');
     L.push('== Domain Overview ==');
@@ -936,7 +927,7 @@
         current.relayPromise = collectBrowserBundle(r.domain.ascii, function (msg) { if (st) st.textContent = msg; })
           .then(function (bundle) {
             if (!bundle || !bundle.https) {
-              if (st) st.textContent = 'The site does not allow cross-origin reads from the browser either — the HTTP section stays unavailable.';
+              if (st) st.textContent = 'The site does not allow cross-origin reads from the browser either, the HTTP section stays unavailable.';
               return;
             }
             if (st) st.textContent = 'Analyzing the browser-collected response…';

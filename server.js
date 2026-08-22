@@ -1,6 +1,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 const ezoicApi = require('./lib/ezoic/api');
 const mediavineApi = require('./lib/mediavine/api');
 const raptiveApi = require('./lib/raptive/api');
@@ -13,45 +14,37 @@ const botblockerApi = require('./lib/botblocker/api');
 const cwvApi = require('./lib/cwv/api');
 const rssApi = require('./lib/rss/api');
 
-const criticalCss = fs.readFileSync('assets/css/style.css', 'utf8');
+const criticalCss = fs.readFileSync(path.join(__dirname, 'assets/css/style.css'), 'utf8');
 const esc = s => String(s ?? '').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
 const icon = name => `<span class="material-icons" aria-hidden="true">${esc(name)}</span>`;
+const FAVICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231976d2'/%3E%3Ccircle cx='27' cy='27' r='13' fill='none' stroke='white' stroke-width='6'/%3E%3Cpath d='M37 37L51 51' stroke='white' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E";
+
+/* Central registry of tools: powers the Other Tools menu, related links,
+   the footer and the XML sitemap from one source of truth. */
+const TOOLS = {
+  seo:        { name:'SEO Audit', icon:'travel_explore', path:'/', short:'Technical, content and performance audit' },
+  adsense:    { name:'AdSense Eligibility Checker', icon:'monetization_on', path:'/adsense-eligibility-checker', short:'Website readiness for AdSense' },
+  ezoic:      { name:'Ezoic Eligibility Checker', icon:'insights', path:'/ezoic-eligibility-checker', short:'Website readiness for Ezoic' },
+  mediavine:  { name:'Mediavine Eligibility Checker', icon:'trending_up', path:'/mediavine-eligibility-checker', short:'Website readiness for Mediavine' },
+  raptive:    { name:'Raptive Eligibility Checker', icon:'campaign', path:'/raptive-eligibility-checker', short:'Website readiness for Raptive' },
+  wptheme:    { name:'WordPress Theme Detector', icon:'palette', path:'/wordpress-theme-detector', short:'Detect the active WP theme' },
+  domaincheck:{ name:'Domain Information Checker', icon:'dns', path:'/domain-information-checker', short:'DNS, WHOIS, SSL and hosting intelligence' },
+  sitemap:    { name:'XML Sitemap Generator', icon:'account_tree', path:'/xml-sitemap-generator', short:'Crawl, validate and export XML sitemaps' },
+  brokenlink: { name:'Broken Link Checker', icon:'link_off', path:'/broken-link-checker', short:'Find and classify broken links accurately' },
+  llmstxt:    { name:'LLMs.txt Generator', icon:'auto_stories', path:'/llms-txt-generator', short:'Generate and validate an llms.txt file' },
+  botblocker: { name:'AI Crawler &amp; LLM Bot Blocker', icon:'security', path:'/ai-crawler-blocker', short:'Control AI bots via robots.txt and server rules' },
+  cwv:        { name:'Core Web Vitals &amp; INP Auditor', icon:'speed', path:'/core-web-vitals-auditor', short:'Real LCP, INP, CLS, FCP and TTFB measurement' },
+  rss:        { name:'RSS Feed Generator', icon:'rss_feed', path:'/rss-feed-generator', short:'Discover content and generate valid RSS' }
+};
 
 function otherToolsMenu(active) {
   return `<details class="tools-menu"><summary>${icon('build')}<span>Other Tools</span>${icon('arrow_drop_down')}</summary>
-    <div class="tools-menu-panel" role="menu">
-      <a href="/" role="menuitem" class="${active==='seo'?'is-active':''}">${icon('travel_explore')}<span><b>SEO Audit</b><small>Technical, content &amp; performance audit</small></span></a>
-      <a href="/adsense-eligibility-checker" role="menuitem" class="${active==='adsense'?'is-active':''}">${icon('monetization_on')}<span><b>AdSense Eligibility Checker</b><small>Website readiness for AdSense</small></span></a>
-      <a href="/ezoic-eligibility-checker" role="menuitem" class="${active==='ezoic'?'is-active':''}">${icon('insights')}<span><b>Ezoic Eligibility Checker</b><small>Website readiness for Ezoic</small></span></a>
-      <a href="/mediavine-eligibility-checker" role="menuitem" class="${active==='mediavine'?'is-active':''}">${icon('trending_up')}<span><b>Mediavine Eligibility Checker</b><small>Website readiness for Mediavine</small></span></a>
-      <a href="/raptive-eligibility-checker" role="menuitem" class="${active==='raptive'?'is-active':''}">${icon('campaign')}<span><b>Raptive Eligibility Checker</b><small>Website readiness for Raptive</small></span></a>
-      <a href="/wordpress-theme-detector" role="menuitem" class="${active==='wptheme'?'is-active':''}">${icon('palette')}<span><b>WordPress Theme Detector</b><small>Detect the active WP theme</small></span></a>
-      <a href="/domain-information-checker" role="menuitem" class="${active==='domaincheck'?'is-active':''}">${icon('dns')}<span><b>Domain Information Checker</b><small>DNS, WHOIS, SSL &amp; hosting intelligence</small></span></a>
-      <a href="/xml-sitemap-generator" role="menuitem" class="${active==='sitemap'?'is-active':''}">${icon('account_tree')}<span><b>XML Sitemap Generator</b><small>Crawl, validate &amp; export XML sitemaps</small></span></a>
-      <a href="/broken-link-checker" role="menuitem" class="${active==='brokenlink'?'is-active':''}">${icon('link_off')}<span><b>Broken Link Checker</b><small>Find &amp; classify broken links accurately</small></span></a>
-      <a href="/llms-txt-generator" role="menuitem" class="${active==='llmstxt'?'is-active':''}">${icon('auto_stories')}<span><b>LLMs.txt Generator</b><small>Generate &amp; validate an llms.txt file</small></span></a>
-      <a href="/ai-crawler-blocker" role="menuitem" class="${active==='botblocker'?'is-active':''}">${icon('security')}<span><b>AI Crawler &amp; LLM Bot Blocker</b><small>Control AI bots via robots.txt + server rules</small></span></a>
-      <a href="/core-web-vitals-auditor" role="menuitem" class="${active==='cwv'?'is-active':''}">${icon('speed')}<span><b>Core Web Vitals &amp; INP Auditor</b><small>Real LCP / INP / CLS / FCP / TTFB measurement</small></span></a>
-      <a href="/rss-feed-generator" role="menuitem" class="${active==='rss'?'is-active':''}">${icon('rss_feed')}<span><b>RSS Feed Generator</b><small>Discover content, extract metadata &amp; generate valid RSS</small></span></a>
+    <div class="tools-menu-panel" role="menu">${Object.entries(TOOLS).map(([key, t]) =>
+      `<a href="${t.path}" role="menuitem" class="${active===key?'is-active':''}">${icon(t.icon)}<span><b>${t.name}</b><small>${t.short}</small></span></a>`).join('')}
     </div></details>`;
 }
 
 function relatedTools(active) {
-  const T = {
-    seo:       ['travel_explore','SEO Audit','/'],
-    adsense:   ['monetization_on','AdSense Eligibility Checker','/adsense-eligibility-checker'],
-    ezoic:     ['insights','Ezoic Eligibility Checker','/ezoic-eligibility-checker'],
-    mediavine: ['trending_up','Mediavine Eligibility Checker','/mediavine-eligibility-checker'],
-    raptive:   ['campaign','Raptive Eligibility Checker','/raptive-eligibility-checker'],
-    wptheme:   ['palette','WordPress Theme Detector','/wordpress-theme-detector'],
-    domaincheck:['dns','Domain Information Checker','/domain-information-checker'],
-    sitemap:   ['account_tree','XML Sitemap Generator','/xml-sitemap-generator'],
-    brokenlink:['link_off','Broken Link Checker','/broken-link-checker'],
-    llmstxt:   ['auto_stories','LLMs.txt Generator','/llms-txt-generator'],
-    botblocker:['security','AI Crawler & LLM Bot Blocker','/ai-crawler-blocker'],
-    cwv:       ['speed','Core Web Vitals & INP Auditor','/core-web-vitals-auditor'],
-    rss:       ['rss_feed','RSS Feed Generator','/rss-feed-generator']
-  };
   const rel = {
     seo: ['cwv','brokenlink','sitemap','botblocker'],
     adsense: ['ezoic','mediavine','raptive','seo'],
@@ -69,431 +62,689 @@ function relatedTools(active) {
   };
   const list = rel[active];
   if (!list) return '';
-  return `<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('hub')}<h4 style="margin:0;">Related tools</h4></div><div class="alltools-grid">${list.map(k => { const t = T[k]; return `<a class="alltools-item" href="${t[2]}"><span class="material-icons" aria-hidden="true">${t[0]}</span>${t[1]}</a>`; }).join('')}</div></div>`;
+  return `<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('hub')}<h4 style="margin:0;">Related tools</h4></div><div class="alltools-grid">${list.map(k => { const t = TOOLS[k]; return `<a class="alltools-item" href="${t.path}"><span class="material-icons" aria-hidden="true">${t.icon}</span>${t.name}</a>`; }).join('')}</div></div>`;
 }
+
+/* ---------- content helpers ---------- */
+const chip = (ic, label) => `<span>${icon(ic)}${label}</span>`;
+const chips = list => `<div class="audit-trust">${list.map(([ic, l]) => chip(ic, l)).join('')}</div>`;
+const lede = text => `<p class="section-lede">${text}</p>`;
+const guideGrid = items => `<div class="guide-grid">${items.map(([ic, title, html]) =>
+  `<div class="guide-item"><h5>${icon(ic)}${title}</h5>${html}</div>`).join('')}</div>`;
+const cards = (heading, headingIcon, cells) =>
+  `<div class="container section"><div class="section-heading-row">${icon(headingIcon)}<h4 style="margin:0;">${heading}</h4></div>` +
+  `<div class="grid feature-grid">${cells.map(([ic, title, text]) =>
+    `<div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon(ic)}${title}</h6><p>${text}</p></div></div></div>`).join('')}</div></div>`;
+const faqSection = (items, heading = 'Common Questions', ic = 'quiz') =>
+  `<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon(ic)}<h4 style="margin:0;">${heading}</h4></div>` +
+  `<div class="faq-accordion">${items.map(([q, a]) => `<details><summary><b>${q}</b></summary><p>${a}</p></details>`).join('')}</div></div>`;
+const faqLd = items => ({ '@context':'https://schema.org', '@type':'FAQPage', mainEntity: items.map(([q, a]) =>
+  ({ '@type':'Question', name:q, acceptedAnswer:{ '@type':'Answer', text:String(a).replace(/<[^>]+>/g, '') } })) });
+
+const searchForm = (id, { inputId, placeholder = 'https://yourwebsite.com', button = 'Audit', extra = '', icon: ic = 'link' }) =>
+  `<form id="${id}" class="search-field audit-search" role="search"><span class="material-icons" aria-hidden="true">${ic}</span>` +
+  `<input id="${inputId}" name="url" type="url" placeholder="${placeholder}" required aria-label="Website URL">${extra}` +
+  `<button class="btn" type="submit">${button}</button></form>`;
+
+const crawlSelect = (id, label, opts, sel) =>
+  `<select id="${id}" class="crawl-select" aria-label="${label}">${opts.map(v => `<option value="${v}"${v==sel?' selected':''}>${v} page${v==='1'?'':'s'}</option>`).join('')}</select>`;
+
+const section = (cls, inner) => `<div class="container section">${inner}</div>`;
 
 function layout(title, body, opts) {
   opts = opts || {};
   const active = opts.active || '';
-  const scripts = opts.scripts || ['/assets/js/common.js','/assets/js/audit.js'];
-  const meta = opts.meta || '';
+  const scripts = opts.scripts || ['/assets/js/progress.js','/assets/js/common.js','/assets/js/audit.js'];
+  const desc = opts.description || 'Free website tools that run in your browser with no account: SEO audit, ad network readiness checks, sitemap and RSS generators, domain intelligence and more.';
+  const meta = (opts.meta || '') +
+    `<meta name="description" content="${esc(desc)}"><meta name="robots" content="index,follow">` +
+    `<meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}"><meta property="og:type" content="website"><meta name="twitter:card" content="summary">`;
   const jsonLd = opts.jsonLd ? `<script type="application/ld+json">${JSON.stringify(opts.jsonLd)}</script>` : '';
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="color-scheme" content="light dark">${meta}<title>${esc(title)}</title><link rel="canonical" href="${opts.canonical||'https://huvanti.com/'}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><script>try{if(localStorage.getItem('theme-mode')==='dark')document.documentElement.classList.add('dark')}catch(e){}</script><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Icons&display=swap" rel="stylesheet"><style>${criticalCss}</style>${jsonLd}</head><body><a class="skip-link" href="#main">Skip to content</a><div class="app"><header class="appbar"><div class="toolbar"><a class="brand" href="/">${icon('construction')}<span class="brand-name">Huvanti</span></a><nav class="desktop-nav" aria-label="Primary"><a href="/">${icon('home')}<span>Home</span></a>${otherToolsMenu(active)}<a href="/about">${icon('info')}<span>About</span></a><a href="/contact">${icon('mail')}<span>Contact</span></a></nav><button type="button" class="icon-button theme-toggle" aria-label="Switch to dark mode" id="theme-toggle"><span class="material-icons">dark_mode</span></button></div></header><main id="main">${body}${relatedTools(active)}</main><footer class="footer"><div class="container footer-grid"><div><div class="footer-brand">Huvanti</div><p class="footer-tagline">Free, no-account website tools.</p></div><div><div class="footer-heading">Tools</div><div class="footer-links"><a href="/">SEO Audit</a><a href="/adsense-eligibility-checker">AdSense Eligibility Checker</a><a href="/ezoic-eligibility-checker">Ezoic Eligibility Checker</a><a href="/mediavine-eligibility-checker">Mediavine Eligibility Checker</a><a href="/raptive-eligibility-checker">Raptive Eligibility Checker</a><a href="/wordpress-theme-detector">WordPress Theme Detector</a><a href="/domain-information-checker">Domain Information Checker</a><a href="/xml-sitemap-generator">XML Sitemap Generator</a><a href="/broken-link-checker">Broken Link Checker</a><a href="/llms-txt-generator">LLMs.txt Generator</a><a href="/ai-crawler-blocker">AI Crawler &amp; LLM Bot Blocker</a><a href="/core-web-vitals-auditor">Core Web Vitals &amp; INP Auditor</a><a href="/rss-feed-generator">RSS Feed Generator</a></div></div><div><div class="footer-heading">Pages</div><div class="footer-links"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div></div></div><div class="container footer-copyright">&copy; 2026 Huvanti. All rights reserved. Not affiliated with Google, Ezoic or Mediavine.</div></footer></div>${scripts.map(s=>`<script src="${s}"></script>`).join('')}</body></html>`;
+  const toolLd = { '@context':'https://schema.org', '@type':'WebSite', name:'Huvanti', url:'https://huvanti.com/' };
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="color-scheme" content="light dark"><meta name="theme-color" content="#1976d2" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">${meta}<title>${esc(title)}</title><link rel="canonical" href="${opts.canonical||'https://huvanti.com/'}"><link rel="icon" href="${FAVICON}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><script>try{var t=localStorage.getItem('theme-mode');if(t==='dark'||(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Icons&display=swap" rel="stylesheet"><style>${criticalCss}</style>${jsonLd}<script type="application/ld+json">${JSON.stringify(toolLd)}</script></head><body><a class="skip-link" href="#main">Skip to content</a><div class="app"><header class="appbar"><div class="toolbar"><a class="brand" href="/">${icon('query_stats')}<span class="brand-name">Huvanti</span></a><nav class="desktop-nav" aria-label="Primary"><a href="/">${icon('home')}<span>Home</span></a>${otherToolsMenu(active)}<a href="/about">${icon('info')}<span>About</span></a><a href="/contact">${icon('mail')}<span>Contact</span></a></nav><button type="button" class="icon-button theme-toggle" aria-label="Switch to dark mode" id="theme-toggle"><span class="material-icons">dark_mode</span></button></div></header><main id="main">${body}${relatedTools(active)}</main><footer class="footer"><div class="container footer-grid"><div><div class="footer-brand">Huvanti</div><p class="footer-about">Free browser based tools for website owners: SEO auditing, ad network readiness, sitemaps, feeds, domain intelligence and bot control. No account, nothing to install.</p></div><div><div class="footer-heading">Tools</div><div class="footer-links">${Object.values(TOOLS).map(t => `<a href="${t.path}">${t.name}</a>`).join('')}</div></div><div><div class="footer-heading">Pages</div><div class="footer-links"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div></div></div><div class="footer-bottom"><div class="container footer-copyright" style="margin:0;padding:0;text-align:left">&copy; 2026 Huvanti</div><p class="footer-note">Huvanti is an independent project. It is not affiliated with Google, AdSense, Ezoic, Mediavine or Raptive, and approval decisions always belong to those platforms.</p></div></footer></div>${scripts.map(s=>`<script src="${s}" defer></script>`).join('')}</body></html>`;
 }
 
+/* gzip aware response helper with sensible caching */
+function send(req, res, status, type, body, cache) {
+  res.statusCode = status;
+  res.setHeader('content-type', type);
+  res.setHeader('vary', 'accept-encoding');
+  if (cache) res.setHeader('cache-control', cache); else res.setHeader('cache-control', 'no-store');
+  const buf = Buffer.isBuffer(body) ? body : Buffer.from(body);
+  if (buf.length > 900 && /\bgzip\b/i.test(String(req.headers['accept-encoding'] || ''))) {
+    zlib.gzip(buf, (e, z) => {
+      if (e) { res.end(buf); return; }
+      res.setHeader('content-encoding', 'gzip');
+      res.setHeader('content-length', z.length);
+      res.end(z);
+    });
+  } else {
+    res.setHeader('content-length', buf.length);
+    res.end(buf);
+  }
+}
+/* ============================== HOME: SEO AUDIT ============================== */
 function home() {
-  return layout('Free SEO Audit Tool | Huvanti',
-    `<section class="hero audit-home"><span class="material-icons hero-icon" aria-hidden="true">travel_explore</span><h1>SEO Audit</h1><p class="hero-subtitle">Technical SEO audit for any public website</p><form id="audit-form" class="search-field audit-search" role="search" aria-label="SEO audit"><span class="material-icons" aria-hidden="true">link</span><input id="audit-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL"><select id="crawl-limit" class="crawl-select" aria-label="Crawl limit"><option value="1">1 page</option><option value="6" selected>6 pages</option><option value="15">15 pages</option><option value="30">30 pages</option><option value="50">50 pages</option></select><button class="btn" type="submit">Audit</button></form><div class="audit-trust"><span>${icon('person_off')}No account</span><span>${icon('settings_input_component')}Technical</span><span>${icon('description')}On-page</span><span>${icon('article')}Content</span><span>${icon('speed')}Performance</span><span>${icon('phone_iphone')}Mobile</span><span>${icon('security')}Security</span><span>${icon('smart_toy')}AI Search</span></div></section><div id="audit-results" class="audit-results"></div><div class="container section"><div class="section-heading-row">${icon('verified')}<h4 style="margin:0;">What this audit checks — 250+ signals across 12 categories</h4></div><div class="grid feature-grid"><div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('settings_input_component')} Technical SEO</h6><p>HTTPS, SSL, HTTP→HTTPS &amp; WWW redirects, status codes (200/3xx/4xx/5xx), redirect chains, robots.txt, XML sitemap, canonical, noindex/nofollow, X-Robots, URL length &amp; structure, trailing-slash consistency, duplicate URLs.</p></div></div></div><div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('description')} On-page SEO</h6><p>Title &amp; meta-description length and duplicates, H1/H2–H6 hierarchy, multiple/missing H1, keyword placement &amp; density, headings, text-to-HTML ratio, anchor text, broken links.</p></div></div></div><div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('article')} Content SEO</h6><p>Word count, thin/empty content, Flesch readability, content freshness, duplicate &amp; near-duplicate pages, keyword cannibalization, search intent, entities and semantic coverage.</p></div></div></div><div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('image')} Image SEO</h6><p>Missing/empty alt text, image count, WebP/AVIF detection, lazy loading, width/height (CLS), responsive srcset, broken &amp; oversized images.</p></div></div></div><div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('speed')} Performance</h6><p>Render-blocking JS/CSS, inline scripts, compression (gzip/Brotli), browser caching, CDN &amp; CMS detection, third-party scripts, fonts, oversized images, TTFB; direct links to PageSpeed for LCP/INP/CLS.</p></div></div></div><div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('phone_iphone')} Mobile SEO</h6><p>Viewport meta, responsive media queries, tap-target &amp; horizontal-overflow guidance.</p></div></div></div><div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('account_tree')} Schema</h6><p>JSON-LD, Microdata, RDFa detection, invalid JSON, detected @type (Organization, WebSite, Article, Product, FAQ, Breadcrumb…), with a Rich Results test link.</p></div></div></div><div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('hub')} Internal &amp; external links</h6><p>Internal/external counts, orphan &amp; isolated pages, zero/excessive links, click depth, empty anchors, broken internal/external links, nofollow/sponsored/UGC, anchor distribution, internal-authority proxy.</p></div></div></div><div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('translate')} International &amp; Security</h6><p>Hreflang detection &amp; validation, HTML lang, canonical/hreflang conflicts; mixed content, HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy.</p></div></div></div><div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('smart_toy')} AI Search</h6><p>GPTBot, ClaudeBot, PerplexityBot, Google-Extended blocking, AI-readable content, entity identification and entity/schema consistency.</p></div></div></div><div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('account_tree')} Architecture</h6><p>Visual crawled-URL table, crawl &amp; click depth, flat/deep structure, deep pages, isolated pages, URL discovery.</p></div></div></div><div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('grading')} Score, reports &amp; sharing</h6><p>Overall + 12 category scores, critical/warning/passed/info filters, why-it-matters &amp; how-to-fix guidance, priority fixes, CSV, PDF/Print, copy summary, shareable link, no-account history comparison.</p></div></div></div></div></div><div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('forum')}<h4 style="margin:0;">Common Questions</h4></div><div class="faq-accordion"><details><summary>Does this require an account?</summary><p>No account and no sign-up. Paste a URL, choose how many pages to crawl, and run the audit. Recent audits are stored only in your own browser for the compare feature.</p></details><details><summary>How does the crawl work?</summary><p>It starts from the URL you enter, reads robots.txt and sitemaps, then follows internal links up to the page limit you choose. A live progress indicator shows the page being crawled and you can cancel at any time.</p></details><details><summary>Can it crawl password-protected or blocked sites?</summary><p>No — only publicly reachable pages. Sites that block public readers or require authentication cannot be audited.</p></details><details><summary>Are LCP, INP and CLS scored?</summary><p>Core Web Vitals need a real browser lab/field run. The audit checks the performance signals it can measure (compression, caching, render-blocking resources, image sizing, TTFB when available) and links directly to PageSpeed Insights for LCP, INP, CLS, FCP and TBT instead of faking scores.</p></details><details><summary>Can I export or share the report?</summary><p>Yes — download CSV, print/save as PDF, copy a text summary, or generate a shareable link that reproduces the full report. The compare feature shows score changes against your previous audits, all without an account.</p></details></div></div>`,
-    {active:'seo', canonical:'https://huvanti.com/',
-     jsonLd:{'@context':'https://schema.org','@type':'WebApplication',name:'Huvanti SEO Audit',applicationCategory:'SEOApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free no-account technical SEO audit with content, image, performance, mobile, schema, link and security checks.'}});
+  const faqs = [
+    ['What is an SEO audit?', 'An SEO audit reviews a website the way a search engine sees it. It checks technical fundamentals such as redirects, canonical tags and indexability, plus on page elements like titles and headings, content quality, images, linking and security headers. The goal is to find the specific issues that hold a site back and to put them in an order you can actually fix.'],
+    ['Is this SEO audit tool really free?', 'Yes. There is no account, no trial and no credit card. Paste a URL, run the audit and read the report. The tool supports itself with ads, the same model most free web tools use.'],
+    ['How does the audit crawl my site?', 'It starts from the URL you enter, reads robots.txt and any sitemaps it finds, then follows internal links page by page. Each page is parsed in your browser, so nothing is uploaded to a server you do not control. A live progress panel shows exactly which page is being read at any moment.'],
+    ['How many pages can the audit check at once?', 'You choose the crawl size when you start: 1 page for a quick single page review, up to 50 pages for a deeper look. Larger sites can be covered by running the audit on important sections, one subfolder at a time.'],
+    ['What is a good SEO audit score?', 'Scores of 90 and above mean the measured checks are clean. Between 75 and 89 the site is in good shape with room to improve. Below that, the priority list will usually contain a handful of fixes that move the needle quickly. Treat the score as a progress tracker for your own site rather than a comparison against others.'],
+    ['How often should I run an SEO audit?', 'Most site owners audit once a quarter, and after any big change such as a redesign, a migration or a new theme. The compare feature stores your recent audits in your own browser, so you can see whether scores move up or down between runs.'],
+    ['Why does the audit show fewer pages than my website has?', 'The crawl stops at the page limit you set, and it only follows links it can actually read. Pages hidden behind JavaScript menus, blocked by robots.txt or linked only from pages outside the crawl will not appear. This is also useful information: if an important page cannot be reached by a simple crawl, search engines may struggle with it too.'],
+    ['Does the audit work with WordPress, Shopify and other platforms?', 'Yes. The audit reads public HTML, so it works on any platform that serves normal web pages, including WordPress, Shopify, Wix, Squarespace, Webflow and static site generators. The report also identifies the detected platform so you can prioritise fixes that suit your stack.'],
+    ['Can I audit a website I do not own?', 'You can audit any publicly reachable page, which is the same information a browser shows any visitor. It is a common way to study what competitors do well. Respect each site terms where they apply.'],
+    ['Will fixing the reported issues improve my rankings?', 'Fixing errors removes obstacles, it does not guarantee positions. Technical fixes tend to help most when a site has real problems, such as noindex tags on key pages or duplicate content. Rankings still depend on content quality, competition and links.'],
+    ['Is the data I submit stored anywhere?', 'No. The audit runs in your browser. Recent audit summaries are kept in your own browser storage for the compare feature, and you can clear them at any time through your browser settings.'],
+    ['What is the difference between technical SEO and on page SEO?', 'Technical SEO covers how a site is built and served: HTTPS, redirects, canonical tags, sitemaps, response codes and page speed. On page SEO covers what is on each page: the title, the description, headings, text and internal links. Both matter, and the audit scores them separately so you can see where the work is.']
+  ];
+  const cardsList = [
+    ['settings_input_component','Technical SEO','HTTPS and redirects, response codes, canonical tags, noindex directives, robots.txt, sitemap references, URL structure and duplicate URLs.'],
+    ['description','On page SEO','Title and description length and uniqueness, one H1 per page, heading order and keyword placement in the places that carry weight.'],
+    ['article','Content quality','Word count, thin or empty pages, readability scoring, duplicate and near duplicate pages, and keyword cannibalisation between pages.'],
+    ['image','Images','Missing alt text, modern formats such as WebP and AVIF, lazy loading, width and height attributes, and oversized or broken images.'],
+    ['speed','Performance','Render blocking scripts, third party scripts, compression, caching headers, server response time and a direct link to PageSpeed Insights for lab metrics.'],
+    ['smartphone','Mobile','The viewport tag every mobile browser needs, responsive styling signals and guidance on tap targets and horizontal overflow.'],
+    ['account_tree','Structured data','JSON-LD detection and validation, recognised schema types and suggestions for the types a page could qualify for.'],
+    ['hub','Internal linking','Internal link counts, orphan pages found through the sitemap, click depth, empty anchors and links that point at redirects.'],
+    ['translate','International','Hreflang annotations, language codes and conflicts between canonical tags and alternate language versions.'],
+    ['security','Security headers','Mixed content plus HSTS, content security policy and the other headers that harden a site against common attacks.'],
+    ['smart_toy','AI search','Which AI crawlers such as GPTBot and ClaudeBot are allowed or blocked in robots.txt, and whether your content is easy for AI systems to parse.'],
+    ['grading','Score and reports','One overall score, twelve category scores, a priority fix list, CSV export, print to PDF, a shareable link and comparison with your earlier audits.']
+  ];
+  const howItWorks = [
+    ['travel_explore','It starts with a real crawl','Your site is read the way a search engine reads it: robots.txt first, then sitemaps, then internal links from page to page. Nothing is simulated and no guesses are made about pages the crawl cannot reach.'],
+    ['manage_search','Every page is analysed in detail','Each crawled page passes through more than two hundred checks covering technology, on page elements, content, images, linking, security and AI visibility. Anything that cannot be measured honestly is labelled as such instead of being invented.'],
+    ['grading','Scoring you can inspect','The overall score and the twelve category scores are weighted by how much each issue matters. Open any category to see every individual check, why it matters and how to fix it, so nothing in the score is hidden from you.'],
+    ['low_priority','A fix list in priority order','The report leads with the small number of changes that matter most, ordered by severity and impact. Work down that list and rerun the audit to confirm the score moves.']
+  ];
+  const fixFirst = [
+    ['error','Start with critical errors','A noindex tag on an important page, a blocked robots.txt or server errors will cost you far more than any fine tuning. The critical list at the top of the report is where the fastest wins usually are.'],
+    ['title','Then clean up titles and headings','Unique titles between 30 and 60 characters, one clear H1 and a logical heading order help both rankings and the way your listing reads in search results.'],
+    ['content_paste','Remove thin and duplicate content','Pages with little text, or several pages covering the same topic, split your authority. Merge them, expand them or set a clear canonical, then let the audit confirm the duplicates are gone.'],
+    ['image','Speed up images','Missing alt text, oversized files and unsized images appear in most first audits. They are quick to fix and they help accessibility, loading speed and layout stability at the same time.']
+  ];
+  const body = `<section class="hero audit-home"><span class="material-icons hero-icon" aria-hidden="true">travel_explore</span><h1>SEO Audit</h1><p class="hero-subtitle">A free technical SEO audit for any public website</p>
+<form id="audit-form" class="search-field audit-search" role="search" aria-label="SEO audit"><span class="material-icons" aria-hidden="true">link</span><input id="audit-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL">${crawlSelect('crawl-limit','Crawl limit',['1','6','15','30','50'],'6')}<button class="btn" type="submit">Audit</button></form>
+${chips([['person_off','No account'],['settings_input_component','Technical'],['description','On page'],['article','Content'],['image','Images'],['speed','Performance']])}</section>
+<div id="audit-results" class="audit-results"></div>
+${cards('What the audit checks', 'verified', cardsList)}
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('route')}<h4 style="margin:0;">How the audit works</h4></div>${lede('No two audits should feel the same, because no two sites are. Here is what actually happens between the moment you press Audit and the moment the report appears.')}${guideGrid(howItWorks)}</div>
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('checklist')}<h4 style="margin:0;">What to fix first</h4></div>${lede('A long report is only useful if you know where to start. This is the order experienced auditors usually work in, and it maps directly to the priority list in your report.')}${guideGrid(fixFirst)}
+<p class="prose-block">When the technical layer is clean, two of our other tools pick up where this audit stops. The <a href="/core-web-vitals-auditor">Core Web Vitals auditor</a> measures real loading and interaction speed in a browser, and the <a href="/broken-link-checker">broken link checker</a> verifies every internal and external link on a site, not just the sample this audit probes.</p></div>
+${faqSection(faqs)}`;
+  return layout('Free SEO Audit Tool | Huvanti', body, {
+    active:'seo', canonical:'https://huvanti.com/',
+    description:'Free SEO audit for any public website. Over two hundred checks across technical SEO, on page elements, content, images, links and security, with a prioritised fix list. No account.',
+    jsonLd:[{'@context':'https://schema.org','@type':'WebApplication',name:'Huvanti SEO Audit',applicationCategory:'SEOApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free technical SEO audit with content, image, performance, mobile, schema, link and security checks.'}, faqLd(faqs)]
+  });
 }
 
+/* ============================== ADSENSE ============================== */
 function adsensePage() {
-  const meta = `<meta name="description" content="Free AdSense Eligibility Checker. Enter a URL and get an evidence-based Website Readiness Score across content, trust, policy risk, UX, technical and performance signals — no account, no AI."><meta name="robots" content="index,follow">
-<meta property="og:title" content="AdSense Eligibility Checker — Huvanti"><meta property="og:description" content="Get an evidence-based AdSense readiness score from deterministic crawling and rule-based checks. No account required."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
-  const jsonLd = {'@context':'https://schema.org','@graph':[
-    {'@type':'WebSite',name:'Huvanti',url:'https://huvanti.com/'},
-    {'@type':'WebApplication',name:'AdSense Eligibility Checker',applicationCategory:'BusinessApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',featureList:'AdSense readiness score, content quality, trust pages, policy-risk scanner, technical SEO, UX, performance',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free, deterministic AdSense eligibility checker that scores publicly observable website signals.'}
-  ]};
-  const body = `<section class="hero audit-home adsense-home"><span class="material-icons hero-icon" aria-hidden="true">monetization_on</span><h1>AdSense Eligibility Checker</h1><p class="hero-subtitle">Get an evidence-based Website Readiness Score — no account, no AI.</p>
-<form id="adsense-form" class="search-field audit-search" role="search" aria-label="AdSense eligibility checker"><span class="material-icons" aria-hidden="true">link</span><input id="adsense-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL" value="https://example.com"><select id="adsense-limit" class="crawl-select" aria-label="Crawl limit"><option value="10">10 pages</option><option value="25">25 pages</option><option value="50" selected>50 pages</option><option value="100">100 pages</option><option value="250">250 pages</option></select><button class="btn" type="submit">Check Eligibility</button></form>
-<div class="audit-trust"><span>Content quality</span><span>Trust pages</span><span>Policy risk</span><span>UX</span><span>Technical</span><span>Performance</span></div></section>
+  const faqs = [
+    ['How do I know if my site is ready for AdSense?', 'Readiness comes down to a handful of things Google checks during review: enough original content, a clear purpose, the required policy pages, easy navigation and no policy risks. This checker crawls your site and scores exactly those areas, so you can fix problems before a reviewer ever sees the site.'],
+    ['How many pages or posts do I need for AdSense approval?', 'There is no official minimum. In practice most approvals happen once a site has around fifteen to thirty solid pages that would satisfy a real reader. Ten thin posts are a common rejection reason, while one genuinely useful article is worth more than ten filler pages.'],
+    ['How much traffic do I need for AdSense?', 'None. AdSense has no traffic requirement, which is why it is usually the first network new sites join. Traffic matters for earnings, not for approval.'],
+    ['How long does AdSense approval take?', 'Usually a few days, and in busy periods up to two weeks. Google reviews the whole site, not just the homepage, which is why every page needs to be in reasonable shape before you apply.'],
+    ['Why does AdSense reject sites for low value content?', 'Low value content is the most common rejection. It means the reviewer found pages with little original material: scraped or rewritten text, very short posts, pages that exist only to show ads, or topics with no clear purpose. The fix is to remove or rewrite weak pages rather than to add more of them.'],
+    ['Do I need a privacy policy page for AdSense?', 'Yes. AdSense requires a privacy policy that explains how cookies and advertising are used, and it must be easy to find from anywhere on the site. An about page and a contact method are equally expected, and this checker looks for all three.'],
+    ['Can a brand new site get AdSense approval?', 'Yes, though new domains face more scrutiny. Give the site a few weeks of real content first, make sure the basic pages exist, and expect that applying the day after launch rarely goes well.'],
+    ['What content is not allowed on AdSense?', 'Adult content, gambling without licence, illegal downloads, hacking material, misleading claims and violent or hateful content are the headline exclusions. The policy risk screen in this checker flags the common patterns, but Google policies are the final word.'],
+    ['Can I apply for AdSense with a free site or a subdomain?', 'It is possible on platforms that are AdSense partners, such as Blogspot, and you can use a subdomain of a domain you control. In both cases the same content rules apply, and a custom domain usually reviews more smoothly.'],
+    ['Does this checker connect to my AdSense account?', 'No. It never asks for a login and has no way to see your account. It reads only what is public on your site and scores that evidence.'],
+    ['Can I reapply to AdSense after a rejection?', 'Yes, and there is no fixed limit on retries. Fix the stated reason first, remove weak content, then reapply. Many successful publishers were rejected once or twice before approval.'],
+    ['Does Google allow AI written content on AdSense sites?', 'Google evaluates usefulness, not production method. Content that is thin, unedited or mass generated tends to fail review regardless of how it was written, while clearly useful material generally passes. Editing and adding genuine value matters more than the tool used to draft.']
+  ];
+  const cardsList = [
+    ['article','Content quality','Unique word counts after navigation and boilerplate are removed, thin or empty pages, readability and repeated phrases, judged with page type in mind.'],
+    ['verified_user','Trust and transparency','Whether About, Contact, Privacy and Terms pages exist, are linked and are substantive rather than empty shells.'],
+    ['gpp_maybe','Policy risk screening','Weighted checks for adult, gambling, piracy, malware and scam patterns, always shown with the matching context and never labelled as an official violation.'],
+    ['touch_app','User experience','Mobile viewport, responsive styling, navigation clarity, intrusive popups, autoplay media and detectable ad density.'],
+    ['build','Technical quality','HTTPS, response codes, redirects, canonical tags, robots rules, sitemap presence, titles, descriptions and broken images.'],
+    ['speed','Performance signals','Response time where it can be measured, page weight, render blocking scripts, compression, cache headers and third party requests.']
+  ];
+  const guides = [
+    ['edit_note','Build the content layer first','Approvals live and die on content. Aim for a body of work that answers real questions in your niche, written by someone who clearly knows the subject. Fifteen strong pages beat fifty rushed ones, and every page should survive the question: would a reader bookmark this?'],
+    ['badge','Publish the pages reviewers expect','About, Contact and Privacy pages are not optional extras. They tell both reviewers and readers that a real person stands behind the site. Link them in the footer so they are one click from anywhere, and keep the contact page functional rather than a form that goes nowhere.'],
+    ['format_paint','Make navigation boring and predictable','Reviewers land on random pages, not just the homepage. A clear menu, readable text without popup walls and a consistent layout across pages signal a cared for site. Save the creative layouts for after approval.'],
+    ['block','Remove anything that looks like a shortcut','Copied articles, AI text published without editing, pages stuffed with affiliate links and downloadable content you do not own are the fastest route to a low value rejection. Delete or rewrite them before applying, not after.'],
+    ['fact_check','Read the policies once, properly','Most rejections cite a policy the publisher never read. The AdSense program policies take twenty minutes and answer most questions about what is allowed, from ad placement to content restrictions.'],
+    ['loop','Treat the score as a pre flight check','Run the checker, fix what it finds, then apply. If the verdict still says Needs Improvement, the report shows which category is holding you back, so you know exactly what to work on before a human reviewer arrives.']
+  ];
+  const body = `<section class="hero audit-home adsense-home"><span class="material-icons hero-icon" aria-hidden="true">monetization_on</span><h1>AdSense Eligibility Checker</h1><p class="hero-subtitle">See how ready your site is before Google reviews it</p>
+<form id="adsense-form" class="search-field audit-search" role="search" aria-label="AdSense eligibility check"><span class="material-icons" aria-hidden="true">link</span><input id="adsense-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL">${crawlSelect('adsense-limit','Crawl limit',['10','25','50','100','250'],'50')}<button class="btn" type="submit">Check Eligibility</button></form>
+${chips([['article','Content quality'],['verified_user','Trust pages'],['gpp_maybe','Policy risk'],['touch_app','User experience'],['build','Technical'],['speed','Performance']])}</section>
 <div id="adsense-results" class="audit-results adsense-results"></div>
-<div class="container section">
-  <div class="section-heading-row">${icon('rule_folder')}<h4 style="margin:0;">What it measures</h4></div>
-  <div class="grid feature-grid">
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('article')} Content quality</h6><p>Unique word count after template removal, headings, repeated phrases, boilerplate, thin/empty pages and Flesch readability — with page-type awareness.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('verified_user')} Trust &amp; transparency</h6><p>Detects About, Contact, Privacy, Terms and Disclaimer pages by URL, title, H1 and nav links, with a confidence score and author/date checks.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('gpp_bad')} Policy risk</h6><p>Weighted screening for adult, gambling, piracy, malware, scam and similar signals, shown with matching context — never labelled an official violation.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('touch_app')} User experience</h6><p>Mobile viewport, responsive CSS, navigation, popups/overlays, autoplay media, broken links and detectable ad density.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('build_circle')} Technical quality</h6><p>HTTPS, status codes, redirects, canonical, robots meta, noindex, robots.txt, sitemap, title, description, H1 and broken images.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('speed')} Performance &amp; mobile</h6><p>Response time when available, page weight, render-blocking scripts, compression, cache headers and third-party requests.</p></div></div></div>
-  </div>
-</div>
-<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('forum')}<h4 style="margin:0;">Common Questions</h4></div><div class="faq-accordion"><details><summary>Does this guarantee AdSense approval?</summary><p>No. It produces a transparent readiness score from public signals so you can fix obvious issues; Google's review is final.</p></details><details><summary>Does it use AI or an LLM?</summary><p>No. Every check is deterministic — a crawler, DOM parser, text statistics, similarity and readability formulas, and a weighted rule engine. No API keys.</p></details><details><summary>Will short pages be flagged as thin content?</summary><p>No. Contact, Privacy, Terms and other utility pages are detected by type and not penalised for low word count.</p></details></div></div>`;
-  return layout('AdSense Eligibility Checker — Free Website Readiness Score | Huvanti', body, {
-    active:'adsense', canonical:'https://huvanti.com/adsense-eligibility-checker', meta, jsonLd,
-    scripts:['/assets/js/common.js','/assets/js/adsense/01-util.js','/assets/js/adsense/02-crawler.js','/assets/js/adsense/03-parser.js','/assets/js/adsense/04-rules.js','/assets/js/adsense/05-analyzers.js','/assets/js/adsense/09-siteanalysis.js','/assets/js/adsense/06-scoring.js','/assets/js/adsense/07-orchestrate.js','/assets/js/adsense/08-ui.js']
+${cards('What the checker measures', 'rule_folder', cardsList)}
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">How to get a site ready for AdSense</h4></div>${lede('Most AdSense rejections are avoidable. These are the steps publishers who get approved on the first or second attempt tend to follow.')}${guideGrid(guides)}
+<p class="prose-block">If AdSense feels like the wrong fit for your traffic level, the sister tools check the requirements of the larger networks: <a href="/ezoic-eligibility-checker">Ezoic</a>, <a href="/mediavine-eligibility-checker">Mediavine</a> and <a href="/raptive-eligibility-checker">Raptive</a>. A full <a href="/">SEO audit</a> is also a sensible base before any network application.</p></div>
+${faqSection(faqs, 'People Often Ask')}`;
+  return layout('AdSense Eligibility Checker | Free Website Readiness Score | Huvanti', body, {
+    active:'adsense', canonical:'https://huvanti.com/adsense-eligibility-checker',
+    description:'Free AdSense eligibility checker. Enter a URL and get a readiness score across content quality, trust pages, policy risk, user experience and technical health before you apply. No account.',
+    scripts:['/assets/js/progress.js','/assets/js/common.js','/assets/js/adsense/01-util.js','/assets/js/adsense/02-crawler.js','/assets/js/adsense/03-parser.js','/assets/js/adsense/04-rules.js','/assets/js/adsense/05-analyzers.js','/assets/js/adsense/09-siteanalysis.js','/assets/js/adsense/06-scoring.js','/assets/js/adsense/07-orchestrate.js','/assets/js/adsense/08-ui.js'],
+    jsonLd:[{'@context':'https://schema.org','@type':'WebApplication',name:'AdSense Eligibility Checker',applicationCategory:'BusinessApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free AdSense readiness checker that scores publicly observable website signals.'}, faqLd(faqs)]
   });
 }
 
+/* ============================== EZOIC ============================== */
 function ezoicPage() {
-  const meta = `<meta name="description" content="Free Ezoic Eligibility Checker. Enter a URL for an evidence-based Ezoic Readiness Score from a deep public crawl — no account, no AI. Not an official Ezoic score."><meta name="robots" content="index,follow">
-<meta property="og:title" content="Ezoic Eligibility Checker — Huvanti"><meta property="og:description" content="Deep, deterministic Ezoic website readiness check. No account required. Final eligibility belongs to Ezoic."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
-  const jsonLd = {'@context':'https://schema.org','@graph':[
-    {'@type':'WebSite',name:'Huvanti',url:'https://huvanti.com/'},
-    {'@type':'WebApplication',name:'Ezoic Eligibility Checker',applicationCategory:'BusinessApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',featureList:'Ezoic readiness score, official requirement checks, content quality, duplicate detection, trust pages, policy-risk scanner, technical SEO, UX, monetization signals',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free, deterministic Ezoic eligibility checker that scores publicly observable website signals. Not affiliated with Ezoic.'}
-  ]};
-  const body = `<section class="hero audit-home ezoic-home"><span class="material-icons hero-icon" aria-hidden="true">insights</span><h1>Ezoic Eligibility Checker</h1><p class="hero-subtitle">Evidence-based Ezoic website readiness — no account, no AI.</p>
-<form id="ezoic-form" class="search-field audit-search" role="search" aria-label="Ezoic eligibility checker"><span class="material-icons" aria-hidden="true">link</span><input id="ezoic-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL"><select id="ezoic-limit" class="crawl-select" aria-label="Crawl limit"><option value="10">10 pages</option><option value="25">25 pages</option><option value="50" selected>50 pages</option><option value="100">100 pages</option><option value="250">250 pages</option></select><button class="btn" type="submit">Check Eligibility</button></form>
-<div class="audit-trust"><span>Official requirements</span><span>Content quality</span><span>Duplicates</span><span>Trust pages</span><span>Policy risk</span><span>UX</span><span>Technical</span><span>Monetization</span></div></section>
+  const faqs = [
+    ['What are the requirements to join Ezoic?', 'Ezoic looks for original content, a working site with the usual policy pages, and a documented general expectation of around 250,000 monthly active users verified through Google Analytics. Requirements beyond that are about site quality rather than hard thresholds.'],
+    ['Is Ezoic free to join?', 'Yes. Ezoic has a free plan where they take a share of ad revenue, plus paid tiers with lower revenue shares. Most small publishers start on the free plan and let the numbers decide later.'],
+    ['Does Ezoic require a minimum traffic level?', 'Ezoic documents a general expectation of 250,000 monthly active users, checked through Analytics during application. That figure cannot be read from public pages, so this checker lists it as manual verification instead of guessing.'],
+    ['How long does Ezoic approval take?', 'Typically a few days to two weeks. Applications stall most often when Analytics access is missing, so grant read access when asked and expect a quicker review.'],
+    ['Can I use Ezoic with WordPress?', 'Yes, and with most other platforms. Integration happens through Cloudflare, name servers or a WordPress plugin, and the tool works the same way whichever route your host supports.'],
+    ['Can I run Ezoic and AdSense together?', 'Yes, during the transition. Ezoic can mediate AdSense inventory while you test, and many publishers keep both linked for months before deciding.'],
+    ['Why do Ezoic applications get rejected?', 'The usual reasons are thin or duplicated content, missing policy pages, sites that are mostly images or videos with little text, and traffic that cannot be verified. Fixing content depth and the trust pages resolves most cases.'],
+    ['Does Ezoic need access to my analytics?', 'Yes, read only access to Google Analytics. They use it to verify audience size and later to report earnings against sessions. The checker flags whether a tracking install is detected, but only Ezoic can confirm it is wired correctly.'],
+    ['What happens after Ezoic approves my site?', 'You integrate through Cloudflare or name servers, Ezoic tests ad placements automatically, and earnings usually start within days. Expect a testing period where revenue dips before placements learn.'],
+    ['Is this checker connected to Ezoic?', 'No. It reads public signals from your site and maps them to Ezoic published guidance. The final decision always belongs to Ezoic.']
+  ];
+  const cardsList = [
+    ['verified','Documented requirements','Each check maps to Ezoic support guidance where one exists, and anything a public crawl cannot see is listed as manual verification rather than scored.'],
+    ['article','Content and uniqueness','Unique words after boilerplate removal, thin or empty page ratios, image only articles and near duplicate detection across pages.'],
+    ['account_tree','Architecture crawl','Up to 250 internal pages through links, sitemaps, navigation and canonical tags, with click depth, orphans and dead ends mapped.'],
+    ['verified_user','Trust and transparency','About, Contact, Privacy and Terms pages detected from URLs, titles, headings, menus and footers, then checked for substance.'],
+    ['gpp_maybe','Policy risk screening','Context aware checks for adult, gambling, piracy, malware and scam signals. An isolated word is never treated as a high risk finding.'],
+    ['ads_click','Monetization signals','Existing ad scripts, ads.txt presence and ad heavy thin layouts, noted as facts about the site rather than automatic rejections.']
+  ];
+  const guides = [
+    ['insights','Where Ezoic fits','Ezoic sits between AdSense and the premium networks. It suits publishers who have outgrown manual ad management but do not yet meet the revenue or session floors of Mediavine and Raptive. If Analytics already shows solid monthly users, the fit is usually good.'],
+    ['query_stats','Verify the audience question first','The one requirement public tools cannot check is monthly active users. Look at your Analytics before anything else: if the number is far below the documented expectation, spend the next quarter on growth and revisit the application later.'],
+    ['edit_note','Deepen content before applying','Ezoic reviewers read the site like any other network. Pages that exist only to host ads, recycled introductions and image galleries without text are the common culprits. Rewrite the weakest pages instead of publishing new weak ones.'],
+    ['link','Connect the standard pages','About, Contact and Privacy pages with real information, plus a working ads.txt once you are integrated. These are small jobs that remove easy objections.'],
+    ['monitoring','Keep analytics healthy','A clean GA4 install is part of the application, not an afterthought. Check that the tag fires on every page, that key events are configured, and grant read access promptly when Ezoic asks.'],
+    ['compare','Compare the networks with real numbers','Run the same site through the <a href="/mediavine-eligibility-checker">Mediavine</a>, <a href="/raptive-eligibility-checker">Raptive</a> and <a href="/adsense-eligibility-checker">AdSense</a> checkers. Seeing all four readiness reports side by side makes the sensible next step obvious.']
+  ];
+  const body = `<section class="hero audit-home ezoic-home"><span class="material-icons hero-icon" aria-hidden="true">insights</span><h1>Ezoic Eligibility Checker</h1><p class="hero-subtitle">Check how your site lines up with Ezoic before you apply</p>
+<form id="ezoic-form" class="search-field audit-search" role="search" aria-label="Ezoic eligibility check"><span class="material-icons" aria-hidden="true">link</span><input id="ezoic-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL">${crawlSelect('ezoic-limit','Crawl limit',['10','25','50','100','250'],'50')}<button class="btn" type="submit">Check Eligibility</button></form>
+${chips([['verified','Official requirements'],['article','Content quality'],['merge_type','Duplicates'],['verified_user','Trust pages'],['gpp_maybe','Policy risk'],['ads_click','Monetization']])}</section>
 <div id="ezoic-results" class="audit-results ezoic-results"></div>
-<div class="container section">
-  <div class="section-heading-row">${icon('rule_folder')}<h4 style="margin:0;">What this checker actually does</h4></div>
-  <div class="grid feature-grid">
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('verified')} Documented Ezoic requirements</h6><p>Rules are sourced from Ezoic Support (traffic, content, privacy, contact, site type, language). Items that cannot be seen on a public site are labelled <b>Unable to verify automatically</b> — never guessed.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('article')} Content &amp; uniqueness</h6><p>Unique words after template removal, thin/empty ratios, image-only articles, keyword stuffing, n-grams, Jaccard, TF-IDF cosine and SimHash near-duplicates with shared-text evidence.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('account_tree')} Architecture crawl</h6><p>Up to 250 internal pages with robots.txt, sitemaps, canonicals, redirects, click depth, orphans and dead-ends. Default 50 pages.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('verified_user')} Trust &amp; transparency</h6><p>About, Contact, Privacy, Terms, cookies — detected from URL, title, H1, nav, footer and body. Pages must be linked and substantive, not empty shells.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('gpp_bad')} Policy-risk screening</h6><p>Contextual patterns for adult, gambling, piracy, malware, scam and related signals. One isolated keyword is never a high-risk finding. Not an official Ezoic verdict.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('ads_click')} Monetization signals</h6><p>Existing ad scripts, ads.txt, download-like links and ad-heavy thin layouts. Competing ads are noted as a post-integration task, not an automatic rejection.</p></div></div></div>
-  </div>
-</div>
-<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('forum')}<h4 style="margin:0;">Common Questions</h4></div><div class="faq-accordion">
-<details><summary>Does this guarantee Ezoic approval?</summary><p>No. It produces a transparent <b>Ezoic Readiness Score</b> from public signals. The final eligibility decision belongs to Ezoic. Status labels are Likely Ready, Needs Improvement, Not Ready, or Unable to Verify.</p></details>
-<details><summary>Can it check the 250,000 monthly active users rule?</summary><p>No. Ezoic currently documents a general requirement of 250,000+ monthly active users, verified via Google Analytics during application. That cannot be read from public HTML, so it is listed as <b>Unable to verify automatically</b> and is not guessed in the score.</p></details>
-<details><summary>Does it use AI or an LLM?</summary><p>No. The engine is a server-side crawler plus HTML parsing, similarity, statistics and a weighted rule registry. No OpenAI, Gemini, Claude, or paid AI APIs.</p></details>
-<details><summary>Are tool sites treated like blogs?</summary><p>No. Ezoic’s content guidelines say tool sites are not required to have a blog component. Short tool/utility/privacy pages are not scored as thin articles.</p></details>
-<details><summary>Is this affiliated with Ezoic?</summary><p>No. Findings cite Ezoic Support articles where a check maps to a documented rule, and are otherwise labelled best practice or heuristic.</p></details>
-</div></div>`;
-  return layout('Ezoic Eligibility Checker — Free Website Readiness Score | Huvanti', body, {
-    active:'ezoic', canonical:'https://huvanti.com/ezoic-eligibility-checker', meta, jsonLd,
-    scripts:['/assets/js/common.js','/assets/js/ezoic/crawler.js','/assets/js/ezoic/ui.js']
+${cards('What the checker measures', 'rule_folder', cardsList)}
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">Getting ready for Ezoic</h4></div>${lede('Ezoic approval is mostly a content and verification exercise. This is the short version of what works.')}${guideGrid(guides)}
+<p class="prose-block">A clean technical base helps every application. The <a href="/">SEO audit</a> catches the indexing and content problems that slow reviews, and the <a href="/core-web-vitals-auditor">Core Web Vitals auditor</a> confirms the site is pleasant to use, which Ezoic testing also measures indirectly.</p></div>
+${faqSection(faqs)}`;
+  return layout('Ezoic Eligibility Checker | Free Website Readiness Score | Huvanti', body, {
+    active:'ezoic', canonical:'https://huvanti.com/ezoic-eligibility-checker',
+    description:'Free Ezoic eligibility checker. See how your site scores against Ezoic requirements across content, trust pages, policy risk and technical health before you apply. No account.',
+    scripts:['/assets/js/progress.js','/assets/js/common.js','/assets/js/ezoic/crawler.js','/assets/js/ezoic/ui.js'],
+    jsonLd:[{'@context':'https://schema.org','@type':'WebApplication',name:'Ezoic Eligibility Checker',applicationCategory:'BusinessApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free Ezoic readiness checker that scores publicly observable website signals.'}, faqLd(faqs)]
   });
 }
 
+/* ============================== MEDIAVINE ============================== */
 function mediavinePage() {
-  const meta = `<meta name="description" content="Free Mediavine Eligibility Checker. Enter a URL for an evidence-based Mediavine Website Readiness Score from a deep public crawl — no account, no AI. Official vs Journey applied separately. Not an official Mediavine score."><meta name="robots" content="index,follow">
-<meta property="og:title" content="Mediavine Eligibility Checker — Huvanti"><meta property="og:description" content="Deep, deterministic Mediavine website readiness check. Official &amp; Journey applied separately. No account required. Final eligibility belongs to Mediavine."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
-  const jsonLd = {'@context':'https://schema.org','@graph':[
-    {'@type':'WebSite',name:'Huvanti',url:'https://huvanti.com/'},
-    {'@type':'WebApplication',name:'Mediavine Eligibility Checker',applicationCategory:'BusinessApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',featureList:'Mediavine Website Readiness score, Official vs Journey requirements, original content audit, duplicate detection, brand-safety screen, reader experience, advertising readiness, technical SEO, trust pages, traffic verification',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free, deterministic Mediavine eligibility checker that scores publicly observable website signals. Not affiliated with Mediavine.'}
-  ]};
-  const body = `<section class="hero audit-home mediavine-home"><span class="material-icons hero-icon" aria-hidden="true">trending_up</span><h1>Mediavine Eligibility Checker</h1><p class="hero-subtitle">Evidence-based Mediavine website readiness — no account, no AI.</p>
-<form id="mediavine-form" class="search-field audit-search" role="search" aria-label="Mediavine eligibility checker"><span class="material-icons" aria-hidden="true">link</span><input id="mediavine-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL"><select id="mediavine-program" class="crawl-select" aria-label="Program focus"><option value="both" selected>Both programs</option><option value="official">Mediavine Official</option><option value="journey">Journey by Mediavine</option></select><select id="mediavine-limit" class="crawl-select" aria-label="Crawl limit"><option value="10">10 pages</option><option value="25">25 pages</option><option value="50" selected>50 pages</option><option value="100">100 pages</option><option value="250">250 pages</option></select><button class="btn" type="submit">Check Eligibility</button></form>
-<div class="audit-trust"><span>Official &amp; Journey</span><span>Original content</span><span>Duplicates</span><span>Brand safety</span><span>Reader experience</span><span>Advertising</span><span>Technical</span><span>Trust pages</span></div></section>
+  const faqs = [
+    ['What are the current Mediavine requirements?', 'Mediavine Official requires at least 5,000 US dollars in annual ad revenue, which usually means an established, traffic heavy site. Journey by Mediavine is the entry program and starts at 1,000 monthly sessions. Both programs expect original content, a good reader experience and the standard policy pages.'],
+    ['What is Journey by Mediavine?', 'Journey is Mediavine program for newer and smaller sites. It opened the door to publishers far below the old traffic floor, using the same ad infrastructure and team. Many publishers treat it as the on ramp to the Official program.'],
+    ['How much traffic do I need for Mediavine?', 'For Journey, 1,000 sessions a month is the documented floor. For Mediavine Official the bar is revenue based rather than session based: 5,000 dollars in annual ad revenue. The old 50,000 sessions figure is outdated and no longer the requirement.'],
+    ['How long does Mediavine approval take?', 'Usually one to three weeks. Applications are reviewed by people who visit the site, so content quality and reader experience genuinely matter, not just numbers.'],
+    ['Does Mediavine require a privacy policy?', 'Yes, along with an about page and a way to contact you. Like all major networks, Mediavine expects clear disclosure pages, and GDPR and CCPA compliance come with the territory once you run their ads.'],
+    ['Which platforms does Mediavine support?', 'WordPress is the comfortable default and most publishers run it, but Mediavine also works with other platforms that allow script insertion. If you cannot add scripts to your template, integration becomes the blocker.'],
+    ['What content does Mediavine not accept?', 'Mediavine is brand safety focused. Adult content, unlicensed medical or financial advice, misinformation, harmful niches and scraped or spun content are out. Recipe and lifestyle publishers make up much of the network, but any people first content niche can fit.'],
+    ['Does Mediavine accept AI generated content?', 'Mediavine asks for content created with human involvement and first hand experience. Mass generated, unedited articles fail that bar, while AI assisted drafts that a knowledgeable author substantially shapes generally do not.'],
+    ['How much can a site earn with Mediavine?', 'Earnings scale with sessions, geography and niche. Food and home publishers often quote RPMs in the ten to thirty dollar range in strong seasons, though numbers swing by month and by site. Mediavine publishes no earnings guarantee, and neither does this tool.'],
+    ['Mediavine or AdSense, which should a smaller site use?', 'Below Journey levels, AdSense is the natural choice. Once a site clears roughly 1,000 sessions a month, Journey usually pays better for the same traffic thanks to programmatic demand. Many publishers run AdSense until they qualify, then switch.'],
+    ['Is this checker affiliated with Mediavine?', 'No. It scores your site against Mediavine published requirements and reports what a public crawl can verify. Mediavine makes every actual decision.']
+  ];
+  const cardsList = [
+    ['verified','Two programs, scored separately','The report applies the Official and Journey requirements independently, so you see which program your site is closest to.'],
+    ['article','Original content analysis','Unique text after boilerplate removal, thin and empty ratios, and near duplicate detection with the evidence shown per pair.'],
+    ['gpp_maybe','Brand safety screening','Context aware checks across adult, drugs, gambling, weapons, hate, piracy and fraud categories, scored with confidence levels.'],
+    ['touch_app','Reader experience','Viewport and responsiveness, navigation clarity, intrusive overlays, sticky elements, horizontal overflow and content obstruction.'],
+    ['account_tree','Deep architecture crawl','Up to 250 internal pages discovered through links, sitemaps, menus, breadcrumbs and canonicals, with depth and orphan reporting.'],
+    ['fact_check','Honest about private data','Revenue and session counts are private, so they appear in a dedicated verification panel and are excluded from the score rather than estimated.']
+  ];
+  const guides = [
+    ['route','Pick the right track','If your analytics show around a thousand sessions a month, aim at Journey. If you already earn near five thousand dollars a year from ads, aim at Official. The checker asks which program you care about and scores against it, because the preparation differs.'],
+    ['edit_note','Write for readers first','Mediavine reviewers are editors at heart. First hand experience, original photos, clear structure and answers that leave the reader satisfied are what get sites in. Content written to rank rather than to help is the most common weakness they see.'],
+    ['smartphone','Fix the reading experience','Mobile sessions dominate lifestyle traffic. Kill intrusive popups, keep paragraphs readable, ensure tap targets are comfortable and check that nothing shifts while the page loads.'],
+    ['speed','Get speed respectable','Ad scripts slow every site, so the base has to be fast before ads land. Compress images, enable caching and remove abandoned plugins. The <a href="/core-web-vitals-auditor">Core Web Vitals auditor</a> gives exact numbers if you want them.'],
+    ['badge','Prepare the paperwork','About, Contact, Privacy and affiliate disclosure pages, plus a clean GDPR and CCPA setup once accepted. Reviewers check these, and so does the checker.'],
+    ['trending_up','Grow sessions deliberately','Journey starts at 1,000 sessions but earnings feel real closer to 10,000. Double down on the posts that already earn traffic, refresh the rest, and let internal links from strong pages lift the weak ones. The <a href="/">SEO audit</a> shows which pages have that untapped potential.']
+  ];
+  const body = `<section class="hero audit-home mediavine-home"><span class="material-icons hero-icon" aria-hidden="true">trending_up</span><h1>Mediavine Eligibility Checker</h1><p class="hero-subtitle">Score your site against Mediavine Official and Journey</p>
+<form id="mediavine-form" class="search-field audit-search" role="search" aria-label="Mediavine eligibility check"><span class="material-icons" aria-hidden="true">link</span><input id="mediavine-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL"><select id="mediavine-program" class="crawl-select" aria-label="Program"><option value="both" selected>Both programs</option><option value="official">Mediavine Official</option><option value="journey">Journey by Mediavine</option></select>${crawlSelect('mediavine-limit','Crawl limit',['10','25','50','100','250'],'50')}<button class="btn" type="submit">Check Eligibility</button></form>
+${chips([['verified','Official and Journey'],['article','Original content'],['gpp_maybe','Brand safety'],['touch_app','Reader experience'],['build','Technical'],['verified_user','Trust pages']])}</section>
 <div id="mediavine-results" class="audit-results mediavine-results"></div>
-<div class="container section">
-  <div class="section-heading-row">${icon('rule_folder')}<h4 style="margin:0;">What this checker actually does</h4></div>
-  <div class="grid feature-grid">
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('verified')} Official &amp; Journey, applied separately</h6><p>Mediavine Official requires $5,000+ annual ad revenue; Journey starts at 1,000 sessions. Revenue and sessions are private data, so they are shown as <b>Unable to verify automatically</b> — never guessed. Old 50,000-session advice is not presented as current.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('article')} Original, audience-first content</h6><p>Unique words after boilerplate removal, thin/empty ratios, sentence fingerprints, n-grams, Jaccard, TF-IDF cosine and SimHash near-duplicates, plus a Potential Search-First Content Pattern label (not a definitive Google classification).</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('gpp_bad')} Brand-safety screening</h6><p>Deterministic contextual scanner for adult, drugs, gambling, weapons, hate, extremism, piracy, malware, phishing, fraud, scam and more — with low/medium/high confidence. Isolated keywords are never a high finding.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('smartphone')} Reader experience &amp; ads</h6><p>Viewport, navigation, overlays, popups, autoplay, sticky/fixed elements, horizontal overflow, content obstruction and ad density. Existing ads are not automatically penalized.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('account_tree')} Deep architecture crawl</h6><p>Up to 250 internal pages from homepage, links, sitemap, robots.txt, nav, footer, breadcrumbs, categories and canonicals. Orphans, dead-ends, depth, broken internal links. Default 50 pages.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('verified_user')} Honest about what a URL cannot verify</h6><p>Annual revenue, monthly sessions, traffic sources/countries, demographics and Google account standing are private data. They appear in a dedicated <b>Requires Your Verification</b> panel and are excluded from the score, not invented.</p></div></div></div>
-  </div>
-</div>
-<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('forum')}<h4 style="margin:0;">Common Questions</h4></div><div class="faq-accordion">
-<details><summary>Does this guarantee Mediavine approval?</summary><p>No. It produces a transparent internal <b>Mediavine Website Readiness Score</b> from public signals. The final eligibility decision belongs to Mediavine. Status labels are Strong Readiness, Needs Improvement, Significant Issues, or Unable to Determine.</p></details>
-<details><summary>Can it verify the $5,000 revenue or 1,000 sessions?</summary><p>No. Annual ad revenue and monthly sessions are private data. They are listed as <b>Unable to verify automatically</b> and never guessed. The Official $5,000+ and Journey 1,000+ thresholds are current (2026) and applied separately.</p></details>
-<details><summary>Is the old 50,000-session requirement still used?</summary><p>No. As of 2026, Mediavine Official is revenue-based ($5,000+ annual ad revenue) and Journey starts at 1,000 sessions. This tool uses the current program structure and does not present outdated 50k-session advice as current.</p></details>
-<details><summary>Does it use AI or an LLM?</summary><p>No. The engine is a crawler plus HTML parsing, similarity statistics and a weighted rule registry. No paid AI APIs.</p></details>
-<details><summary>Are tool or ecommerce sites treated like blogs?</summary><p>No. Pages are classified by type, and article-content rules are not applied to utility, product, tool, or legal pages. Content portfolio balance is weighed site-wide, not page-by-page.</p></details>
-<details><summary>Is this affiliated with Mediavine?</summary><p>No. Findings cite Mediavine Help Center sources where a check maps to a documented requirement, and are otherwise labelled Quality Signal or Heuristic.</p></details>
-</div></div>`;
-  return layout('Mediavine Eligibility Checker — Free Website Readiness Score | Huvanti', body, {
-    active: 'mediavine', canonical: 'https://huvanti.com/mediavine-eligibility-checker', meta, jsonLd,
-    scripts: ['/assets/js/common.js', '/assets/js/mediavine/crawler.js', '/assets/js/mediavine/ui.js']
+${cards('What the checker measures', 'rule_folder', cardsList)}
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">Preparing a site for Mediavine</h4></div>${lede('Mediavine reviews sites the way a magazine editor would. These are the areas that decide most applications.')}${guideGrid(guides)}
+<p class="prose-block">Not sure which network fits your stage? Compare with the <a href="/adsense-eligibility-checker">AdSense</a>, <a href="/ezoic-eligibility-checker">Ezoic</a> and <a href="/raptive-eligibility-checker">Raptive</a> checkers, and run a full <a href="/">SEO audit</a> first so technical issues never reach a reviewer.</p></div>
+${faqSection(faqs, 'People Often Ask')}`;
+  return layout('Mediavine Eligibility Checker | Free Website Readiness Score | Huvanti', body, {
+    active:'mediavine', canonical:'https://huvanti.com/mediavine-eligibility-checker',
+    description:'Free Mediavine eligibility checker. Score your site against Journey and Mediavine Official requirements across content, brand safety, reader experience and technical health. No account.',
+    scripts:['/assets/js/progress.js','/assets/js/common.js','/assets/js/mediavine/crawler.js','/assets/js/mediavine/ui.js'],
+    jsonLd:[{'@context':'https://schema.org','@type':'WebApplication',name:'Mediavine Eligibility Checker',applicationCategory:'BusinessApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free Mediavine readiness checker that scores publicly observable website signals.'}, faqLd(faqs)]
   });
 }
 
+/* ============================== RAPTIVE ============================== */
 function raptivePage() {
-  const meta = `<meta name="description" content="Free Raptive Eligibility Checker. Enter a URL for an evidence-based Raptive Readiness Score from a deep public crawl — no account, no AI. Current 25,000 pageview minimum. Not an official Raptive score."><meta name="robots" content="index,follow">
-<meta property="og:title" content="Raptive Eligibility Checker — Huvanti"><meta property="og:description" content="Deep, deterministic Raptive website readiness check. 25,000 pageview minimum. No account required. Final eligibility belongs to Raptive."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
-  const jsonLd = {'@context':'https://schema.org','@graph':[
-    {'@type':'WebSite',name:'Huvanti',url:'https://huvanti.com/'},
-    {'@type':'WebApplication',name:'Raptive Eligibility Checker',applicationCategory:'BusinessApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',featureList:'Raptive readiness score, official requirement checks, originality audit, long-form coverage, human-involvement signals, Google Analytics detection, domain age, brand safety, ad readiness, traffic verification',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free, deterministic Raptive eligibility checker that scores publicly observable website signals. Not affiliated with Raptive.'}
-  ]};
-  const body = `<section class="hero audit-home raptive-home"><span class="material-icons hero-icon" aria-hidden="true">campaign</span><h1>Raptive Eligibility Checker</h1><p class="hero-subtitle">Evidence-based Raptive website readiness — no account, no AI.</p>
-<form id="raptive-form" class="search-field audit-search" role="search" aria-label="Raptive eligibility checker"><span class="material-icons" aria-hidden="true">link</span><input id="raptive-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL"><select id="raptive-limit" class="crawl-select" aria-label="Crawl limit"><option value="10">10 pages</option><option value="25">25 pages</option><option value="50" selected>50 pages</option><option value="100">100 pages</option><option value="250">250 pages</option></select><button class="btn" type="submit">Check Eligibility</button></form>
-<div class="audit-trust"><span>Official requirements</span><span>Original content</span><span>Long-form</span><span>Human involvement</span><span>Google Analytics</span><span>Domain age</span><span>Brand safety</span><span>Ad readiness</span></div>
-<details class="raptive-optional container"><summary>Optional: enter verified Analytics figures (user-provided)</summary>
+  const faqs = [
+    ['What are the requirements to join Raptive?', 'The published bar is at least 25,000 monthly pageviews measured over the last 30 days in Google Analytics, a domain at least six months old, a GA4 install with read access granted, original content with clear human involvement and a site that is ready to show ads. Geography also matters.'],
+    ['How many pageviews do you need for Raptive?', 'The documented minimum is 25,000 pageviews a month. It replaced the old 100,000 pageview requirement, which is now just a higher tier with a lower key country share.'],
+    ['Which countries does Raptive accept traffic from?', 'Raptive requires most traffic to come from its key markets: the United States, the United Kingdom, Canada, Australia and New Zealand. At 25,000 to 99,999 pageviews the combined share from those countries must be at least half. At 100,000 pageviews or more it must be at least forty percent.'],
+    ['Is Raptive the same company as AdThrive?', 'Yes. AdThrive rebranded to Raptive in 2023. Same team, same standards, new name.'],
+    ['How long does Raptive approval take?', 'Usually one to two weeks after you grant Analytics access. Applications move faster when the GA4 property is clean and the site clearly meets the pageview floor.'],
+    ['Does Raptive require Google Analytics?', 'Yes. GA4 with read only access granted to Raptive is part of the application, because pageviews and geography are verified from your Analytics rather than self reported.'],
+    ['Does Raptive accept AI generated content?', 'Raptive looks for human involvement and demonstrable expertise. Content that is mass produced without editing or first hand knowledge fails that expectation, while drafts a real author shapes with experience and original insight are viewed on their merits.'],
+    ['Can a new site join Raptive?', 'Rarely. The six month domain age rule and the 25,000 pageview floor both push brand new sites toward AdSense, Ezoic or Journey first, with Raptive as the destination once traffic and content depth arrive.'],
+    ['Raptive or Mediavine, which should I aim for?', 'They compete for the same premium tier. Raptive uses a pageview floor of 25,000, while Mediavine Official is revenue based at 5,000 dollars a year and Journey starts at 1,000 sessions. Publishers often apply to whichever threshold they already cross, and both reviews reward the same fundamentals.'],
+    ['Does this checker submit anything to Raptive?', 'No. It reads your site and, only if you type them in, compares numbers you supply against the published thresholds. Raptive sees nothing until you apply yourself.']
+  ];
+  const cardsList = [
+    ['verified','Current requirements','The 25,000 pageview minimum, the key country share rules, the six month domain age and the GA4 expectation, each scored against what a public crawl can honestly verify.'],
+    ['article','Originality analysis','Unique text after boilerplate removal, duplicate and near duplicate pairs, and content depth on the pages where long form material belongs.'],
+    ['person','Human involvement signals','Author presence, first hand detail, sourcing and editorial identity, reported as patterns with evidence rather than verdicts.'],
+    ['analytics','Analytics and domain age','Whether a GA4 or tag manager install is detected, kept strictly separate from whether the configuration is verified, plus RDAP domain age where the registry exposes it.'],
+    ['gpp_maybe','Brand safety','The same context aware screening used across our network checkers: adult, drugs, gambling, weapons, hate, piracy and fraud categories with confidence levels.'],
+    ['campaign','Ad readiness','Existing ad scripts, ads.txt, layout density and whether the build can host premium placements without wrecking the reader experience.']
+  ];
+  const guides = [
+    ['query_stats','Verify pageviews and geography first','Open GA4 and check two numbers before anything else: pageviews for the last 30 days, and the combined share of US, UK, Canadian, Australian and New Zealand sessions. If either is below the bar, that is the work, and no amount of site polish changes it.'],
+    ['edit_note','Show who made the content','Raptive cares about human involvement. Named authors, short bios with real credentials, original photos and first hand notes inside articles are the signals. Remove anything that reads like it was stamped out by a template.'],
+    ['history','Mind the six month clock','Domain age is checked from registration records. If your domain is young, use the waiting months to deepen content: it is the most productive waiting list there is.'],
+    ['speed','Prepare a premium layout','Premium ads need a stable, quick site. Fix layout shift and slow images before applying, because the same page will carry heavier ad code afterwards. The <a href="/core-web-vitals-auditor">Core Web Vitals auditor</a> measures exactly this.'],
+    ['link','Build internal authority','Large sites live on internal links. Make sure money pages are reachable within a few clicks and that older strong posts link forward to newer work. The <a href="/">SEO audit</a> maps click depth and orphan pages for you.'],
+    ['compare','Benchmark against the alternatives','Run the <a href="/mediavine-eligibility-checker">Mediavine</a> and <a href="/ezoic-eligibility-checker">Ezoic</a> checkers on the same crawl. The overlap in their reports is the genuine work list, whichever network you choose.']
+  ];
+  const body = `<section class="hero audit-home raptive-home"><span class="material-icons hero-icon" aria-hidden="true">campaign</span><h1>Raptive Eligibility Checker</h1><p class="hero-subtitle">See how your site scores against current Raptive requirements</p>
+<form id="raptive-form" class="search-field audit-search" role="search" aria-label="Raptive eligibility check"><span class="material-icons" aria-hidden="true">link</span><input id="raptive-url" type="url" placeholder="https://yourwebsite.com" required aria-label="Website URL">${crawlSelect('raptive-limit','Crawl limit',['10','25','50','100','250'],'50')}<button class="btn" type="submit">Check Eligibility</button></form>
+<details class="raptive-optional container"><summary>Optional: add verified Analytics figures</summary>
 <div class="raptive-optional-grid">
-<label>Monthly pageviews <input id="raptive-pageviews" class="text-input" type="number" min="0" step="1" placeholder="e.g. 32000" inputmode="numeric"></label>
+<label>Monthly pageviews <input id="raptive-pageviews" class="text-input" type="number" min="0" step="1" placeholder="32000" inputmode="numeric"></label>
 <label>US % <input id="raptive-us" class="text-input" type="number" min="0" max="100" step="0.1" placeholder="%"></label>
 <label>UK % <input id="raptive-uk" class="text-input" type="number" min="0" max="100" step="0.1" placeholder="%"></label>
 <label>Canada % <input id="raptive-ca" class="text-input" type="number" min="0" max="100" step="0.1" placeholder="%"></label>
 <label>Australia % <input id="raptive-au" class="text-input" type="number" min="0" max="100" step="0.1" placeholder="%"></label>
 <label>New Zealand % <input id="raptive-nz" class="text-input" type="number" min="0" max="100" step="0.1" placeholder="%"></label>
 </div>
-<p class="muted">These are labelled <b>User-provided value</b> and are never presented as independently verified. Combined US+UK+CA+AU+NZ is compared with Raptive’s current 50% (25k–99,999 PV) or 40% (100,000+ PV) thresholds. Leave blank if you do not have Analytics access.</p>
-</details></section>
+<p class="muted">Figures you enter are labelled as user provided and compared with the published thresholds: half of traffic from the US, UK, Canada, Australia and New Zealand at 25,000 to 99,999 pageviews, or forty percent at 100,000 and above. Leave blank if you prefer.</p>
+</details>
+${chips([['verified','Official requirements'],['article','Original content'],['person','Human involvement'],['analytics','Analytics'],['history','Domain age'],['gpp_maybe','Brand safety']])}</section>
 <div id="raptive-results" class="audit-results raptive-results"></div>
-<div class="container section">
-  <div class="section-heading-row">${icon('rule_folder')}<h4 style="margin:0;">What this checker actually does</h4></div>
-  <div class="grid feature-grid">
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('verified')} Current Raptive requirements</h6><p>Minimum <b>25,000</b> monthly pageviews (not the old 100,000). 50% key-country traffic at 25k–99,999 PV; 40% at 100,000+. GA4, 6-month domain, original content, human involvement, long-form on the majority of pages (25k–99,999), ad-ready build. Private items are labelled Manual Verification Required — never guessed.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('article')} Originality &amp; long-form</h6><p>Unique body text after boilerplate removal, duplicates, near-duplicates, n-grams, Jaccard, TF-IDF cosine, SimHash. Long-form coverage on eligible content pages — utility pages excluded. Not a copyright or AI-authorship proof.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('person')} Human-involvement signals</h6><p>Author bios, first-hand detail, sources, editorial identity vs. repetitive templates. Never labelled “AI-generated content detected.” Uses <b>Potential low-human-involvement pattern</b> with evidence.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('analytics')} Google Analytics &amp; domain age</h6><p>Detects GA4 Measurement IDs, gtag, GTM, duplicate installs. Distinguishes tracking code detected from configuration verified. RDAP domain age when available; otherwise Unable to Verify.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('gpp_bad')} Brand safety &amp; reader experience</h6><p>Contextual scanner for adult, drugs, gambling, weapons, hate, piracy, malware, scam and more. UX: viewport, overlays, autoplay, sticky chrome, navigation.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('account_tree')} Deep public crawl</h6><p>Up to 250 internal pages from homepage, links, sitemap, robots.txt, nav and footer. Default 50. SSRF-protected. No account, no LLM, no paid SEO API.</p></div></div></div>
-  </div>
-</div>
-<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('forum')}<h4 style="margin:0;">Common Questions</h4></div><div class="faq-accordion">
-<details><summary>Does this guarantee Raptive approval?</summary><p>No. It produces a transparent internal <b>Raptive Readiness Score</b> from public signals. Application eligibility is shown separately and is usually <b>Cannot Be Fully Verified</b> until you provide Analytics pageviews and country share. Raptive makes the final decision.</p></details>
-<details><summary>Is 100,000 monthly pageviews still the minimum?</summary><p>No. Raptive currently lists a minimum of <b>25,000 monthly pageviews</b> (last 30 days, via Google Analytics). 100,000+ is a higher traffic tier with a 40% key-country requirement, not the general entry bar.</p></details>
-<details><summary>Can it verify my pageviews or country mix?</summary><p>No. Those are private Analytics data. The report has a dedicated <b>Manual Verification Required</b> section. You may optionally enter verified figures; they are labelled user-provided and are not independently verified.</p></details>
-<details><summary>Does detecting Google Analytics mean it is correctly configured?</summary><p>No. The tool distinguishes <b>tracking code detected</b> from <b>Analytics configuration verified</b>. The latter requires actual Analytics access, which Raptive also requires at application (read-only GA4 authorization).</p></details>
-<details><summary>Does it use AI or an LLM?</summary><p>No. The engine is a crawler plus HTML parsing, similarity statistics and a weighted Raptive rule registry. No OpenAI, Gemini, Claude, Semrush, Ahrefs, or Google Analytics API.</p></details>
-<details><summary>Is this affiliated with Raptive?</summary><p>No. Findings cite Raptive Support where a check maps to a documented requirement, and are otherwise labelled Quality Signal or Heuristic.</p></details>
-</div></div>`;
-  return layout('Raptive Eligibility Checker — Free Website Readiness Score | Huvanti', body, {
-    active: 'raptive', canonical: 'https://huvanti.com/raptive-eligibility-checker', meta, jsonLd,
-    scripts: ['/assets/js/common.js', '/assets/js/raptive/crawler.js', '/assets/js/raptive/ui.js']
+${cards('What the checker measures', 'rule_folder', cardsList)}
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">Preparing a site for Raptive</h4></div>${lede('Raptive is a premium network, and the review reflects that. Here is what actually moves applications.')}${guideGrid(guides)}
+<p class="prose-block">Every network checker on Huvanti uses the same crawl engine, so results are comparable. See also the <a href="/adsense-eligibility-checker">AdSense</a> and <a href="/ezoic-eligibility-checker">Ezoic</a> checkers, or start with a full <a href="/">SEO audit</a>.</p></div>
+${faqSection(faqs)}`;
+  return layout('Raptive Eligibility Checker | Free Website Readiness Score | Huvanti', body, {
+    active:'raptive', canonical:'https://huvanti.com/raptive-eligibility-checker',
+    description:'Free Raptive eligibility checker. Score your site against the current 25,000 pageview requirement, key country rules, content and human involvement signals. No account.',
+    scripts:['/assets/js/progress.js','/assets/js/common.js','/assets/js/raptive/crawler.js','/assets/js/raptive/ui.js'],
+    jsonLd:[{'@context':'https://schema.org','@type':'WebApplication',name:'Raptive Eligibility Checker',applicationCategory:'BusinessApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free Raptive readiness checker that scores publicly observable website signals.'}, faqLd(faqs)]
   });
 }
-
+/* ============================== WORDPRESS THEME DETECTOR ============================== */
 function wpthemePage() {
-  const meta = `<meta name="description" content="Free WordPress Theme Detector. Enter a URL to detect the active WordPress theme, version, author, child/parent theme and detection confidence — evidence-based, no account, no AI."><meta name="robots" content="index,follow">
-<meta property="og:title" content="WordPress Theme Detector — Huvanti"><meta property="og:description" content="Multi-signal WordPress theme detection with transparent evidence and confidence. No account, no AI, no third-party API."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
-  const jsonLd = {'@context':'https://schema.org','@graph':[
-    {'@type':'WebSite',name:'Huvanti',url:'https://huvanti.com/'},
-    {'@type':'WebApplication',name:'WordPress Theme Detector',applicationCategory:'DeveloperApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',featureList:'WordPress detection, active theme detection, theme version, child and parent theme, premium and custom theme signals, fingerprint database, detection evidence, confidence score, public exposure notes',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free, deterministic WordPress theme detector that reads only publicly observable evidence. No login, no account, no API keys, no AI.'}
-  ]};
-  const body = `<section class="hero audit-home wptheme-home"><span class="material-icons hero-icon" aria-hidden="true">palette</span><h1>WordPress Theme Detector</h1><p class="hero-subtitle">Detect the active WordPress theme from public evidence — no account, no AI.</p>
-<form id="wptheme-form" class="search-field audit-search" role="search" aria-label="WordPress theme detector"><span class="material-icons" aria-hidden="true">link</span><input id="wptheme-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="Enter website URL — e.g. https://example.com" required aria-label="Website URL"><button class="btn" type="submit">Detect Theme</button></form>
-<div class="audit-trust"><span>Theme name &amp; slug</span><span>Version</span><span>Child &amp; parent</span><span>Author</span><span>Fingerprints</span><span>Evidence-based</span><span>No fake results</span></div></section>
+  const faqs = [
+    ['How do I find out what theme a website is using?', 'The fastest honest way is to look at the page source and search for wp-content/themes, because WordPress loads every theme file from that folder. This detector does the same automatically and then verifies the theme by reading its style.css header, so the answer comes with evidence rather than a guess.'],
+    ['Why can the detector not read some sites?', 'Caching layers can rename asset paths, CDNs can rewrite URLs, and security layers can block automated readers entirely. When that happens the tool says so instead of inventing a name, and it reports whatever partial evidence it could collect.'],
+    ['Can I also detect which plugins a site uses?', 'Sometimes, incidentally, from script and asset paths, but reliable plugin detection is a different problem and this tool does not claim it. The report focuses on the theme because that is what the public evidence supports.'],
+    ['What is a child theme?', 'A child theme inherits everything from a parent theme and overrides selected files, which is the safe way to customise a design without losing changes on updates. The detector identifies child themes from the Template field and then resolves the parent by name.'],
+    ['How do I find the theme on my own WordPress site?', 'In the dashboard open Appearance and then Themes, where the active theme is highlighted. The detector is mainly useful for sites you do not manage, or to check what the public can see about your own install.'],
+    ['Does it work on block themes and newer WordPress versions?', 'Yes. Block themes still ship a style.css with the standard header, so name, author and version detection works the same way.'],
+    ['Can I download a premium theme the detector finds?', 'No. Premium themes such as Divi or Avada are licensed, and copies circulating for free are both illegal and a common malware vector. The detector links to the official marketplace instead.'],
+    ['Why does the version sometimes say appears to be?', 'Exact versions come from the theme header. When the only clue is a version query string on an asset URL, the tool reports it as an estimate, and when the header hides the version it says the version is not publicly detectable. No number is invented.'],
+    ['Is knowing another site theme actually useful?', 'It is one input among many. Seeing which theme a successful site in your niche runs tells you what performance and layout baselines are proven there, but design success comes from content and customisation, not from the theme name alone.'],
+    ['Are the URLs I check recorded anywhere?', 'No. Scans run from your browser and nothing is stored on a server. See the privacy page for the full picture.']
+  ];
+  const cardsList = [
+    ['verified','WordPress detection','Weighted signals from asset paths, generator tags, REST endpoints and headers. A single weak clue is never enough on its own.'],
+    ['search','Theme path discovery','Homepage markup, stylesheets, scripts and feeds are scanned for the theme folder path before any theme is named.'],
+    ['description','style.css verification','The theme header that WordPress itself reads is parsed for name, version, author, licence and template fields.'],
+    ['account_tree','Child and parent themes','A Template field proves a child theme, and the parent is then read directly rather than guessed from looks.'],
+    ['fingerprint','Fingerprint database','Popular free and premium themes such as Astra, GeneratePress, Kadence, Divi and Avada are recognised from multiple distinct markers.'],
+    ['history','Honest version reporting','Exact versions, estimated versions and hidden versions are labelled as exactly what they are, with no vulnerability claims attached.']
+  ];
+  const guides = [
+    ['travel_explore','How to read the report','Every claim links to the evidence that produced it: the stylesheet URL, the header fields, the matching fingerprints. If the evidence is thin, the verdict says Likely rather than Detected, and that distinction is the whole point of the tool.'],
+    ['palette','Use themes as research, not recipes','A theme that carries a leading publication is proven to scale, which is useful knowledge. The same site also invested in photography, layout and speed, so copy the standards rather than the product.'],
+    ['lock','What your own theme reveals','Run the detector on your own site to see what the public can learn: theme name, version, author. Site owners who want a quieter footprint can remove version strings or rename asset paths, and this report shows exactly what is exposed today.'],
+    ['speed','Theme choice and speed','Lightweight themes such as Astra, GeneratePress and Kadence dominate performance comparisons for a reason. If a candidate theme feels heavy in demo form, it will feel heavier with your content. Pair any choice with a run of the <a href="/core-web-vitals-auditor">Core Web Vitals auditor</a>.'],
+    ['dns','Dig further with the other tools','Once you know the stack, the <a href="/domain-information-checker">domain information checker</a> shows hosting, DNS and certificates behind the site, and the <a href="/">SEO audit</a> scores the content itself.']
+  ];
+  const body = `<section class="hero audit-home wptheme-home"><span class="material-icons hero-icon" aria-hidden="true">palette</span><h1>WordPress Theme Detector</h1><p class="hero-subtitle">Find the active WordPress theme behind any public site</p>
+<form id="wptheme-form" class="search-field audit-search" role="search" aria-label="WordPress theme detection"><span class="material-icons" aria-hidden="true">link</span><input id="wptheme-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL"><button class="btn" type="submit">Detect Theme</button></form>
+${chips([['wordpress','Theme name and slug'],['history','Version'],['account_tree','Child and parent'],['fingerprint','Fingerprints'],['verified','Evidence based']])}</section>
 <div id="wptheme-results" class="audit-results wptheme-results"></div>
-<div class="container section">
-  <div class="section-heading-row">${icon('rule_folder')}<h4 style="margin:0;">How detection works — nine methods, one transparent verdict</h4></div>
-  <div class="grid feature-grid">
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('verified')} WordPress detection engine</h6><p>Weighted, family-based signals: /wp-content/, /wp-includes/, /wp-json/, generator metadata, REST API, HTML patterns, headers and feeds. One weak signal is never enough — “Detected” needs independent, corroborating evidence.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('search')} Theme path discovery</h6><p>Homepage HTML, CSS URLs, JS URLs, enqueued asset handles, REST content and oEmbed output are all scanned for /wp-content/themes/&lt;slug&gt;/ references before a theme is named.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('description')} style.css analysis</h6><p>The public WordPress theme header is parsed for Theme Name, Version, Author, Author URI, Theme URI, Description, License, Text Domain, Tags and Template — the exact same header WordPress itself reads.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('account_tree')} Child &amp; parent themes</h6><p>A Template: field proves a child theme. The parent’s public style.css is then read for its name, author and version — the parent is never guessed from appearance.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('fingerprint')} Fingerprint database</h6><p>A maintainable local database covers popular free themes (Astra, GeneratePress, Kadence, Neve, OceanWP, Hello Elementor…), premium themes (Divi, Avada, Flatsome, WoodMart, Newspaper…) and frameworks. Naming requires multiple distinct markers.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('history')} Honest version reporting</h6><p>Exact versions are labelled exact, ?ver= estimates are labelled “appears to be”, and hidden versions say “not publicly detectable”. Versions are never invented, and no vulnerability claims are made from a local dataset.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('visibility')} Theme exposure</h6><p>A short informational section showing which theme details are publicly observable (metadata, version, screenshot, readme, source maps, directory listings) — with no exploitation or intrusive testing.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('security')} Safe by design</h6><p>SSRF-protected scanning: private IPs, loopback, cloud metadata and DNS-rebinding targets are refused; every redirect is re-validated; requests, bytes and time are budgeted so a scan can never flood a site.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('block')} Four honest outcomes</h6><p>Every scan ends in Detected, Likely, Unable to Verify or Not Detected. A blocked, challenged or JavaScript-only site is reported as “Unable to determine” — never as “not WordPress”.</p></div></div></div>
-  </div>
-</div>
-<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('forum')}<h4 style="margin:0;">Common Questions</h4></div>
-  <div class="faq-accordion">
-<details><summary>Is this accurate?</summary><p>Accuracy is prioritised over producing a result for every site. Detection combines nine independent methods, shows every signal and weight, and labels results Detected, Likely, Unable to Verify or Not Detected. It never names a theme it could not evidence.</p></details>
-<details><summary>Does it work on any WordPress site?</summary><p>No tool can. Sites can hide or rename theme paths, block scanners, serve assets from rewritten CDNs, or be behind bot protection. In those cases this tool reports exactly what blocked the scan and what partial evidence exists, instead of guessing.</p></details>
-<details><summary>What happens if the scanner server can’t reach a site?</summary><p>The server first tries a direct, SSRF-protected connection. If that is impossible (firewall, TLS reset, blocked egress — for example on this preview sandbox), the same small set of resources is collected through your own browser and analysed by the identical engine. The report always states which transport was used, and a blocked or unreadable site is reported as Unable to determine — never as “not WordPress”.</p></details>
-<details><summary>Does it need an account, API key or AI?</summary><p>No. Detection is deterministic: direct HTTP requests, HTML/CSS parsing, WordPress fingerprints and a weighted evidence engine. No OpenAI, Gemini, Claude, or paid third-party detection APIs.</p></details>
-<details><summary>Can it detect premium or custom themes?</summary><p>Premium themes are identified when multiple fingerprint markers match a known commercial theme or its marketplace URI. Custom themes are flagged as “Possible custom theme” with confidence from several weak signals — never stated as certainty.</p></details>
-<details><summary>Does it check security?</summary><p>It only reports publicly observable theme information (exposure). It does not attempt exploitation, does not test for vulnerabilities, and never claims a version is vulnerable. Version age is compared against a bundled dataset that may lag reality.</p></details>
-<details><summary>What about privacy and abuse?</summary><p>The submitted URL is treated as untrusted: private, loopback, internal and cloud-metadata targets are refused; redirects are re-validated against the same rules; and scans are rate-limited and budgeted (a handful of small requests).</p></details>
-  </div>
-</div>`;
-  return layout('WordPress Theme Detector — Detect the Active WP Theme from Evidence | Huvanti', body, {
-    active: 'wptheme', canonical: 'https://huvanti.com/wordpress-theme-detector', meta, jsonLd,
-    scripts: ['/assets/js/common.js', '/assets/js/wptheme/collector.js', '/assets/js/wptheme/ui.js']
+${cards('How detection works', 'rule_folder', cardsList)}
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">Getting value from theme detection</h4></div>${lede('A theme name is a starting point, not an answer. Here is how experienced builders use that information.')}${guideGrid(guides)}
+<p class="prose-block">Detection is one page of the picture. A full <a href="/">SEO audit</a> of the same site shows how well the theme is actually configured, and the <a href="/broken-link-checker">broken link checker</a> confirms the maintenance discipline behind it.</p></div>
+${faqSection(faqs)}`;
+  return layout('WordPress Theme Detector | Find the Theme Behind Any Site | Huvanti', body, {
+    active:'wptheme', canonical:'https://huvanti.com/wordpress-theme-detector',
+    description:'Free WordPress theme detector. Enter a URL to identify the active theme, version, author and parent theme from public evidence, with confidence shown for every claim. No account.',
+    scripts:['/assets/js/progress.js','/assets/js/common.js','/assets/js/wptheme/collector.js','/assets/js/wptheme/ui.js'],
+    jsonLd:[{'@context':'https://schema.org','@type':'WebApplication',name:'WordPress Theme Detector',applicationCategory:'DeveloperApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free WordPress theme detector that reads only publicly observable evidence.'}, faqLd(faqs)]
   });
 }
 
-
+/* ============================== DOMAIN INFO ============================== */
 function domainInfoPage() {
-  const meta = `<meta name="description" content="Free Domain Information Checker. Enter a domain or URL for an evidence-based report: registration, WHOIS/RDAP, DNS records, hosting, CDN, SSL/TLS, HTTP, email security, DNSSEC and technology — no account, no AI."><meta name="robots" content="index,follow">
-<meta property="og:title" content="Domain Information Checker — Huvanti"><meta property="og:description" content="Evidence-based domain intelligence from RDAP, WHOIS, DNS, TLS and HTTP — with sources and confidence for every value. Never fabricates data. No account required."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
-  const jsonLd = {'@context':'https://schema.org','@graph':[
-    {'@type':'WebSite',name:'Huvanti',url:'https://huvanti.com/'},
-    {'@type':'WebApplication',name:'Domain Information Checker',applicationCategory:'DeveloperApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',featureList:'Domain validation, RDAP/WHOIS registration data, domain age, DNS records, DNS health, nameserver analysis, hosting detection, CDN detection, SSL/TLS certificate, HTTP status and redirects, email security, DNSSEC, TLD information, IDN/punycode, technology detection, evidence and confidence',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free, deterministic domain information checker that reports only publicly verifiable data. No login, no account, no AI, no paid SEO API.'}
-  ]};
-  const body = `<section class="hero audit-home domaincheck-home"><span class="material-icons hero-icon" aria-hidden="true">dns</span><h1>Domain Information Checker</h1><p class="hero-subtitle">Publicly verifiable domain intelligence — RDAP, DNS, hosting, SSL, email &amp; more. No account, no AI.</p>
-<form id="domaincheck-form" class="search-field audit-search" role="search" aria-label="Domain information checker"><span class="material-icons" aria-hidden="true">dns</span><input id="domaincheck-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="example.com or https://example.com" required aria-label="Domain name or URL"><button class="btn" type="submit">Check Domain</button></form>
-<div class="audit-trust"><span>RDAP + WHOIS</span><span>DNS &amp; DNSSEC</span><span>Hosting &amp; ASN</span><span>CDN detection</span><span>SSL / TLS</span><span>HTTP &amp; redirects</span><span>Email security</span><span>Evidence-based</span></div></section>
+  const faqs = [
+    ['How can I find out who hosts a website?', 'Look up the A record to get the IP address, then resolve which network owns that IP range through BGP data. The catch is CDNs: when a site sits behind Cloudflare or similar, the visible network is the CDN, not the host, and this tool reports both facts separately instead of presenting the CDN as the host.'],
+    ['How do I find out where a domain is registered?', 'The registry record, fetched through RDAP or WHOIS, lists the registrar of record. The report shows the registrar name, the IANA identifier when published, and the registration and expiry dates that come with it.'],
+    ['How can I tell if a domain name is available?', 'A registry answer of no record found means the domain is not registered and is likely available. A registration record means it is taken. Anything ambiguous, such as a rate limit or a registry delay, is reported as unverifiable rather than guessed.'],
+    ['How do I check the age of a domain?', 'Age is calculated from the official registration date in the registry record, shown in years, months and days with a timeline. If privacy rules or the TLD hide the date, the report says the age is not publicly available rather than estimating it.'],
+    ['Why is so much WHOIS information hidden?', 'Privacy rules such as GDPR led registrars to redact registrant names, addresses and emails by default. The checker reports whether a domain uses privacy protection and nothing more, because the hidden details are private by design.'],
+    ['What is RDAP and how is it different from WHOIS?', 'RDAP is the modern registry protocol that returns structured data over HTTPS, and it is gradually replacing the old WHOIS service. This tool tries RDAP first and falls back to WHOIS where a registry has not adopted it yet.'],
+    ['What is DNSSEC and should I enable it?', 'DNSSEC adds cryptographic signatures to DNS answers so a resolver can prove the response is genuine. It protects against DNS spoofing. Enabling it is a one time setting at your registrar and DNS provider, and the report shows whether your domain currently has it.'],
+    ['How do I check my SSL certificate expiry?', 'The certificate panel shows the issuer, the validity window and the days remaining before expiry. If you run a site, renewals belong in a calendar with margin, because an expired certificate takes a site offline for most visitors.'],
+    ['What are MX, SPF and DMARC records?', 'MX records say which servers receive mail for the domain. SPF lists which servers may send its mail, and DMARC tells receiving providers what to do when a message fails those checks. Together they are the baseline of email deliverability and spoofing protection, and the report reads all three.'],
+    ['Why does my site show Cloudflare instead of my host?', 'Because a CDN answers requests first and hides the origin. Public data genuinely cannot see behind it. The report separates CDN from origin hosting and labels the origin as not publicly determinable when that is the truth.'],
+    ['Can someone find my personal details through this tool?', 'No. The tool reads registry and DNS data and never displays redacted personal data, even where some legacy WHOIS servers still expose it.'],
+    ['Is the data from this checker live?', 'Yes. Lookups run at query time against registry, DNS and certificate sources, with the source and a timestamp shown beside each value. Nothing is served from a stale database.']
+  ];
+  const cardsList = [
+    ['assignment','Registration data','Registrar, dates, EPP statuses explained in plain language and registry source shown for every value.'],
+    ['storage','DNS records','A, AAAA, CNAME, MX, NS, TXT, CAA, SOA, SRV, DS and DNSKEY records with a calm health summary.'],
+    ['router','Hosting and network','IP, network owner from BGP data and reverse DNS, with CDN and origin hosting kept clearly separate.'],
+    ['lock','SSL and HTTP','Certificate issuer, validity and hostname match, plus response status, redirects, HSTS and cache headers.'],
+    ['mail','Email infrastructure','MX servers and provider, SPF and DMARC policies, and DKIM checks for common selectors only.'],
+    ['memory','Technology fingerprints','Heuristic detection of WordPress, Shopify, Wix, Next.js, React, Laravel and more, always with confidence attached.']
+  ];
+  const guides = [
+    ['timeline','Read the timeline first','Registration, last update, today and expiry in one line tells a story: a domain registered last month behind a corporate claim deserves different trust than one renewed steadily for a decade. Age is not virtue by itself, but it is context.'],
+    ['verified_user','Use it before you buy or partner','Checking a domain before a purchase or a partnership answers quiet questions: who runs it, how long has it existed, is the certificate healthy, is email properly configured. Five minutes here prevents expensive lessons later.'],
+    ['dns','Audit your own DNS setup','The DNS panel is a free configuration review. Missing AAAA is fine, but a broken SPF, a missing DMARC record or DNSSEC left off are small fixes with real security value.'],
+    ['lock','Watch certificate expiry','Certificates expire at the least convenient time. When the report shows under three weeks of validity, put the renewal in your calendar today, and check whether your host auto renews at all.'],
+    ['mail','Fix email deliverability at the source','If your newsletter lands in spam, the email panel shows the usual suspects: no SPF, no DMARC, or mail servers that do not match. Fix the DNS side before blaming the content.'],
+    ['hub','Pair it with the site level tools','The domain report covers infrastructure. For the site itself, run the <a href="/">SEO audit</a>, the <a href="/wordpress-theme-detector">theme detector</a> and the <a href="/core-web-vitals-auditor">performance auditor</a> to review what visitors actually experience.']
+  ];
+  const body = `<section class="hero audit-home domaincheck-home"><span class="material-icons hero-icon" aria-hidden="true">dns</span><h1>Domain Information Checker</h1><p class="hero-subtitle">Registration, DNS, hosting, SSL and email records in one report</p>
+<form id="domaincheck-form" class="search-field audit-search" role="search" aria-label="Domain information check"><span class="material-icons" aria-hidden="true">dns</span><input id="domaincheck-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="example.com or https://example.com" required aria-label="Domain name or URL"><button class="btn" type="submit">Check Domain</button></form>
+${chips([['assignment','RDAP and WHOIS'],['storage','DNS and DNSSEC'],['router','Hosting and ASN'],['lock','SSL and TLS'],['mail','Email security'],['verified','Evidence based']])}</section>
 <div id="domaincheck-results" class="audit-results domaincheck-results"></div>
-<div class="container section">
-  <div class="section-heading-row">${icon('rule_folder')}<h4 style="margin:0;">What this checker actually does</h4></div>
-  <div class="grid feature-grid">
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('assignment')} Registration intelligence (RDAP first)</h6><p>Queries the registry’s official RDAP service, with the IANA-assigned WHOIS server as fallback. Registration/expiration dates, registrar, IANA ID, EPP statuses (explained in plain language) and DNSSEC delegation — only when publicly available.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('storage')} DNS &amp; nameservers</h6><p>A, AAAA, CNAME, MX, NS, TXT, CAA, SOA, SRV, DS and DNSKEY records with a non-alarmist DNS health panel. Nameserver IPs, networks and DNS-provider detection are shown with their signals.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('router')} Hosting vs CDN — kept separate</h6><p>ASN/BGP data, network fingerprints and reverse DNS identify the network. When a CDN proxies the site, the report says <b>CDN/Proxy: Cloudflare</b> and <b>Origin Hosting: Not publicly determinable</b> — the proxy is never claimed as the host.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('lock')} SSL/TLS &amp; HTTP</h6><p>Certificate issuer, validity window, days remaining, SANs, chain status, TLS version and hostname match; HTTP status, response time, redirect chain, HSTS, compression and cache headers. Handshake-only checks — no intrusive testing.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('mail')} Email infrastructure</h6><p>MX servers and provider, SPF and DMARC policies, and DKIM for a small set of common selectors only (never brute-forced). SPF presence is never presented as “fully protected”.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('verified')} Accuracy over completeness</h6><p>Every major value carries its source, confidence and timestamp. Conflicting sources are shown side by side. Anything unavailable is labelled <b>Not publicly available</b> or <b>Unable to Verify</b> — never invented.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('timeline')} Domain age &amp; timeline</h6><p>Age is computed from the official registration date only — years, months, days and total days — with a Registered → Updated → Now → Expires timeline and expiration warnings. No registration date? It says so.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('memory')} Technology fingerprints</h6><p>Heuristic detection of WordPress, Shopify, Wix, Webflow, Drupal, Joomla, Laravel, Next.js, React, Vue, Angular, PHP, Node.js, Google Analytics/GTM and CDNs from public fingerprints — with confidence, never claimed as certain.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('security')} Safe by design</h6><p>Domain input is treated as untrusted: private/loopback/metadata targets are refused, redirects are re-validated, lookups are rate-limited, cached per scan and strictly budgeted. No login, no AI, no paid SEO API.</p></div></div></div>
-  </div>
-</div>
-<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('forum')}<h4 style="margin:0;">Common Questions</h4></div><div class="faq-accordion">
-<details><summary>Is this a WHOIS lookup?</summary><p>It is a complete domain intelligence report: RDAP/WHOIS registration data, DNS records and health, nameservers, IP/ASN/hosting, CDN detection, SSL/TLS, HTTP and redirects, email security, DNSSEC, TLD and IDN information, domain age, timeline, and heuristic technology detection.</p></details>
-<details><summary>Where does the data come from?</summary><p>Directly from public sources: the registry’s RDAP/WHOIS services, public DNS resolvers, BGP/ASN data, TLS handshakes and HTTP responses, plus a local fingerprint database. Every major result shows its source, confidence and timestamp in the report.</p></details>
-<details><summary>Does it guess or use AI?</summary><p>No. Nothing is fabricated and no LLM/API is involved. If a value (registration date, registrar, hosting, IP, ASN, SSL issuer…) cannot be verified, the report says <b>Not publicly available</b> or <b>Unable to Verify</b> — and conflicting sources are shown instead of being merged silently.</p></details>
-<details><summary>Why does the report say “Origin Hosting: Not publicly determinable”?</summary><p>When a CDN/reverse proxy (Cloudflare, CloudFront, Fastly…) fronts a domain, public data only reveals the edge network. Claiming the origin host would be a guess, so the tool separates <b>CDN/Proxy</b> from <b>Origin Hosting</b> and says so honestly.</p></details>
-<details><summary>Does it show the domain owner?</summary><p>No. Registrant names, addresses, phone numbers and emails are private data. The tool detects whether registrant data is privacy-protected and reports that — it never displays or bypasses WHOIS privacy.</p></details>
-<details><summary>Why are some sections unavailable?</summary><p>Some registries have no RDAP and some environments block direct HTTPS/WHOIS connections. Those sections are reported as unavailable with the reason — never filled in with guesses. The DNS-based sections always work.</p></details>
-<details><summary>Is availability checking exact?</summary><p>A registry “not found” answer is reported as Available, a registration record as Registered, and anything else as <b>Unable to Verify</b>. Rate limits and registry delays are respected and stated.</p></details>
-</div></div>`;
-  return layout('Domain Information Checker — DNS, WHOIS, SSL & Hosting Intelligence | Huvanti', body, {
-    active: 'domaincheck', canonical: 'https://huvanti.com/domain-information-checker', meta, jsonLd,
-    scripts: ['/assets/js/common.js', '/assets/js/domaincheck/ui.js']
+${cards('What the report covers', 'rule_folder', cardsList)}
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">Reading a domain report well</h4></div>${lede('Domain data answers questions that a website deliberately or accidentally leaves open. These habits get the most out of it.')}${guideGrid(guides)}
+<p class="prose-block">Curious what a full site review covers beyond infrastructure? Start with the <a href="/">SEO audit</a>, then check accessibility of every link with the <a href="/broken-link-checker">broken link checker</a>.</p></div>
+${faqSection(faqs, 'People Often Ask')}`;
+  return layout('Domain Information Checker | DNS, WHOIS, SSL and Hosting | Huvanti', body, {
+    active:'domaincheck', canonical:'https://huvanti.com/domain-information-checker',
+    description:'Free domain information checker. Registration and WHOIS data, DNS records, hosting and CDN detection, SSL certificate, email security and domain age in one report. No account.',
+    scripts:['/assets/js/progress.js','/assets/js/common.js','/assets/js/domaincheck/ui.js'],
+    jsonLd:[{'@context':'https://schema.org','@type':'WebApplication',name:'Domain Information Checker',applicationCategory:'DeveloperApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free domain intelligence tool reporting only publicly verifiable data.'}, faqLd(faqs)]
   });
 }
 
+/* ============================== XML SITEMAP GENERATOR ============================== */
 function sitemapPage() {
-  const meta = `<meta name="description" content="Free XML Sitemap Generator. Crawl a public website safely, respect robots.txt, analyse existing sitemaps, validate indexable URLs, and download standards-compliant XML."><meta name="robots" content="index,follow">
-<meta property="og:title" content="XML Sitemap Generator — Huvanti"><meta property="og:description" content="Production-quality sitemap generator and analyzer with robots.txt, canonical, noindex, redirect and XML validation."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
-  const jsonLd = {'@context':'https://schema.org','@graph':[
-    {'@type':'WebSite',name:'Huvanti',url:'https://huvanti.com/'},
-    {'@type':'WebApplication',name:'XML Sitemap Generator',applicationCategory:'DeveloperApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',featureList:'URL validation, SSRF-safe fetching, robots.txt parsing, sitemap discovery, internal crawling, canonical and noindex detection, XML validation, sitemap splitting, existing sitemap analysis',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free deterministic XML sitemap generator and analyzer. No login, account, AI or paid SEO API.'}
-  ]};
-  const body = `<section class="hero audit-home sitemap-home"><span class="material-icons hero-icon" aria-hidden="true">account_tree</span><h1>XML Sitemap Generator</h1><p class="hero-subtitle">Generate or analyse technically valid XML sitemaps from real crawlable pages.</p>
+  const faqs = [
+    ['What is an XML sitemap?', 'It is a file that lists the URLs you want search engines to know about, in a fixed XML format that crawlers understand. Think of it as a table of contents for robots: it does not force indexing, but it makes discovery easier, especially for new or large sites.'],
+    ['Does my website need a sitemap?', 'Google recommends one for large sites, new sites with few external links, sites with poorly linked pages and sites with rich media. A small blog with clean navigation can rank fine without one, but since a sitemap costs nothing, most sites keep one anyway.'],
+    ['Where do I put the sitemap file?', 'At the root of your domain, so its address is yoursite.com/sitemap.xml. That is where crawlers look first. Reference the same address in robots.txt so every engine finds it.'],
+    ['How do I submit a sitemap to Google?', 'Add your property in Google Search Console, open the Sitemaps section, enter the file name and press Submit. Submission is a hint that speeds discovery; Google still decides what to index.'],
+    ['How many URLs can one sitemap contain?', 'The protocol limit is 50,000 URLs or 50 megabytes per file, whichever comes first. Larger sites split the list across several sitemaps tied together by a sitemap index file, which this generator can produce automatically.'],
+    ['Should noindex pages be in a sitemap?', 'No. A sitemap should contain pages you want indexed, and listing a noindex page sends mixed signals. The generator excludes noindex URLs, redirects and non canonical pages by default and tells you why each URL was excluded.'],
+    ['Does a sitemap improve rankings?', 'Not directly. It helps search engines find and recrawl your pages, which indirectly helps new content get indexed faster. Rankings still depend on content quality, relevance and links.'],
+    ['What is the difference between sitemap.xml and robots.txt?', 'robots.txt tells crawlers what they may not access and points to your sitemap. The sitemap lists what you want discovered. You need the sitemap reference inside robots.txt, but the files do different jobs.'],
+    ['How often should I update my sitemap?', 'Whenever you publish or remove pages. WordPress does this automatically. For static sites, regenerate after meaningful changes, or schedule it, and keep lastmod values truthful because Google discounts stale or fake dates.'],
+    ['Does Google use the lastmod date?', 'Google has said it uses lastmod for recrawl scheduling when the value is consistently accurate. Faking fresh dates to trigger crawls is detected and ignored, so only publish real modification times.'],
+    ['Does WordPress create a sitemap automatically?', 'Yes, since version 5.5 WordPress ships a basic sitemap at wp-sitemap.xml. Plugins extend it with better exclusion controls. You can also generate a fresh one here to audit what your current sitemap actually exposes.'],
+    ['What does Analyze Existing Sitemap mode do?', 'Point it at your current sitemap file and it checks every listed URL: broken ones, redirects, duplicates, non canonical and noindex entries that should not be there, then scores the file health.']
+  ];
+  const cardsList = [
+    ['security','Safe crawler','Public URLs only, with private addresses, unsafe redirects and oversized responses refused, and robots.txt respected.'],
+    ['rule','Indexability rules','Response codes, canonical tags, noindex directives and robots rules are checked before any URL is included.'],
+    ['fact_check','Existing sitemap analysis','A health score for your current file: broken URLs, redirects, duplicates, non canonical pages and structural XML problems.'],
+    ['code','Standards compliant XML','The sitemap protocol namespace, correctly escaped locations, reliable lastmod values only, and automatic splitting with an index for large sites.'],
+    ['image','Optional image sitemap','Image URLs associated with each page can be included, filtered to real content images rather than icons and trackers.'],
+    ['table_view','Transparent URL explorer','Every crawled URL with its status, canonical target, inclusion decision and the exact reason for any exclusion.']
+  ];
+  const guides = [
+    ['rule','Include what deserves indexing','A good sitemap is a curated list, not a dump. Product pages, posts, categories and key landing pages belong in it. Tag archives, search result pages, filtered faceted URLs and thin utility pages dilute it and are better excluded, which this generator does by default.'],
+    ['content_cut','One URL, one canonical entry','Each page should appear once, in its canonical form, without parameters and duplicate trailing slash variants. The generator normalises and deduplicates before writing the file, so you ship one clean list.'],
+    ['event_repeat','Keep it honest and current','An outdated sitemap wastes crawler attention on dead URLs. Regenerate after removing pages, and when you analyse your existing file here, fix every broken and redirected entry it reports before resubmitting.'],
+    ['anchor','Connect it to robots.txt','One line, Sitemap: https://yoursite.com/sitemap.xml, makes the file discoverable to every major crawler, not only the one where you submitted it. The generator reminds you of the exact line to add.'],
+    ['monitoring','Submit, then verify coverage','After submitting in Search Console, watch the Pages report for coverage. If indexed counts sit far below submitted counts, the URL explorer shows which entries were excluded and why, which is usually the whole story.'],
+    ['hub','Pair with the related generators','Many sites publish a feed alongside a sitemap. The <a href="/rss-feed-generator">RSS feed generator</a> and the <a href="/llms-txt-generator">LLMs.txt generator</a> cover the other discovery formats from the same crawl, and the <a href="/broken-link-checker">broken link checker</a> verifies what the sitemap points at.']
+  ];
+  const body = `<section class="hero audit-home sitemap-home"><span class="material-icons hero-icon" aria-hidden="true">account_tree</span><h1>XML Sitemap Generator</h1><p class="hero-subtitle">Generate a clean sitemap or audit the one you already have</p>
 <form id="sitemap-form" class="sitemap-form" aria-label="XML sitemap generator">
   <div class="mode-tabs" role="radiogroup" aria-label="Mode"><label><input type="radio" name="sitemap-mode" value="generate" checked> Generate New Sitemap</label><label><input type="radio" name="sitemap-mode" value="analyze"> Analyze Existing Sitemap</label></div>
   <div class="search-field audit-search"><span class="material-icons" aria-hidden="true">link</span><input name="url" id="sitemap-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website or sitemap URL"><button class="btn" type="submit">Generate Sitemap</button></div>
   <details class="sitemap-options sitemap-advanced"><summary>${icon('tune')} Advanced crawl settings</summary>
-    <div class="sitemap-option-row"><label>Maximum URLs <select name="maxUrls" class="select"><option value="100">100</option><option value="500" selected>500</option><option value="1000">1,000</option><option value="5000">5,000</option><option value="10000">10,000</option></select></label><label>Crawl Depth <select name="depth" class="select"><option value="unlimited">Unlimited (capped safely)</option><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="5">5</option><option value="10">10</option></select></label><label>Changefreq <select name="changefreq" class="select"><option value="" selected>Don't include</option><option value="always">Always</option><option value="hourly">Hourly</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option><option value="never">Never</option></select></label></div>
-    <div class="sitemap-option-row"><label><input type="checkbox" name="includeSubdomains"> Include subdomains</label><label><input type="checkbox" name="includeNoindex"> Include noindex URLs <small>(not recommended)</small></label><label><input type="checkbox" name="includeImages"> Include Images</label></div>
+    <div class="sitemap-option-row"><label>Maximum URLs <select name="maxUrls" class="select"><option value="100">100</option><option value="500" selected>500</option><option value="1000">1,000</option><option value="5000">5,000</option></select></label><label>Crawl depth <select name="depth" class="select"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="5">5</option></select></label><label><input type="checkbox" name="includeImages"> Include images</label></div>
   </details>
 </form>
-<div class="audit-trust"><span>No account</span><span>No AI API</span><span>Robots.txt respected</span><span>Canonicals checked</span><span>Noindex excluded</span><span>XML validated</span><span>Download ready</span></div></section>
+${chips([['rule','Robots respected'],['link','Canonicals checked'],['do_not_disturb_on','Noindex excluded'],['code','XML validated'],['download','Download ready']])}</section>
 <div id="sitemap-results" class="audit-results sitemap-results"></div>
-<div class="container section"><div class="section-heading-row">${icon('verified')}<h4 style="margin:0;">Built for accurate sitemap generation — not link dumping</h4></div><div class="grid feature-grid">
-  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('security')} Safe crawler</h6><p>Only public HTTP/HTTPS URLs are accepted. Private IPs, localhost, metadata endpoints, unsafe redirects, oversized responses and request flooding are blocked.</p></div></div></div>
-  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('rule')} Robots and indexability</h6><p>robots.txt, HTTP status, content type, canonical links, meta robots and X-Robots-Tag are checked before a URL is included.</p></div></div></div>
-  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('fact_check')} Existing sitemap analysis</h6><p>Inspect XML validity, broken URLs, redirects, duplicates, non-canonical pages, non-indexable URLs and structure issues with an internal health score.</p></div></div></div>
-  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('code')} Standards-compliant XML</h6><p>Generated files use the sitemap protocol namespace, properly escaped loc values, reliable lastmod only, automatic splitting and validation.</p></div></div></div>
-  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('image')} Optional image sitemap</h6><p>When enabled, page-associated image URLs from img, picture/srcset and Open Graph are included without tracking pixels or UI icons.</p></div></div></div>
-  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('table_view')} Transparent URL explorer</h6><p>Every crawled URL is shown with status, indexability, canonical target, inclusion decision and a precise exclusion reason.</p></div></div></div>
-</div></div>
-<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('forum')}<h4 style="margin:0;">Common Questions</h4></div><div class="faq-accordion">
-<details><summary>Why can a crawl fail?</summary><p>Some sites block datacenter crawlers, require JavaScript challenges, rate-limit requests, have DNS/SSL issues, or disallow crawling in robots.txt. The tool now tries a server crawl first and then a browser/relay fallback, but it still reports a real access failure instead of inventing URLs.</p></details>
-<details><summary>Does this include every discovered link?</summary><p>No. A URL must be internal, allowed by robots.txt, return a successful HTML response, be indexable, and pass canonical and duplicate checks before it is included in the generated sitemap.</p></details>
-<details><summary>Are lastmod, changefreq and priority fabricated?</summary><p>No. lastmod is only included when reliable data exists. changefreq is optional and user-selected. priority is not generated by default because arbitrary priorities do not guarantee search-engine ranking behavior.</p></details>
-<details><summary>What happens if an existing sitemap is detected?</summary><p>The generator shows Existing Sitemap Detected. You can still generate a fresh crawl-based sitemap or switch to Analyze Existing Sitemap mode to inspect broken URLs, redirects, duplicates, canonical problems and non-indexable URLs.</p></details>
-<details><summary>Does this work with WordPress and JavaScript sites?</summary><p>It detects common WordPress sitemap structures and crawlable WordPress URLs. For JavaScript-heavy pages, it reports limited crawlability when the server HTML has too little content; it does not fake rendered links.</p></details>
-<details><summary>Is this affiliated with Google?</summary><p>No. The sitemap health score is an internal diagnostic score, not an official Google score. A valid sitemap helps discovery but never guarantees indexing.</p></details>
-</div></div>`;
-  return layout('XML Sitemap Generator — Free Crawl, Validate & Download | Huvanti', body, { active:'sitemap', canonical:'https://huvanti.com/xml-sitemap-generator', meta, jsonLd, scripts:['/assets/js/common.js','/assets/js/sitemap/browser.js','/assets/js/sitemap/ui.js'] });
+${cards('What the generator does', 'verified', cardsList)}
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">Building a sitemap that helps</h4></div>${lede('A sitemap is easy to generate and easy to get wrong. These are the practices that separate a useful file from a noisy one.')}${guideGrid(guides)}
+<p class="prose-block">Before generating, a quick <a href="/">SEO audit</a> will surface the redirect and canonical problems that decide which URLs belong in the file at all.</p></div>
+${faqSection(faqs)}`;
+  return layout('XML Sitemap Generator | Free Crawl, Validate and Download | Huvanti', body, {
+    active:'sitemap', canonical:'https://huvanti.com/xml-sitemap-generator',
+    description:'Free XML sitemap generator. Crawl a public website, respect robots.txt, exclude noindex and non canonical URLs, validate the XML and download a standards compliant sitemap. No account.',
+    scripts:['/assets/js/progress.js','/assets/js/common.js','/assets/js/sitemap/browser.js','/assets/js/sitemap/ui.js'],
+    jsonLd:[{'@context':'https://schema.org','@type':'WebApplication',name:'XML Sitemap Generator',applicationCategory:'DeveloperApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free XML sitemap generator and analyzer.'}, faqLd(faqs)]
+  });
 }
 
+/* ============================== BROKEN LINK CHECKER ============================== */
+function brokenlinkPage() {
+  const faqs = [
+    ['How do I find broken links on my website?', 'Use a crawler that follows every link and records the response. This checker crawls your pages, verifies each destination, retries uncertain answers and classifies every link, so you get a confirmed list rather than a pile of timeouts.'],
+    ['Do broken links hurt SEO?', 'Indirectly but really. Broken internal links waste crawl budget and block authority from flowing, and broken outbound links frustrate readers, which shows up in engagement. Google does not run a specific broken link penalty, but the effects compound.'],
+    ['What is the difference between a 404 and a soft 404?', 'A hard 404 returns the proper status code. A soft 404 returns a 200 with a not found page, which crawlers must guess at from content. Soft 404s are worse for crawlers because the status code lies, and they usually come from rewrite rules that catch everything.'],
+    ['Should I redirect or fix a broken link?', 'If the target moved, redirect it with a 301 to the closest equivalent page. If the target is gone for good, update the linking page to point somewhere genuinely useful, or remove the link. Redirecting everything to the homepage is the classic mistake to avoid.'],
+    ['How many broken links are acceptable?', 'There is no fixed threshold, but the honest answer is fewer every quarter. A handful of rotting outbound links on a large blog is normal life on the web. Hundreds of internal 404s point at a migration that was never finished.'],
+    ['Why do external links break so often?', 'Link rot is structural: sites move, reorganise, delete old content and expire domains. Studies of citation links regularly find a quarter or more dead within a few years, which is why periodic link audits are maintenance, not failure.'],
+    ['What causes 500 errors in link checks?', 'Server side failures: crashing code, overloaded databases, bad deployments or aggressive rate limiting. Because 5xx answers can be transient, this checker retries them and only reports persistent failures as broken.'],
+    ['What is a redirect chain and why does it matter?', 'A chain is when a URL redirects to another redirect, sometimes several times. Each hop adds latency, loses a little equity and increases the chance of a future break. Update links and redirects so every hop lands in one step.'],
+    ['Why are some links marked Restricted or Bot Protection instead of broken?', 'Because a 401, 403, 429 or a CAPTCHA page proves only that our reader was refused, not that the page is gone. Calling those broken would be a false positive, so they are classified separately with the evidence shown.'],
+    ['Does the checker respect robots.txt?', 'Yes, by default. Pages and paths a site disallows are reported as blocked rather than fetched, and you can see them listed with the reason.'],
+    ['How often should I check for broken links?', 'Quarterly suits most sites, monthly for large or constantly edited ones, and always immediately after a migration, redesign or platform change.']
+  ];
+  const cardsList = [
+    ['security','Safe and polite crawling','Private addresses refused, redirects validated, response sizes capped, robots.txt respected and concurrency kept at polite levels.'],
+    ['fact_check','Accurate classification','Confirmed broken only with real evidence. Restricted, rate limited, bot protection and timeout answers are labelled as exactly what they are.'],
+    ['loop','Retries and redirect analysis','Uncertain answers retried with backoff, full redirect chains recorded and loops detected across hops.'],
+    ['dns','DNS and TLS diagnostics','Expired certificates, hostname mismatches and failed lookups reported as their own failure classes, not generic errors.'],
+    ['image_search','Images and documents too','Optional checks for images, PDFs and other file links, plus anchor validation for links that point to page sections.'],
+    ['grading','A health score that forgives life','Normal 301 redirects and politely refused external endpoints do not sink the score. Confirmed internal failures do.']
+  ];
+  const guides = [
+    ['format_list_numbered','Work the confirmed list top down','Start with internal 404s, because those are fully under your control and they block authority from reaching live pages. External rot comes second, and restricted or protected endpoints last, since those are often just policy, not breakage.'],
+    ['redirect','Fix causes, not symptoms','If an internal URL 404s, decide whether to restore the page, redirect it to the nearest real equivalent, or remove links to it. The right answer is usually the redirect map you wish you had made during the migration.'],
+    ['link','Tidy anchors while you are in there','Links to page sections break silently when someone renames an id. The anchor check lists every heading target that no longer exists, which takes minutes to fix and improves navigation for everyone.'],
+    ['map','Keep the redirect map short','After a big cleanup, chains tend to accumulate: old URL to new URL to newer URL. Collapse each chain to a single hop and update internal links to point at the final destination.'],
+    ['event_repeat','Make it a routine, not a rescue','Link rot returns. A quarterly scan catches rot while it is small, keeps crawl budget on real pages, and gives you a health score trend instead of an annual archaeology project.'],
+    ['hub','Combine with the structure tools','Run the <a href="/xml-sitemap-generator">sitemap generator</a> in analyze mode afterwards to confirm the file lists no dead URLs, and a full <a href="/">SEO audit</a> to catch the duplicate and canonical issues that usually travel with link problems.']
+  ];
+  const body = `<section class="hero audit-home brokenlink-home"><span class="material-icons hero-icon" aria-hidden="true">link_off</span><h1>Broken Link Checker</h1><p class="hero-subtitle">Crawl a site and verify every link, with no false alarms</p>
+<form id="brokenlink-form" class="brokenlink-form" aria-label="Broken link checker">
+  <div class="search-field audit-search" style="flex-wrap:wrap;gap:8px;padding:10px;max-width:900px">
+    <span class="material-icons" aria-hidden="true">link</span>
+    <input id="bl-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL" style="flex:1;min-width:200px">
+    <button class="btn" type="submit">Start Scan</button>
+  </div>
+  <details class="sitemap-options sitemap-advanced" style="max-width:900px;margin:18px auto 0"><summary>${icon('tune')} Scan settings</summary>
+    <div class="sitemap-option-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+      <label>Maximum pages
+        <select id="bl-max-pages" class="select"><option value="100">100</option><option value="500" selected>500</option><option value="1000">1,000</option><option value="5000">5,000</option></select>
+      </label>
+      <label>Maximum crawl depth
+        <select id="bl-max-depth" class="select"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="5" selected>5</option><option value="10">10</option></select>
+      </label>
+      <label>Scan scope
+        <select id="bl-scan-scope" class="select"><option value="internal+external" selected>Internal and external</option><option value="internal">Internal only</option></select>
+      </label>
+    </div>
+    <div class="sitemap-option-row" style="display:flex;flex-wrap:wrap;gap:16px;margin-top:12px">
+      <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="bl-check-external" checked> Check external links</label>
+      <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="bl-check-images"> Check images</label>
+      <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="bl-check-docs"> Check documents</label>
+      <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="bl-check-anchors"> Check section anchors</label>
+      <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="bl-respect-robots" checked> Respect robots.txt</label>
+    </div>
+  </details>
+</form>
+${chips([['fact_check','Accurate classes'],['security','SSRF safe'],['rule','Robots respected'],['loop','Redirect chains'],['retry','Retry verification'],['grading','Health score']])}</section>
+<div id="brokenlink-results" class="audit-results brokenlink-results"></div>
+${cards('What the scan covers', 'verified', cardsList)}
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">Fixing links the professional way</h4></div>${lede('A link report is only as good as the fixes that follow. This is the order that returns the most value for the effort.')}${guideGrid(guides)}
+<p class="prose-block">Link problems rarely travel alone. After the cleanup, a <a href="/">SEO audit</a> confirms the technical side is clean and the <a href="/xml-sitemap-generator">sitemap generator</a> rebuilds a file with only live URLs.</p></div>
+${faqSection(faqs, 'People Often Ask')}`;
+  return layout('Broken Link Checker | Accurate Scan with No False Positives | Huvanti', body, {
+    active:'brokenlink', canonical:'https://huvanti.com/broken-link-checker',
+    description:'Free broken link checker. Crawl any public site, find confirmed broken links, redirect chains and loops, with careful classification and no false positives. No account.',
+    scripts:['/assets/js/progress.js','/assets/js/common.js','/assets/js/brokenlink/crawler.js','/assets/js/brokenlink/ui.js'],
+    jsonLd:[{'@context':'https://schema.org','@type':'WebApplication',name:'Broken Link Checker',applicationCategory:'DeveloperApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free broken link checker with multi stage verification and accurate classification.'}, faqLd(faqs)]
+  });
+}
+/* ============================== LLMS.TXT GENERATOR ============================== */
 function llmstxtPage() {
-  const meta = `<meta name="description" content="Free LLMs.txt Generator. Crawl a public website, extract metadata, prioritise genuinely useful pages and generate a spec-compliant llms.txt — no account, no AI, no paid SEO APIs."><meta name="robots" content="index,follow">
-<meta property="og:title" content="LLMs.txt Generator — Huvanti"><meta property="og:description" content="Generate, validate and download a clean llms.txt from real crawlable pages with deterministic relevance scoring and robots.txt respect."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
-  const jsonLd = {'@context':'https://schema.org','@graph':[
-    {'@type':'WebSite',name:'Huvanti',url:'https://huvanti.com/'},
-    {'@type':'WebApplication',name:'LLMs.txt Generator',applicationCategory:'DeveloperApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',featureList:'URL validation, SSRF-safe crawling, robots.txt parsing, sitemap discovery, metadata extraction, canonical and noindex handling, duplicate removal, page classification, deterministic relevance scoring, llms.txt generation and validation, download',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free deterministic llms.txt generator and validator. No login, no account, no AI, no paid SEO API.'}
-  ]};
-  const body = `<section class="hero audit-home llmstxt-home"><span class="material-icons hero-icon" aria-hidden="true">auto_stories</span><h1>LLMs.txt Generator</h1><p class="hero-subtitle">Generate a clean, spec-compliant <code>llms.txt</code> from a real public crawl — no AI, no paid APIs.</p>
+  const faqs = [
+    ['What is llms.txt?', 'It is a proposed standard file, placed at the root of a domain, that gives AI systems and language models a curated map of a site. It is written in simple Markdown: a title, a short description, then sections of links to the content that best represents the site, each with a one line note.'],
+    ['Do I need an llms.txt file?', 'Nobody needs one yet. Adoption is early: some AI tools read it, many ignore it, and the format is still a proposal rather than a standard. Publishing one is a low effort bet that costs ten minutes and makes your key content easier for any compliant system to find.'],
+    ['Does Google use llms.txt for search?', 'Google has said Search does not use llms.txt, and that robots.txt plus normal crawling cover its needs. The file is aimed at AI assistants and answer engines, where a curated content map has more obvious value.'],
+    ['Where do I put the llms.txt file?', 'At https://yoursite.com/llms.txt, the same way robots.txt sits at the root. Nothing needs to be registered anywhere: the file is simply there for tools that look for it.'],
+    ['Is llms.txt the same as robots.txt?', 'No. robots.txt tells crawlers what they may not access. llms.txt describes what your site is about and which pages matter most. They work side by side and control different things.'],
+    ['Will an llms.txt file get my site cited in AI answers?', 'No file guarantees that. Answers depend on relevance, quality and each platform own ranking. What a good llms.txt does is remove friction: clear descriptions, clean URLs and an honest map of your best material.'],
+    ['What pages should go into llms.txt?', 'Your genuinely strongest material: cornerstone guides, definitive documentation, key tools and popular posts. A short curated file beats an exhaustive dump, because the entire point is telling models where the real substance lives.'],
+    ['How is llms.txt different from a sitemap?', 'A sitemap lists every indexable URL for search engines, usually without context. llms.txt lists a small curated selection with descriptions that explain why each link matters. One is breadth for crawlers, the other is guidance for models.'],
+    ['Does this generator use AI to write the file?', 'No. It crawls your site, scores pages by measurable signals such as depth, links and content, and writes descriptions from your own meta data and page text. The process is deterministic and reproducible.'],
+    ['Can I edit the file before downloading?', 'Yes. The page table lets you exclude pages, rewrite titles and descriptions, reorder entries and add custom URLs, and the preview updates as you go. The download is exactly what the preview shows.']
+  ];
+  const cardsList = [
+    ['security','Safe public crawling','Public URLs only, robots.txt respected, redirects validated and response sizes capped, with a bounded crawl budget.'],
+    ['auto_awesome','Deterministic selection','Pages are scored on measurable signals like proximity to the homepage, links, sitemap presence and content depth. No model, no guessing.'],
+    ['description','Real descriptions','Every entry is described using your own meta description, Open Graph text or introductory paragraph, never generated filler.'],
+    ['fact_check','Quality filtering','Duplicates, noindex pages, non canonical URLs, tracking parameters and login or cart pages are excluded with the reason shown.'],
+    ['edit','Full manual control','Include, exclude, recategorise, rewrite and reorder every entry, add custom URLs, then regenerate instantly.'],
+    ['code','Validated output','The file is checked against the llms.txt structure before download, and the quality score explains any deductions.']
+  ];
+  const guides = [
+    ['auto_stories','Curate like an editor','Imagine a new colleague asking where the real knowledge on your site lives. The handful of links you would hand them is your llms.txt. Depth beats completeness: fifty well chosen entries outperform five thousand undifferentiated ones.'],
+    ['description','Write descriptions that carry information','The note beside each link is what a model actually reads. Explain what the page covers and who it serves, in one specific sentence. A note that could apply to any page on the internet helps no one.'],
+    ['category','Group with the standard sections','The format expects an H1 title, an optional summary, then file list sections, with Optional for secondary material. Keep the structure recognizable so every tool that reads the format can parse your file.'],
+    ['link','Keep URLs clean and canonical','One address per page, the canonical one, no parameters or fragments. The generator normalises and deduplicates automatically, but it is worth knowing why: duplicates make models unsure which version represents the content.'],
+    ['update','Refresh it like a sitemap','When cornerstone content moves or new definitive pages ship, regenerate. A stale llms.txt quietly points models at pages that no longer exist, which is worse than no file at all.'],
+    ['hub','Cover the other discovery channels','Pair it with the <a href="/xml-sitemap-generator">XML sitemap generator</a> for search engines and the <a href="/rss-feed-generator">RSS feed generator</a> for feed readers. If you also want to control which AI bots may crawl you at all, the <a href="/ai-crawler-blocker">bot blocker</a> generates those rules.']
+  ];
+  const body = `<section class="hero audit-home llmstxt-home"><span class="material-icons hero-icon" aria-hidden="true">auto_stories</span><h1>LLMs.txt Generator</h1><p class="hero-subtitle">Turn your best pages into a clean llms.txt for AI tools</p>
 <form id="llmstxt-form" class="llmstxt-form" aria-label="LLMs.txt generator">
   <div class="search-field audit-search"><span class="material-icons" aria-hidden="true">link</span><input name="url" id="llmstxt-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL"><button class="btn" type="submit">Generate llms.txt</button></div>
   <details class="sitemap-options sitemap-advanced"><summary>${icon('tune')} Crawl settings</summary>
-    <div class="sitemap-option-row"><label>Maximum Pages <select name="maxPages" class="select"><option value="100">100</option><option value="500" selected>500</option><option value="1000">1,000</option><option value="5000">5,000</option><option value="10000">10,000</option></select></label><label>Crawl Depth <select name="maxDepth" class="select"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="5">5</option><option value="10">10</option></select></label></div>
-    <div class="sitemap-option-row"><label><input type="checkbox" name="includePdfs" checked> Include PDFs</label><label><input type="checkbox" name="includeBlog" checked> Include Blog Posts</label><label><input type="checkbox" name="includeDocs" checked> Include Documentation</label></div>
-    <details class="llmstxt-advanced-sub"><summary>${icon('tune')} Advanced options</summary>
-      <div class="sitemap-option-row"><label><input type="checkbox" name="includeExternal"> Include External URLs <small>(candidates only)</small></label><label><input type="checkbox" name="includeCategories"> Include Category Pages</label><label><input type="checkbox" name="includeAuthors"> Include Author Pages</label><label><input type="checkbox" name="includeNoindex" id="llmstxt-noindex-toggle"> Include noindex pages <small class="llmstxt-noindex-warning" hidden>(not recommended)</small></label></div>
-      <div class="sitemap-option-row"><label>Maximum Blog URLs <select name="maxBlogUrls" class="select"><option value="10">10</option><option value="25" selected>25</option><option value="50">50</option><option value="100">100</option><option value="250">250</option><option value="all">All</option></select></label><label>Maximum Product URLs <select name="maxProducts" class="select"><option value="10">10</option><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option><option value="250">250</option><option value="all">All</option></select></label></div>
-      <div class="sitemap-option-row"><label style="flex:1 1 100%;align-items:flex-start;flex-direction:column;gap:4px">Website description <small class="muted">Optional — leave blank to auto-detect from the homepage</small><input type="text" name="websiteDescription" class="text-input llmstxt-desc-input" placeholder="e.g. Practical guides on home organization" style="max-width:520px"></label></div>
-    </details>
+    <div class="sitemap-option-row"><label>Maximum pages <select name="maxPages" class="select"><option value="100">100</option><option value="500" selected>500</option><option value="1000">1,000</option><option value="5000">5,000</option></select></label><label>Crawl depth <select name="maxDepth" class="select"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="5">5</option></select></label></div>
+    <input type="hidden" name="includePdfs" value="1"><input type="hidden" name="includeBlog" value="1"><input type="hidden" name="includeDocs" value="1">
   </details>
 </form>
-<div class="audit-trust"><span>No account</span><span>No AI API</span><span>Robots.txt respected</span><span>Deterministic scoring</span><span>Canonicals handled</span><span>Output validated</span><span>Download ready</span></div></section>
+${chips([['rule','Robots respected'],['auto_awesome','Deterministic scoring'],['link','Canonicals handled'],['code','Output validated'],['download','Download ready']])}</section>
 <div id="llmstxt-results" class="audit-results llmstxt-results"></div>
-<div class="container section"><div class="section-heading-row">${icon('verified')}<h4 style="margin:0;">A real discovery → analysis → generation pipeline</h4></div><div class="grid feature-grid">
-  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('security')} Safe, SSRF-protected crawler</h6><p>Only public HTTP/HTTPS URLs are accepted. Private IPs, localhost, cloud metadata endpoints, unsafe redirects, oversized responses and request flooding are blocked.</p></div></div></div>
-  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('rule')} robots.txt + sitemap discovery</h6><p>robots.txt Allow/Disallow/Sitemap/Crawl-delay are respected, and sitemaps (including recursive sitemap indexes) are used to improve discovery.</p></div></div></div>
-  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('auto_awesome')} Deterministic selection</h6><p>Every page gets an internal relevance score from homepage proximity, depth, links, navigation, sitemap presence, title, content, headings and metadata — never an LLM.</p></div></div></div>
-  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('description')} Real descriptions</h6><p>Descriptions come only from meta description, Open Graph, the page's own introductory text, or its title — nothing is fabricated.</p></div></div></div>
-  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('fact_check')} Canonical, noindex, duplicates</h6><p>Non-canonical URLs, noindex pages, tracking parameters, query-parameter duplicates, redirects and broken URLs are detected and excluded with precise reasons.</p></div></div></div>
-  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('edit')} Manual editing</h6><p>Include or exclude any page, change its category, title and description, reorder it, or add a custom URL — then regenerate instantly. No account required.</p></div></div></div>
-</div></div>
-<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('forum')}<h4 style="margin:0;">Common Questions</h4></div><div class="faq-accordion">
-<details><summary>What is llms.txt?</summary><p>It is a Markdown file (proposed by Jeremy Howard / Answer.AI, documented at llmstxt.org) placed at <code>/llms.txt</code> that gives LLMs and AI agents a concise, curated overview of a site's most important content. The only required element is an H1 title.</p></details>
-<details><summary>Does this tool use an LLM or AI?</summary><p>No. Discovery, metadata extraction, categorisation, relevance scoring, descriptions, generation and validation are all deterministic code. It does not call OpenAI, Gemini, Claude or any other AI/LLM API.</p></details>
-<details><summary>Why are some pages excluded?</summary><p>Pages are excluded for concrete reasons — duplicates, noindex, non-canonical URLs, tracking parameters, login/cart/account pages, tag archives, broken URLs, robots.txt restrictions, or low relevance. The coverage report lists the exact reasons.</p></details>
-<details><summary>Does an llms.txt guarantee AI visibility or rankings?</summary><p>No. Publishing an llms.txt file never guarantees AI search visibility, citations, rankings, indexing or traffic. It is a best-effort, standard-compliant aid for AI systems.</p></details>
-<details><summary>Does this work with WordPress, WooCommerce, Next.js and others?</summary><p>Yes. It detects common WordPress/WooCommerce sitemap structures, posts, pages, categories and products, and works with any public HTML website — static sites, Next.js, Laravel, Shopify, Webflow, Drupal, Joomla and more — without framework-specific plugins.</p></details>
-<details><summary>Is this an official Google or OpenAI score?</summary><p>No. The quality score shown is this tool's own internal diagnostic score. It is not a Google score, not an official OpenAI score, and it is not a ranking or visibility guarantee.</p></details>
-</div></div>`;
-  return layout('LLMs.txt Generator — Free Crawl, Validate & Download | Huvanti', body, { active:'llmstxt', canonical:'https://huvanti.com/llms-txt-generator', meta, jsonLd, scripts:['/assets/js/common.js','/assets/js/llmstxt/browser.js','/assets/js/llmstxt/ui.js'] });
+${cards('What the generator does', 'verified', cardsList)}
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">Writing an llms.txt worth reading</h4></div>${lede('The format is simple, which puts all the weight on what you choose to include. These habits produce files that actually help.')}${guideGrid(guides)}
+<p class="prose-block">Visibility in AI answers starts with content that answers questions well. The <a href="/">SEO audit</a> shows whether your pages are structured for humans and crawlers alike.</p></div>
+${faqSection(faqs)}`;
+  return layout('LLMs.txt Generator | Free Crawl, Validate and Download | Huvanti', body, {
+    active:'llmstxt', canonical:'https://huvanti.com/llms-txt-generator',
+    description:'Free llms.txt generator. Crawl a public site, select the pages that matter, generate descriptions from your own content and download a validated llms.txt file. No account.',
+    scripts:['/assets/js/progress.js','/assets/js/common.js','/assets/js/llmstxt/browser.js','/assets/js/llmstxt/ui.js'],
+    jsonLd:[{'@context':'https://schema.org','@type':'WebApplication',name:'LLMs.txt Generator',applicationCategory:'DeveloperApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free deterministic llms.txt generator and validator.'}, faqLd(faqs)]
+  });
 }
 
+/* ============================== AI CRAWLER & LLM BOT BLOCKER ============================== */
 function botblockerPage() {
-  const meta = `<meta name="description" content="Free AI Crawler & LLM Bot Blocker. Generate robots.txt, Nginx, Apache, Cloudflare and middleware rules for GPTBot, ClaudeBot, PerplexityBot, Bytespider & more — with a bot access simulator and conflict detection. No account, no AI API."><meta name="robots" content="index,follow">
-<meta property="og:title" content="AI Crawler & LLM Bot Blocker — Huvanti"><meta property="og:description" content="Control which AI crawlers, LLM bots and AI search agents may access your site: robots.txt + server-level rules, validation, simulator, coverage and protection score."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
-  const jsonLd = {'@context':'https://schema.org','@graph':[
-    {'@type':'WebSite',name:'Huvanti',url:'https://huvanti.com/'},
-    {'@type':'WebApplication',name:'AI Crawler & LLM Bot Blocker',applicationCategory:'DeveloperApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',featureList:'AI bot database, crawler classification, protection presets, robots.txt generation, Nginx and Apache and Cloudflare and middleware generation, configuration validation, rule conflict detection, bot access simulator, existing robots.txt analyzer, coverage analysis, protection score, export',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free, deterministic AI crawler management and configuration generator. Clearly separates advisory robots.txt control from technical server-level blocking. No login, no account, no AI, no paid API.'}
-  ]};
-  const body = `<section class="hero audit-home botblocker-home"><span class="material-icons hero-icon" aria-hidden="true">security</span><h1>AI Crawler &amp; LLM Bot Blocker</h1><p class="hero-subtitle">Control which AI crawlers, LLM bots and AI search agents may access your site — advisory <code>robots.txt</code> plus real server-level rules, with an access simulator. No account, no AI API.</p>
-<form id="botblocker-form" class="botblocker-form" aria-label="AI Crawler &amp; LLM Bot Blocker">
-  <div class="search-field audit-search"><span class="material-icons" aria-hidden="true">link</span><input id="botblocker-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" value="https://example.com" aria-label="Website URL"><button class="btn" type="submit">Generate Protection Rules</button></div>
+  const faqs = [
+    ['Should I block GPTBot and other AI crawlers?', 'It depends on your goals. Blocking protects your content from being used to train models you do not control, and saves bandwidth. Allowing it keeps your material eligible to appear in AI answers, which some publishers treat as traffic and others as free riding. There is no single right answer, only the one that matches your strategy.'],
+    ['Does robots.txt actually stop AI bots?', 'For compliant crawlers, yes in practice. OpenAI, Anthropic, Google and other major operators document that their bots honor robots.txt. A scraper that wants to ignore it can, which is why the tool also generates server level rules for real enforcement.'],
+    ['What is Google Extended in robots.txt?', 'Google Extended is a usage control token. Blocking it does not stop Googlebot from crawling for search. It stops Google from using your crawled content for training its AI models. Publishing a rule for it is a decision about training, not about search visibility.'],
+    ['How do I block AI bots in robots.txt?', 'Add a group for each crawler with a Disallow rule for the paths you want closed. The generator writes the file for you from the mode you choose, and the simulator shows exactly which rule wins for any bot and path combination before you upload anything.'],
+    ['How do I block AI crawlers at the server level?', 'Filter the User Agent in Nginx, Apache, Cloudflare or application middleware and return 403. The generator produces ready to paste configurations for each, using exact product tokens with boundaries so innocent browsers never get caught.'],
+    ['Can I allow AI search but block AI training?', 'Yes, and it is a popular middle path. Training crawlers such as GPTBot and ClaudeBot are disallowed while search and retrieval crawlers such as OAI-SearchBot and PerplexityBot are explicitly allowed, so your pages can still surface in AI answers.'],
+    ['Can AI bots just ignore my blocking?', 'A determined scraper can always change its User Agent or ignore robots.txt entirely. Exact token matching stops the well behaved majority, and IP verification against published operator ranges, where available, raises the bar further. Perfect enforcement does not exist on the open web.'],
+    ['Will blocking AI crawlers hurt my Google rankings?', 'No. Blocking AI training bots does not affect Googlebot, and Google has been clear that it crawls as Googlebot regardless of Google Extended rules. Your search visibility and your training opt out are separate dials.'],
+    ['What is Bytespider and why do sites block it?', 'Bytespider is ByteDance crawler, one of the most aggressive on the web in volume, and it is a frequent target of blocking. It typically does not honor robots.txt requests, which makes the server level rules the practical answer for it.'],
+    ['How do I test my robots.txt rules before publishing?', 'Paste your current file into the analyzer, or use the simulator: pick any bot and any path and see which rule wins and why, including the precedence rules from the robots specification.'],
+    ['Is my configuration sent to a server?', 'No. Generation and simulation run entirely in your browser, and saved profiles stay in your browser storage. The only network calls are the two you trigger yourself: fetching an existing robots.txt and the live site check.']
+  ];
+  const cardsList = [
+    ['smart_toy','Bot knowledge base','Around thirty documented AI crawlers with operator, purpose, category, official documentation and robots.txt support, classified by behaviour rather than name.'],
+    ['rule','Generation for every layer','robots.txt plus Nginx, Apache, Cloudflare, Node, PHP and Laravel configurations, all validated after generation for syntax and conflicts.'],
+    ['science','Access simulator','Pick a bot and a path and see exactly which rule wins, with the matching logic explained, before anything is deployed.'],
+    ['balance','Advisory versus enforced','The tool keeps the distinction front and centre: robots.txt is a request, server rules are enforcement, and it never claims the first is the second.'],
+    ['security','False positive protection','Only exact product tokens with boundaries are matched, so a browser named MyAIBrowser is never blocked for containing the letters AI.'],
+    ['lock','Runs in your browser','No account and no server side storage. Profiles live in your browser, and the two optional network checks are clearly labelled.']
+  ];
+  const guides = [
+    ['flag','Decide what you actually want','Before touching any rules, answer three questions. Do you want your content training models? Do you want it appearing in AI answers? Do specific paths such as paid archives need different rules from the rest of the site? The mode picker maps directly to these answers.'],
+    ['alt_route','Consider the middle path','Full blocking removes you from AI answers that increasingly cite sources. Training only blocking keeps you citable while opting out of the training corpus, and many publishers land there after watching referral traffic from AI services grow.'],
+    ['rule','Get robots.txt right first','It is respected by the major operators and it is one file. Use exact group blocks per crawler, validate there are no contradictions, and reference your sitemap while you are in the file. The generator handles all of it, including the precedence traps.'],
+    ['dns','Add server rules for the stubborn ones','For crawlers that ignore robots.txt, enforcement happens at the edge. Paste the generated Nginx, Apache or Cloudflare rules, then verify with the live site check that a spoofed User Agent gets the treatment you expect.'],
+    ['verified_user','Protect your search visibility while you block','Never block Googlebot by accident. The database marks which tokens are usage controls rather than crawlers, so a Google Extended rule never mutates into a search disaster, and the simulator proves it per path.'],
+    ['update','Revisit the setup quarterly','The crawler landscape changes fast: new bots appear, operators publish new ranges, policies shift. The versioned database here gets updated, and a quarterly recheck keeps your rules aligned with reality. Related: the <a href="/llms-txt-generator">llms.txt generator</a> handles the opposite problem, telling compliant AI tools what to read.']
+  ];
+  const body = `<section class="hero audit-home botblocker-home"><span class="material-icons hero-icon" aria-hidden="true">security</span><h1>AI Crawler &amp; LLM Bot Blocker</h1><p class="hero-subtitle">Choose which AI bots may access your site, then generate the rules</p>
+<form id="botblocker-form" class="botblocker-form" aria-label="AI Crawler and LLM Bot Blocker">
+  <div class="search-field audit-search"><span class="material-icons" aria-hidden="true">link</span><input id="botblocker-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" aria-label="Website URL"><button class="btn" type="submit">Generate Protection Rules</button></div>
   <div class="botblocker-formrow">
     <label class="botblocker-modelabel" for="botblocker-mode">Protection mode</label>
     <select id="botblocker-mode" class="select botblocker-modeselect" aria-label="Protection mode">
-      <option value="block-all">Block All Known AI Crawlers (Maximum AI Restriction)</option>
-      <option value="block-training">Block AI Training Crawlers Only</option>
-      <option value="block-search">Block AI Search Crawlers Only</option>
-      <option value="block-extraction">Block AI Content Extraction Crawlers</option>
-      <option value="allow-all">Allow All AI Crawlers</option>
-      <option value="allow-selected">Allow Selected AI Crawlers (block the rest)</option>
-      <option value="custom">Custom AI Crawler Rules (per-bot choices below)</option>
-      <option value="advanced">Custom Advanced Configuration</option>
+      <option value="block-all">Block all known AI crawlers</option>
+      <option value="block-training">Block AI training crawlers only</option>
+      <option value="block-search">Block AI search crawlers only</option>
+      <option value="block-extraction">Block content extraction crawlers</option>
+      <option value="allow-all">Allow all AI crawlers</option>
+      <option value="allow-selected">Allow selected crawlers, block the rest</option>
+      <option value="custom">Custom per crawler rules</option>
+      <option value="advanced">Advanced configuration</option>
     </select>
     <small class="muted botblocker-mode-desc" id="botblocker-mode-desc"></small>
   </div>
-  <details class="botblocker-advanced-sub"><summary>${icon('tune')} Advanced options — paths, exceptions, formats, rate control</summary>
+  <details class="botblocker-advanced-sub"><summary>${icon('tune')} Advanced options: paths, exceptions, formats</summary>
     <div class="botblocker-optgroup">
       <fieldset class="botblocker-fieldset"><legend>Apply rules to</legend>
         <label class="botblocker-radio"><input type="radio" name="botblocker-scope" id="botblocker-scope-entire" value="entire" checked> Entire website <code>/</code></label>
         <label class="botblocker-radio"><input type="radio" name="botblocker-scope" id="botblocker-scope-specific" value="specific"> Specific paths</label>
         <div id="botblocker-pathchips" class="botblocker-chiprow" aria-label="Blocked paths"></div>
-        <div class="botblocker-addrow"><input type="text" id="botblocker-path-input" class="text-input" placeholder="Add custom path, e.g. /private-content/"><button type="button" class="btn" id="botblocker-path-add">${icon('add')} Add</button></div>
+        <div class="botblocker-addrow"><input type="text" id="botblocker-path-input" class="text-input" placeholder="Add custom path, such as /private-content/"><button type="button" class="btn" id="botblocker-path-add">${icon('add')} Add</button></div>
       </fieldset>
-      <fieldset class="botblocker-fieldset"><legend>Block everywhere except (Allow carve-outs)</legend>
+      <fieldset class="botblocker-fieldset"><legend>Block everywhere except these paths</legend>
         <label class="botblocker-radio"><input type="checkbox" id="botblocker-exceptions-on"> Enable exception paths</label>
         <div id="botblocker-exceptionchips" class="botblocker-chiprow" aria-label="Allowed exception paths"></div>
-        <div class="botblocker-addrow"><input type="text" id="botblocker-exc-input" class="text-input" placeholder="Add allow path, e.g. /public/"><button type="button" class="btn" id="botblocker-exc-add">${icon('add')} Add</button></div>
-        <p class="muted">robots.txt has no nested-exception operator — carve-outs rely on longest-match precedence. Verify with the simulator.</p>
+        <div class="botblocker-addrow"><input type="text" id="botblocker-exc-input" class="text-input" placeholder="Add allow path, such as /public/"><button type="button" class="btn" id="botblocker-exc-add">${icon('add')} Add</button></div>
       </fieldset>
     </div>
     <div class="botblocker-optgroup">
-      <fieldset class="botblocker-fieldset"><legend>Default group (User-agent: *)</legend>
+      <fieldset class="botblocker-fieldset"><legend>Default group, for all other crawlers</legend>
         <select id="botblocker-default-group" class="select" aria-label="Default wildcard group">
-          <option value="allow" selected>Allow everything (Allow: /)</option>
+          <option value="allow" selected>Allow everything</option>
           <option value="none">No wildcard group</option>
           <option value="mirror">Apply the same path rules to all other crawlers</option>
-          <option value="block-others">Block all other crawlers (Disallow: /) — high impact</option>
+          <option value="block-others">Block all other crawlers, high impact</option>
         </select>
-        <p class="muted">Specific groups above always take precedence for their crawler.</p>
       </fieldset>
-      <fieldset class="botblocker-fieldset"><legend>Sitemap (optional)</legend>
+      <fieldset class="botblocker-fieldset"><legend>Sitemap, optional</legend>
         <input type="text" id="botblocker-sitemap" class="text-input" placeholder="https://example.com/sitemap.xml" spellcheck="false">
       </fieldset>
     </div>
     <div class="botblocker-optgroup">
-      <fieldset class="botblocker-fieldset"><legend>Output formats (robots.txt is always generated)</legend>
+      <fieldset class="botblocker-fieldset"><legend>Output formats, robots.txt is always generated</legend>
         <div class="botblocker-checkrow">
           <label><input type="checkbox" id="botblocker-out-nginx" checked> Nginx</label>
-          <label><input type="checkbox" id="botblocker-out-apache"> Apache (.htaccess)</label>
+          <label><input type="checkbox" id="botblocker-out-apache"> Apache</label>
           <label><input type="checkbox" id="botblocker-out-cloudflare"> Cloudflare</label>
-          <label><input type="checkbox" id="botblocker-out-node"> Node.js / Express</label>
+          <label><input type="checkbox" id="botblocker-out-node"> Node.js</label>
           <label><input type="checkbox" id="botblocker-out-php"> PHP</label>
           <label><input type="checkbox" id="botblocker-out-laravel"> Laravel</label>
-        </div>
-      </fieldset>
-      <fieldset class="botblocker-fieldset"><legend>AI Crawler Rate Control (optional recommendations)</legend>
-        <label class="botblocker-radio"><input type="checkbox" id="botblocker-rate-on"> Include rate-control recommendations</label>
-        <div class="botblocker-raterow">
-          <label>Req/min <input type="number" id="botblocker-rpm" class="number-input" min="1" max="3000" value="60"></label>
-          <label>Req/sec <input type="number" id="botblocker-rps" class="number-input" min="1" max="50" value="1"></label>
-          <label>Burst <input type="number" id="botblocker-burst" class="number-input" min="1" max="100" value="20"></label>
         </div>
       </fieldset>
     </div>
   </details>
 </form>
-<div class="audit-trust"><span>No account</span><span>Deterministic rules database</span><span>robots.txt + server rules</span><span>Access simulator</span><span>Runs in your browser</span></div>
-</section>
+${chips([['smart_toy','Documented bots'],['rule','robots.txt and server rules'],['science','Access simulator'],['lock','Runs in your browser']])}</section>
 <div id="botblocker-results" class="audit-results botblocker-results"></div>
-<div class="container section">
-  <div class="section-heading-row">${icon('verified')}<h4 style="margin:0;">What this tool does — and what it honestly cannot</h4></div>
-  <div class="grid feature-grid">
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('smart_toy')} Bot database &amp; classification</h6><p>A structured, updatable database of known AI crawlers (GPTBot, ClaudeBot, Claude-SearchBot, OAI-SearchBot, Google-Extended, Applebot-Extended, PerplexityBot, Amazonbot, Bytespider, CCBot, Meta-ExternalAgent, DuckAssistBot, MistralAI-Index and more) with organization, purpose, category, official documentation, robots.txt support and confidence. Bots are classified by documented behavior — never by name.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('rule')} Generation, validation &amp; conflict detection</h6><p>robots.txt, Nginx (map-based, not unsafe if-spam), Apache, Cloudflare WAF expressions and Node.js/PHP/Laravel middleware. Every output is re-validated: syntax, duplicates, contradictions, invalid paths and User-Agent patterns. Contradictory rules are explained via robots.txt matching behavior, never silently shipped.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('science')} Access simulator &amp; analyzer</h6><p>Pick a bot and a path and see exactly which rule wins — with the matching logic explained (exact group beats wildcard, longest pattern wins, Allow wins ties). Paste or fetch your existing robots.txt to analyze, compare before/after and test bots against it.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('balance')} Advisory vs technical — always distinct</h6><p>robots.txt requests compliant crawlers not to access paths; it does not enforce access control. Server/CDN-level rules (Nginx, Apache, Cloudflare, middleware) provide stronger enforcement. The tool never claims “robots.txt completely blocks AI bots”.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('security')} False-positive protection</h6><p>Only exact User-Agent product tokens from the verified database are matched, with token boundaries: “MyAIBrowser” is never blocked because it contains “AI”, and a rule for “Applebot” does not catch “Applebot-Extended”. User-Agent spoofing limits are clearly stated.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('lock')} Privacy &amp; performance</h6><p>No account, nothing stored server-side. All generation runs locally in your browser against a cached database — the only external requests are the ones you explicitly trigger (fetch robots.txt / live website check), with limits and clear labeling.</p></div></div></div>
-  </div>
-</div>
-<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('forum')}<h4 style="margin:0;">Common Questions</h4></div><div class="faq-accordion">
-<details><summary>Does robots.txt block AI bots?</summary><p>No — it requests compliant crawlers not to access the paths you list. Most major AI crawlers document that they honor robots.txt, but a malicious crawler can simply ignore it. For stronger enforcement use the Nginx/Apache/Cloudflare/middleware rules this tool generates, and combine with IP verification where the operator publishes ranges.</p></details>
-<details><summary>Can I block AI training but allow AI search?</summary><p>Yes — choose “Block AI Training Crawlers Only”. Training crawlers (GPTBot, ClaudeBot, CCBot, Meta-ExternalAgent…) get disallow rules while AI search and retrieval crawlers (OAI-SearchBot, Claude-SearchBot, PerplexityBot, DuckAssistBot…) get explicit allow rules. You can still flip any individual bot below.</p></details>
-<details><summary>What about Google-Extended and Applebot-Extended?</summary><p>These are usage-control tokens, not crawlers: they change how already-crawled content may be used (model training). A robots.txt rule for them does not stop Googlebot or Applebot from crawling for search. The tool labels them clearly so you never get a false sense of blocking.</p></details>
-<details><summary>Can someone bypass the blocking?</summary><p>Yes. Any client can change its User-Agent, and robots.txt is voluntary. User-Agent filtering is practical filtering, not a guarantee. IP/network verification (where the operator publishes ranges, e.g. OpenAI or Perplexity) is stronger; authentication and network-level controls are strongest.</p></details>
-<details><summary>Is my configuration sent anywhere?</summary><p>No. Generation runs entirely in your browser. Saved profiles live in your browser\u2019s local storage. The only external requests are the two you explicitly trigger: fetching an existing robots.txt by URL and the live website check — both are labeled and limited.</p></details>
-<details><summary>Does the database contain every AI crawler?</summary><p>No, and it never claims to. Coverage reports count “known crawlers in our database”. The database is versioned and structured so it can be updated; unknown crawlers simply follow your default (*) group.</p></details>
-</div></div>`;
-  const scripts = ['/assets/js/common.js',
+${cards('What the tool does', 'verified', cardsList)}
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">Choosing an AI crawler policy</h4></div>${lede('Blocking is a business decision with technical execution. This is how to think about the decision, then ship it safely.')}${guideGrid(guides)}
+<p class="prose-block">Once access rules are in place, make sure compliant AI tools can find your best work: generate an <a href="/llms-txt-generator">llms.txt</a> and keep your <a href="/xml-sitemap-generator">XML sitemap</a> current.</p></div>
+${faqSection(faqs, 'People Often Ask')}`;
+  const scripts = ['/assets/js/progress.js','/assets/js/common.js',
     '/lib/botblocker/botDatabase.js', '/lib/botblocker/botClassifier.js', '/lib/botblocker/botPatternMatcher.js',
     '/lib/botblocker/robotsParser.js', '/lib/botblocker/robotsSimulator.js', '/lib/botblocker/robotsGenerator.js',
     '/lib/botblocker/ruleConflictDetector.js', '/lib/botblocker/userAgentAnalyzer.js',
@@ -501,252 +752,234 @@ function botblockerPage() {
     '/lib/botblocker/middlewareGenerator.js', '/lib/botblocker/configurationValidator.js', '/lib/botblocker/protectionScore.js',
     '/lib/botblocker/coverageAnalyzer.js', '/lib/botblocker/securityChecker.js', '/lib/botblocker/index.js',
     '/assets/js/botblocker/ui.js'];
-  return layout('AI Crawler & LLM Bot Blocker — robots.txt, Nginx, Apache & Cloudflare Rules | Huvanti', body, { active:'botblocker', canonical:'https://huvanti.com/ai-crawler-blocker', meta, jsonLd, scripts });
+  return layout('AI Crawler and LLM Bot Blocker | robots.txt, Nginx, Cloudflare Rules | Huvanti', body, {
+    active:'botblocker', canonical:'https://huvanti.com/ai-crawler-blocker',
+    description:'Free AI crawler and LLM bot blocker. Generate robots.txt plus Nginx, Apache, Cloudflare and middleware rules for GPTBot, ClaudeBot, Bytespider and more, with a bot access simulator. No account.',
+    scripts,
+    jsonLd:[{'@context':'https://schema.org','@type':'WebApplication',name:'AI Crawler and LLM Bot Blocker',applicationCategory:'DeveloperApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free AI crawler management and configuration generator.'}, faqLd(faqs)]
+  });
 }
 
-function brokenlinkPage() {
-  const meta = `<meta name="description" content="Free Broken Link Checker. Crawl any public website, find confirmed broken links (404,410,5xx,DNS,SSL), detect redirect chains & loops, bot protection, anchor errors — accurate classification, no false positives. No account, no AI."><meta name="robots" content="index,follow">
-<meta property="og:title" content="Broken Link Checker — Huvanti"><meta property="og:description" content="Production-grade broken link checker with accurate classification, retry verification, redirect loop detection, DNS/TLS analysis, and transparent health score. No account required."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
-  const jsonLd = {'@context':'https://schema.org','@graph':[
-    {'@type':'WebSite',name:'Huvanti',url:'https://huvanti.com/'},
-    {'@type':'WebApplication',name:'Broken Link Checker',applicationCategory:'DeveloperApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',featureList:'Broken link detection, 404/410 detection, 5xx verification, DNS analysis, TLS analysis, redirect chain and loop detection, bot protection detection, anchor validation, canonical analysis, sitemap discovery, robots.txt respect, health score, CSV/JSON export',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free, deterministic broken link checker with multi-stage verification and accurate classification. No login, no account, no AI, no paid SEO API.'}
-  ]};
-  const body = `<section class="hero audit-home brokenlink-home"><span class="material-icons hero-icon" aria-hidden="true">link_off</span><h1>Broken Link Checker</h1><p class="hero-subtitle">Production-grade crawling and link auditing — accurate classification, no false positives.</p>
-<form id="brokenlink-form" class="brokenlink-form" aria-label="Broken link checker">
-  <div class="search-field audit-search" style="flex-wrap:wrap;gap:8px;padding:10px;max-width:900px">
-    <span class="material-icons" aria-hidden="true">link</span>
-    <input id="bl-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL" style="flex:1;min-width:200px">
-    <button class="btn" type="submit">Start Scan</button>
-  </div>
-  <details class="sitemap-options sitemap-advanced" open style="max-width:900px;margin:18px auto 0"><summary>${icon('tune')} Scan configuration</summary>
-    <div class="sitemap-option-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
-      <label>Maximum Pages
-        <select id="bl-max-pages" class="select">
-          <option value="100">100</option>
-          <option value="500" selected>500</option>
-          <option value="1000">1,000</option>
-          <option value="5000">5,000</option>
-          <option value="10000">10,000</option>
-          <option value="custom">Custom</option>
-        </select>
-        <input id="bl-max-pages-custom" type="number" min="1" max="10000" placeholder="Custom max" class="text-input" style="display:none;margin-top:6px">
-      </label>
-      <label>Maximum Crawl Depth
-        <select id="bl-max-depth" class="select">
-          <option value="1">1</option>
-          <option value="2">2</option>
-          <option value="3">3</option>
-          <option value="5" selected>5</option>
-          <option value="10">10</option>
-          <option value="unlimited">Unlimited</option>
-        </select>
-      </label>
-      <label>Scan Scope
-        <select id="bl-scan-scope" class="select">
-          <option value="internal+external" selected>Internal + external</option>
-          <option value="internal">Internal only</option>
-        </select>
-      </label>
-    </div>
-    <div class="sitemap-option-row" style="display:flex;flex-wrap:wrap;gap:16px;margin-top:12px">
-      <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="bl-check-external" checked> Check External Links</label>
-      <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="bl-check-images"> Check Images</label>
-      <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="bl-check-docs"> Check Documents (PDF,DOC,etc)</label>
-      <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="bl-check-anchors"> Check Anchor Links</label>
-      <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="bl-respect-robots" checked> Respect robots.txt (ON by default)</label>
-    </div>
-    <p class="muted" style="margin-top:10px">Accuracy first: 401/403/429, CAPTCHA, Cloudflare challenge, timeouts, HEAD failures, robots.txt blocks are never classified as permanently broken. Only confirmed evidence → Confirmed Broken.</p>
-  </details>
-</form>
-<div class="audit-trust"><span>No account</span><span>SSRF-safe</span><span>Robots.txt respected</span><span>Sitemap discovery</span><span>Retry verification</span><span>Redirect loops</span><span>DNS &amp; TLS analysis</span><span>Bot protection aware</span></div></section>
-<div id="brokenlink-results" class="audit-results brokenlink-results"></div>
-<div class="container section"><div class="section-heading-row">${icon('verified')}<h4 style="margin:0;">Built for accuracy — not for the largest number of broken links</h4></div><div class="grid feature-grid">
-  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('security')} Secure crawler</h6><p>SSRF protection, localhost/private/metadata blocking, DNS rebinding prevention, redirect validation, infinite-loop detection, response-size limits, decompression-bomb protection, concurrency control.</p></div></div></div>
-  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('rule')} Robots &amp; sitemap intelligence</h6><p>Fetches /robots.txt, parses Allow/Disallow/Sitemap/Crawl-delay, respects rules, discovers /sitemap.xml, /sitemap_index.xml, /sitemap-index.xml plus sitemaps from robots.txt, parses indexes recursively.</p></div></div></div>
-  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('fact_check')} Accurate classification</h6><p>Healthy (200,204), Redirect (301,302,303,307,308), Confirmed Broken (404,410,persistent 5xx,DNS,connection), Restricted (401,403), Rate Limited (429), Timeout, Bot Protection, Unknown — never false positives.</p></div></div></div>
-  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('loop')} Retry &amp; redirect analysis</h6><p>Exponential backoff, 3 attempts to confirm 404, 503→503→200 = Working, full redirect chain recorded, loop A→B→A detection, cross-domain, HTTP→HTTPS, www↔non-www.</p></div></div></div>
-  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('dns')} DNS &amp; TLS &amp; bot protection</h6><p>NXDOMAIN/SERVFAIL/timeout detection, expired/hostname-mismatch/invalid TLS, Cloudflare/Imperva/Sucuri/Akamai/CAPTCHA challenge detection → Bot Protection / Unable to Verify.</p></div></div></div>
-  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('anchor')} Anchor &amp; canonical &amp; health score</h6><p>Checks id=\"pricing\" existence for #pricing links, canonical points to 404/redirect detection, noindex detection, transparent 0–100 health score that does not penalize normal 301 or blocked external links.</p></div></div></div>
-</div></div>
-<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('forum')}<h4 style="margin:0;">Common Questions</h4></div><div class="faq-accordion">
-<details><summary>What counts as Confirmed Broken?</summary><p>Only when evidence supports it: 404→404→404 after retries, 410, persistent 5xx after retries, DNS NXDOMAIN, persistent connection failure, invalid destination. 401/403/429, CAPTCHA, Cloudflare challenge, timeouts, HEAD failures, robots.txt blocks are classified as Restricted, Rate Limited, Bot Protection, Timeout, Blocked by robots.txt — never as Confirmed Broken.</p></details>
-<details><summary>Does it check external links?</summary><p>Yes by default (Internal + external). External servers may block crawlers or require auth — those are shown as Bot Protection / Unable to Verify, not as broken. You can toggle to Internal only.</p></details>
-<details><summary>How does duplicate handling work?</summary><p>Before requesting, URLs are deduplicated by trailing slash, fragments, case, tracking params (utm_source,gclid,fbclid...), encoded equivalents, and redirects. If 100 pages reference /contact, one network check is performed and the report shows “Found on 100 pages”.</p></details>
-<details><summary>Does it support images, PDFs, anchors?</summary><p>Optional toggles: Check Images (404 images, redirected, inaccessible), Check Documents (PDF,DOC,XLS,ZIP,TXT via HEAD/Range), Check Anchor Links (validates id=\"section\" targets).</p></details>
-<details><summary>What about large sites?</summary><p>Concurrency control (4 crawl + 6 check workers), connection reuse, visited set, result cache, duplicate suppression, retry queue, timeout management, response-size limits, crawl-depth tracking — protects both scanner and target.</p></details>
-<details><summary>Is this a Google score?</summary><p>No. Broken Link Health Score is an internal diagnostic 0–100 based on confirmed internal 404s, persistent 5xx, DNS, broken anchors, redirect loops, long chains. Normal 301, 403, 429, bot protection, temporary failures are not heavily penalized. How the score was calculated is shown.</p></details>
-</div></div>`;
-  return layout('Broken Link Checker — Accurate, No False Positives | Huvanti', body, { active:'brokenlink', canonical:'https://huvanti.com/broken-link-checker', meta, jsonLd, scripts:['/assets/js/common.js','/assets/js/brokenlink/crawler.js','/assets/js/brokenlink/ui.js'] });
-}
-
+/* ============================== CORE WEB VITALS ============================== */
 function cwvPage() {
-  const meta = `<meta name="description" content="Free Core Web Vitals &amp; INP Auditor. Real lab measurement of LCP, INP, CLS, FCP and TTFB with interaction-level INP analysis, long tasks, waterfall, render-blocking resources, caching and evidence-based recommendations — no account, no AI, no PageSpeed API key."><meta name="robots" content="index,follow">
-<meta property="og:title" content="Core Web Vitals &amp; INP Auditor — Huvanti"><meta property="og:description" content="Deep technical website performance audit: LCP, INP, CLS, FCP, TTFB, long tasks, waterfall, dependency chains and evidence-based fixes. Lab measurements only — no fabricated field data."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
-  const jsonLd = {'@context':'https://schema.org','@graph':[
-    {'@type':'WebSite',name:'Huvanti',url:'https://huvanti.com/'},
-    {'@type':'WebApplication',name:'Core Web Vitals & INP Auditor',applicationCategory:'DeveloperApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',featureList:'LCP measurement and element attribution, synthetic INP interaction testing with input/processing/presentation breakdown, CLS session-window analysis, FCP, TTFB phase breakdown, long task detection, network waterfall, dependency tree, render-blocking resources, JavaScript/CSS/image/font/caching/third-party audits, evidence-based recommendations, transparent tool performance score',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free, deterministic Core Web Vitals and interaction performance auditor with real browser measurements. No account, no AI, no paid performance API.'}
-  ]};
-  const body = `<section class="hero audit-home cwv-home"><span class="material-icons hero-icon" aria-hidden="true">speed</span><h1>Core Web Vitals &amp; INP Auditor</h1><p class="hero-subtitle">Real lab measurement of LCP, INP, CLS, FCP &amp; TTFB — with interaction-level INP analysis, long tasks and evidence-based fixes. No API keys.</p>
-<form id="cwv-form" class="cwv-form" aria-label="Core Web Vitals &amp; INP Auditor">
+  const faqs = [
+    ['What are Core Web Vitals?', 'Three user experience metrics Google uses in its page experience signals: Largest Contentful Paint for loading, Interaction to Next Paint for responsiveness and Cumulative Layout Shift for visual stability. First Contentful Paint and Time to First Byte are reported alongside them as supporting metrics.'],
+    ['What is a good LCP score?', '2.5 seconds or faster is good, up to 4 seconds needs improvement and beyond 4 seconds is poor, measured at the 75th percentile of loads. The report shows your measured value, the band it lands in and the phases that made up the time.'],
+    ['What is INP and why did it replace FID?', 'Interaction to Next Paint measures how quickly a page responds to any interaction: clicks, taps and key presses, across the whole visit. It replaced First Input Delay in March 2024 because FID only measured the first interaction and missed everything after it.'],
+    ['What is a good INP score?', '200 milliseconds or faster is good, up to 500 milliseconds needs improvement and beyond that is poor. The report breaks every tested interaction into input delay, processing time and presentation delay, so you can see which part is slow.'],
+    ['What causes layout shift and how do I fix CLS?', 'Images and embeds without reserved space, web fonts swapping in late, banners injected above content and animations that move elements. Fixes are mechanical: always set width and height, reserve space for ads and embeds, and preload the fonts you actually render with.'],
+    ['How do I improve LCP?', 'Find the largest element in the report, then attack its four phases: faster server response, earlier resource discovery with preload hints, smaller image payload with modern formats and less render blocking in front of the element. The phase breakdown tells you which one dominates.'],
+    ['How do I improve INP?', 'Long tasks on the main thread are the usual cause: heavy scripts, large event handlers and third party code. The report attributes long tasks to scripts, lists the slowest interactions and points at the code responsible.'],
+    ['Does Core Web Vitals affect Google rankings?', 'Yes, as part of page experience signals, alongside mobile friendliness, HTTPS and intrusive interstitial rules. It is a tiebreaker among otherwise similar pages rather than a dominant factor, so a great score rescues weak content far less often than people hope.'],
+    ['What is the difference between lab and field data?', 'Lab data comes from a controlled test, this tool in your browser, and is available for any page instantly. Field data comes from real visitors through the Chrome UX Report and reflects real devices and networks. This tool measures lab values and labels them as lab, always.'],
+    ['Why is my PageSpeed score different from real user data?', 'Lab runs use simulated devices and networks, while real users span everything from flagship phones on fibre to old devices on weak connections. Differences are normal. Watch the field data in Search Console for the truth, and lab data for diagnosis.'],
+    ['What is TTFB and what makes it slow?', 'Time to First Byte is how long the server takes to start answering: DNS, connection, TLS handshake and server processing. Slow generation without caching, cheap shared hosting far from your visitors and cold serverless starts are the usual suspects.'],
+    ['How often should I test Core Web Vitals?', 'After any meaningful release that touches templates, scripts or images, and on a slow monthly rhythm otherwise. Scores wander with network conditions and third party behaviour, so trends matter more than any single run.']
+  ];
+  const cardsList = [
+    ['touch_app','INP in detail','Synthetic but safe interactions on real page elements, with input delay, processing and presentation delay broken out per interaction.'],
+    ['image','LCP element analysis','The actual largest element with its size and resource, plus the four phases of its timing and image specific checks such as priority hints.'],
+    ['swap_vert','CLS session windows','Every layout shift with the elements that moved, grouped by the session window model used in the real metric.'],
+    ['timer','TTFB phases','DNS, connection, TLS and server response time separated, so a slow handshake is never confused with slow code.'],
+    ['waterfall_chart','Waterfall and dependencies','Every request with timing, size and type, plus reconstructed dependency chains that show what actually blocked what.'],
+    ['code','Code and caching audits','Long tasks with script attribution, render blocking resources, image and font issues, and cache headers read from live responses.']
+  ];
+  const guides = [
+    ['speed','Read the score, then ignore it','The number is a door, not a destination. Open the metric that is worst, look at the evidence attached, and fix the specific element or script named there. Ten targeted fixes beat a hundred generic optimisations.'],
+    ['image','Start with the largest element','LCP is usually one hero image or one heading block. Serve it in a modern format, give it priority, size it correctly and remove whatever renders in front of it. That single element often decides the whole loading grade.'],
+    ['touch_app','Then hunt long tasks','INP problems live in the main thread. The long task list attributes each one to a script, and the fix is usually deferring, splitting or removing code rather than tuning your own logic, since third party scripts own much of the timeline.'],
+    ['straighten','Reserve space for everything','Layout shift is almost always missing dimensions: images, ads, embeds and late fonts. Setting width and height everywhere and preloading the primary font removes the entire class of problems in an afternoon.'],
+    ['storage','Check what the server does first','A slow first byte delays everything downstream. The phase breakdown separates connection cost from server processing, and if processing dominates, caching and a CDN do more than any front end work.'],
+    ['hub','Pair the measurement with a full audit','Performance sits inside a bigger picture. Run the <a href="/">SEO audit</a> for content and technical health, and the <a href="/broken-link-checker">broken link checker</a> to catch the maintenance issues that quietly drag speed and trust down.']
+  ];
+  const body = `<section class="hero audit-home cwv-home"><span class="material-icons hero-icon" aria-hidden="true">speed</span><h1>Core Web Vitals &amp; INP Auditor</h1><p class="hero-subtitle">Real browser measurement of LCP, INP, CLS, FCP and TTFB</p>
+<form id="cwv-form" class="cwv-form" aria-label="Core Web Vitals and INP auditor">
   <div class="search-field audit-search"><span class="material-icons" aria-hidden="true">link</span><input id="cwv-url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL"><button class="btn" type="submit">Analyze Website</button></div>
   <div class="cwv-formrow">
     <label for="cwv-profile">Device profile
-      <select id="cwv-profile" class="select">
-        <option value="mobile" selected>Mobile — 412×823, Slow 4G</option>
-        <option value="desktop">Desktop — 1350×940, no throttle</option>
-        <option value="custom">Custom</option>
-      </select>
+      <select id="cwv-profile" class="select"><option value="mobile" selected>Mobile, 412 by 823, slow 4G</option><option value="desktop">Desktop, 1350 by 940, no throttle</option><option value="custom">Custom</option></select>
     </label>
-    <label class="cwv-check"><input type="checkbox" id="cwv-both" checked> Measure <b>Mobile</b> and <b>Desktop</b> as two separate lab runs</label>
+    <label class="cwv-check"><input type="checkbox" id="cwv-both" checked> Also measure the other device profile</label>
   </div>
   <div id="cwv-custom-fields" hidden class="cwv-formrow">
     <label>Viewport width <input id="cwv-cw" class="cwv-num" type="number" min="320" max="2560" value="1280"></label>
     <label>Viewport height <input id="cwv-ch" class="cwv-num" type="number" min="320" max="1800" value="800"></label>
     <label>Network
-      <select id="cwv-net" class="select">
-        <option value="none" selected>No throttle</option>
-        <option value="slow4g">Slow 4G (150 ms RTT, 1.6 Mbps)</option>
-        <option value="fast3g">Fast 3G (563 ms RTT, 1.44 Mbps)</option>
-      </select>
+      <select id="cwv-net" class="select"><option value="none" selected>No throttle</option><option value="slow4g">Slow 4G</option><option value="fast3g">Fast 3G</option></select>
     </label>
   </div>
 </form>
-<div class="audit-trust"><span>Real measurements</span><span>INP interaction tests</span><span>LCP element &amp; phases</span><span>CLS session windows</span><span>Long tasks</span><span>Waterfall</span><span>Evidence-based fixes</span><span>No API keys</span></div></section>
+${chips([['speed','Real measurements'],['touch_app','INP interactions'],['image','LCP phases'],['swap_vert','CLS windows'],['waterfall_chart','Waterfall'],['key_off','No API keys']])}</section>
 <div id="cwv-results" class="audit-results cwv-results"></div>
-<div class="container section">
-  <div class="section-heading-row">${icon('rule_folder')}<h4 style="margin:0;">What this auditor actually measures</h4></div>
-  <div class="grid feature-grid">
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('touch_app')} INP — interaction-level detail</h6><p>Synthetic but safe interactions (menus, tabs, accordions, search controls, modal triggers — never forms, never destructive actions) with an input-delay / processing / presentation-delay breakdown, long-task correlation and root-cause analysis. Lab INP is never presented as field data.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('image')} LCP element &amp; phase breakdown</h6><p>The actual LCP element (tag, selector, resource, size) with TTFB → resource load delay → load duration → render delay phases, plus LCP-image checks: lazy-loading, fetchpriority, dimensions and format.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('swap_vert')} CLS with session windows</h6><p>Every layout shift with element, previous/new position and likely cause. Shifts are grouped into session windows per the current CLS model — never summed indefinitely; recent-input shifts are excluded per spec.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('timer')} FCP &amp; TTFB phases</h6><p>First Contentful Paint against the advisory web.dev target, and a TTFB breakdown (DNS / connection / TLS / server response) measured with a pinned direct connection. TTFB alone never claims a specific backend fault.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('waterfall_chart')} Network waterfall &amp; dependency tree</h6><p>Every request with start time, duration, transfer size, type, status, initiator and observed protocol, plus reconstructed dependency chains (HTML → CSS → fonts / JS → API) with long-chain highlighting.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('code')} JS, CSS, images, fonts, caching</h6><p>Long tasks with script attribution, render-blocking and parser-blocking resources, @import chains, image size/format/lazy-loading issues, font-display and FOIT risks, and cache headers read from real responses.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('priority_high')} Evidence-based recommendations</h6><p>Every issue carries the measured evidence, the affected resource, the impacted metric and a concrete fix. Savings are only numeric when computed from measurements — otherwise “Potentially reducible”. No fabricated “improves LCP by X” claims.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('grading')} Transparent score</h6><p>A 0–100 <b>Tool Performance Score</b> with a published component breakdown (LCP, INP, CLS, TTFB, FCP, TBT, resources, network, rendering). Unmeasured components are excluded and shown — never padded. Not Google’s score.</p></div></div></div>
-    <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('security')} Safe by design</h6><p>The URL is untrusted: private/loopback/metadata targets are refused, DNS is pinned per request, every redirect is re-validated, responses are size-capped, and the page runs in a sandboxed iframe with isolated storage — no service workers, no cookies.</p></div></div></div>
-  </div>
-</div>
-<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('forum')}<h4 style="margin:0;">Common Questions</h4></div><div class="faq-accordion">
-<details><summary>Are these Google / PageSpeed Insights scores?</summary><p>No. This is a lab measurement run by this tool in your browser (optionally through the auditor proxy). The <b>Tool Performance Score</b> is this tool’s own transparent score — it is never presented as Google’s score, a Lighthouse score or a PageSpeed Insights score.</p></details>
-<details><summary>Is the INP real field data?</summary><p>No. The INP shown is a <b>lab value</b> from synthetic interactions the auditor dispatches (menus, tabs, accordions, search controls). Synthetic testing can surface responsiveness problems, but field INP reflects real users and real interaction patterns. If a metric cannot be measured, the report says <b>Not Available</b> — it is never replaced with 0 or invented.</p></details>
-<details><summary>What is field data, and why is it unavailable?</summary><p>The legitimate public source of field Core Web Vitals is the Chrome UX Report, which requires a CrUX API key or BigQuery access. This tool uses no API keys, so the report shows <b>Field data unavailable for this URL</b> instead of fabricating field metrics. Lab and field data are kept strictly separate.</p></details>
-<details><summary>How are LCP, CLS and INP measured without a headless browser?</summary><p>The measurement runs in a real browser — yours. The page is loaded into a sandboxed same-origin iframe (via a server proxy when the server can reach the site, otherwise via a browser-direct relay fallback) with a measurement script injected before first paint, capturing the browser’s own PerformanceObserver entries for LCP, CLS, FCP, long tasks and interactions.</p></details>
-<details><summary>Do the mobile/desktop runs throttle CPU?</summary><p>Viewport is emulated and (in proxy mode) network throttling is applied by the auditor proxy. CPU throttling is <b>not</b> applied — that requires DevTools protocol access, which this sandbox measurement does not have. Results are honest about this and do not claim to represent every real device.</p></details>
-<details><summary>Can it audit more than one page?</summary><p>Single-page by default (clearly labelled “One page”). After the first audit you can explicitly start an optional <b>Crawl Website</b> run (10/25/50/100 discovered internal pages) with per-page metrics, worst URLs and a page comparison view. It never crawls a site unless you start it.</p></details>
-<details><summary>Does it use an LLM or a paid API?</summary><p>No. No OpenAI, Gemini, Claude, PageSpeed API key or any paid performance API. The entire pipeline — measurement, analysis, scoring and recommendations — is deterministic code in this repository.</p></details>
-<details><summary>What about sites behind bot protection?</summary><p>Some sites block proxies or challenges (Cloudflare, DataDome…). The report then states exactly what blocked the measurement and which metrics are unavailable — it never substitutes guesses.</p></details>
-</div></div>`;
-  return layout('Core Web Vitals & INP Auditor — Real LCP, INP, CLS, FCP & TTFB Measurement | Huvanti', body, {
-    active: 'cwv', canonical: 'https://huvanti.com/core-web-vitals-auditor', meta, jsonLd,
-    scripts: ['/assets/js/common.js', '/lib/cwv/rewriter.js', '/assets/js/cwv/report.js', '/assets/js/cwv/ui.js']
+${cards('What the auditor measures', 'rule_folder', cardsList)}
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">Making pages genuinely fast</h4></div>${lede('Most performance work fails from fixing the wrong thing first. This is the order that pays off.')}${guideGrid(guides)}
+<p class="prose-block">Speed is one signal among many. Balance it with a full <a href="/">SEO audit</a>, and remember that healthy internal linking, which the audit maps, is what spreads fast pages across a site.</p></div>
+${faqSection(faqs, 'People Often Ask')}`;
+  return layout('Core Web Vitals and INP Auditor | Free Performance Measurement | Huvanti', body, {
+    active:'cwv', canonical:'https://huvanti.com/core-web-vitals-auditor',
+    description:'Free Core Web Vitals auditor. Real lab measurement of LCP, INP, CLS, FCP and TTFB with element attribution, long tasks, a request waterfall and evidence based fixes. No API key.',
+    scripts:['/assets/js/progress.js','/assets/js/common.js','/lib/cwv/rewriter.js','/assets/js/cwv/report.js','/assets/js/cwv/ui.js'],
+    jsonLd:[{'@context':'https://schema.org','@type':'WebApplication',name:'Core Web Vitals and INP Auditor',applicationCategory:'DeveloperApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free Core Web Vitals and interaction performance auditor with real browser measurements.'}, faqLd(faqs)]
   });
 }
 
+/* ============================== RSS FEED GENERATOR ============================== */
 function rssPage() {
-  const meta = `<meta name="description" content="Free RSS Feed Generator. Enter a website URL and automatically discover content, sitemaps and existing feeds, extract real article metadata, validate URLs, and download a standards-compliant RSS 2.0 feed — no account, no AI, no paid APIs.\"><meta name="robots" content="index,follow">
-<meta property="og:title" content="RSS Feed Generator — Huvanti"><meta property="og:description" content="Website discovery, metadata extraction, canonical and duplicate handling, broken-URL checks and a validated RSS 2.0 (or Atom 1.0) feed — deterministic, no fabricated data."><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">`;
-  const jsonLd = {'@context': 'https://schema.org', '@graph': [
-    {'@type': 'WebSite', name: 'Huvanti', url: 'https://huvanti.com/'},
-    {'@type': 'WebApplication', name: 'RSS Feed Generator', applicationCategory: 'DeveloperApplication', operatingSystem: 'Any', browserRequirements: 'Requires JavaScript', featureList: 'URL validation, SSRF-safe crawling, robots.txt respect, sitemap discovery, existing RSS/Atom detection, article metadata extraction, publication date detection, canonical URL handling, duplicate removal, broken URL validation, content sanitization, RSS 2.0 and Atom 1.0 generation, XML validation, quality score, manual editing, comparison, export', offers: {'@type': 'Offer', price: '0', priceCurrency: 'USD'}, description: 'Free deterministic RSS feed generator that crawls a public website, extracts real article metadata and produces a validated, standards-compliant RSS feed. No account, no AI, no paid APIs.'}
-  ]};
-  const body = `<section class="hero audit-home rss-home"><span class="material-icons hero-icon" aria-hidden="true">rss_feed</span><h1>RSS Feed Generator</h1><p class="hero-subtitle">Discover a site's real content, extract accurate article metadata and generate a validated, standards-compliant RSS feed. No account, no AI, no paid APIs.</p>
-<form id="rss-form" class="rss-form" aria-label="RSS Feed Generator">
-  <div class="mode-tabs" role="radiogroup" aria-label="Mode"><label><input type="radio" name="mode" value="website" checked> Generate from Website</label><label><input type="radio" name="mode" value="sitemap"> Generate from Sitemap</label></div>
+  const faqs = [
+    ['How do I create an RSS feed for my website?', 'If you run WordPress or most blog platforms, a feed already exists at yoursite.com/feed. For static sites and unusual platforms, enter your URL here: the tool discovers your content, extracts titles, dates and descriptions, and produces a validated feed file you download and upload to your root folder.'],
+    ['Do people still use RSS feeds?', 'Yes, though differently from the 2010s. News aggregators, podcast apps, newsletter tools, monitoring services and automation pipelines all consume feeds quietly. Feed readers remain popular among developers and researchers. For a publisher, a feed is infrastructure that other systems build on.'],
+    ['Does my WordPress site have a feed already?', 'Yes, at /feed with versions for categories and comments. The checker detects existing feeds and offers a comparison, so before generating anything you know whether the built in feed already does the job.'],
+    ['Where do I put the RSS feed file?', 'At a stable address, usually yoursite.com/feed.xml or yoursite.com/rss.xml. Then add one link tag in your page head so browsers and readers can auto discover it.'],
+    ['What is the difference between RSS and Atom?', 'Both are feed formats doing the same job. RSS 2.0 is older and more widespread. Atom is the cleaner standard with stricter rules. Every major reader supports both, so RSS 2.0 remains the practical default, and this tool can output Atom as well.'],
+    ['How many items should a feed contain?', 'Ten to fifty covers most purposes. Full content feeds trend larger, excerpt feeds smaller. What matters more is that the feed updates reliably when you publish, because silent staleness is what kills subscribers.'],
+    ['Should a feed contain full content or excerpts?', 'Full content serves readers who want everything in their reader and drives fewer site visits. Excerpts bring readers to the site but annoy full content devotees. Both are legitimate: pick deliberately, and say so publicly.'],
+    ['Can I use this feed for a podcast?', 'A podcast feed is RSS with audio enclosures and iTunes style tags. This tool detects audio in pages and can produce a standard feed with enclosures, but podcast directories have additional requirements, so treat it as a starting point rather than a full podcast host replacement.'],
+    ['How do I let people subscribe to my feed?', 'Publish the auto discovery link in your head, mention the feed address on your site, and use a button or icon readers recognise. Feed usage is invisible in standard analytics, so expect measurement to be approximate.'],
+    ['Does an RSS feed help SEO?', 'Indirectly at most. Search engines discover content through crawling and sitemaps, not your feed. The value is distribution: aggregators, readers and automation republishing or surfacing your work, which can earn visits and links that do help.']
+  ];
+  const cardsList = [
+    ['search','Content discovery','Homepage, sitemaps, robots.txt declarations, navigation links and existing feeds are all used to find real articles rather than every URL.'],
+    ['data_object','Accurate metadata','Titles, descriptions, dates, authors and images extracted in a documented priority order, with nothing invented when a value is missing.'],
+    ['rss_feed','Existing feed detection','Standard feed locations and auto discovery links are checked first, and an existing feed is offered for use, comparison or replacement.'],
+    ['link','Canonical handling','Tracking parameters stripped, canonical URLs preferred and duplicates removed by address, canonical and title.'],
+    ['code','Validated XML','Correct escaping, RFC dates, unique identifiers and only the namespaces actually used, verified before the file is offered.'],
+    ['edit','Manual control','An editable item table, manual additions, visual and XML previews, quality scoring and downloads in RSS, Atom and JSON.']
+  ];
+  const guides = [
+    ['rss_feed','Confirm the feed you already have','Before generating, let the tool look for an existing feed. Many platforms ship one that nobody configured, and fixing descriptions inside the platform beats maintaining a second generated file forever.'],
+    ['category','Feed what you publish, consistently','A feed is a promise: when something appears, subscribers see it. Feed your best regular output, not every page on the site, and keep the item count stable so old entries roll off gracefully.'],
+    ['event','Get dates right','Publication dates drive sort order in every reader. The extractor prefers structured data and visible dates and marks undated items honestly, because a feed with invented dates quietly scrambles reader timelines.'],
+    ['description','Write descriptions that work alone','In a reader, your description is the whole pitch. One or two specific sentences beat a truncated first paragraph, and they are what aggregation partners display too.'],
+    ['code','Validate before you ship','One unescaped ampersand can make a feed unreadable for every subscriber at once. The validator here checks structure, escaping and dates on every generation, and the download is exactly the validated file.'],
+    ['hub','Round out your distribution','Pair the feed with an <a href="/xml-sitemap-generator">XML sitemap</a> for search engines and an <a href="/llms-txt-generator">llms.txt</a> for AI tools. Together they cover the discovery channels that matter today.']
+  ];
+  const body = `<section class="hero audit-home rss-home"><span class="material-icons hero-icon" aria-hidden="true">rss_feed</span><h1>RSS Feed Generator</h1><p class="hero-subtitle">Turn your published content into a validated RSS feed</p>
+<form id="rss-form" class="rss-form" aria-label="RSS feed generator">
+  <div class="mode-tabs" role="radiogroup" aria-label="Mode"><label><input type="radio" name="mode" value="website" checked> Generate from website</label><label><input type="radio" name="mode" value="sitemap"> Generate from sitemap</label></div>
   <div class="search-field audit-search"><span class="material-icons" aria-hidden="true">link</span><input id="rss-url" name="url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com" required aria-label="Website URL or sitemap URL"><button class="btn" type="submit">Generate RSS Feed</button></div>
   <details class="sitemap-options rss-options"><summary>${icon('tune')} Feed settings</summary>
-    <div class="sitemap-option-row"><label>Number of items <select name="maxItems" class="select"><option value="10">10</option><option value="20" selected>20</option><option value="25">25</option><option value="50">50</option><option value="100">100</option><option value="250">250</option></select></label><label>Max pages to scan <select name="maxPages" class="select"><option value="25">25</option><option value="60" selected>60</option><option value="100">100</option><option value="200">200</option><option value="400">400</option></select></label><label>Crawl depth <select name="maxDepth" class="select"><option value="2">2</option><option value="3" selected>3</option><option value="5">5</option><option value="10">10</option></select></label></div>
-    <div class="sitemap-option-row"><label>Feed content <select name="contentMode" class="select"><option value="excerpt" selected>Excerpt</option><option value="full">Full Content</option><option value="description">Description Only</option></select></label><label>Feed format <select name="feedMode" class="select"><option value="standard" selected>Standard RSS 2.0</option><option value="news">News Feed Mode</option><option value="podcast">Podcast RSS Mode</option></select></label><label>Sort order <select name="sortOrder" class="select"><option value="newest" selected>Newest First</option><option value="oldest">Oldest First</option><option value="manual">Manual Order</option></select></label></div>
-    <div class="sitemap-option-row"><label><input type="checkbox" name="incImages" checked> Include Images</label><label><input type="checkbox" name="incAuthors" checked> Include Authors</label><label><input type="checkbox" name="incCategories" checked> Include Categories</label><label><input type="checkbox" name="incDates" checked> Include Publication Date</label><label><input type="checkbox" name="excUndated" checked> Exclude items without dates</label><label><input type="checkbox" name="includeSubdomains"> Include subdomains</label></div>
+    <div class="sitemap-option-row"><label>Number of items <select name="maxItems" class="select"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option><option value="100">100</option></select></label><label>Item content <select name="contentMode" class="select"><option value="excerpt" selected>Excerpt</option><option value="full">Full content</option><option value="description">Description only</option></select></label><label>Feed format <select name="feedMode" class="select"><option value="standard" selected>Standard RSS 2.0</option><option value="news">News feed</option><option value="podcast">Podcast mode</option></select></label></div>
+    <div class="sitemap-option-row"><label><input type="checkbox" name="incImages" checked> Include images</label><label><input type="checkbox" name="incAuthors" checked> Include authors</label><label><input type="checkbox" name="incCategories" checked> Include categories</label><label><input type="checkbox" name="incDates" checked> Include dates</label></div>
+    <input type="hidden" name="excUndated" value="1"><input type="hidden" name="sortOrder" value="newest">
   </details>
 </form>
-<div class="audit-trust"><span>No account</span><span>No AI API</span><span>Robots.txt respected</span><span>Existing feed detection</span><span>Canonical URLs</span><span>No fabricated data</span><span>XML validated</span><span>Download ready</span></div></section>
+${chips([['rss_feed','Existing feed detection'],['data_object','Accurate metadata'],['link','Canonical URLs'],['code','XML validated'],['download','Download ready']])}</section>
 <div id="rss-results" class="audit-results rss-results"></div>
-<div class="container section"><div class="section-heading-row">${icon('verified')}<h4 style="margin:0;">A real discovery → extraction → validation pipeline</h4></div><div class="grid feature-grid">
-  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('search')} Content discovery</h6><p>Homepage, sitemaps (including indexes, with lastmod), robots.txt declarations, internal links, blog navigation, category pages and existing feeds — prioritising real content pages. Not every URL is assumed to be an article.</p></div></div></div>
-  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('data_object')} Accurate metadata</h6><p>Title (JSON-LD headline → Open Graph → title → H1), description (meta → OG → first paragraph), publication date (structured data → article:published_time → time[datetime] → visible line; sitemap lastmod only as a labelled fallback), author, categories and images — with priority rules and no invented values.</p></div></div></div>
-  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('link') } Canonicals, duplicates &amp; broken URLs</h6><p>Tracking parameters, fragments and www variants normalised; canonical URLs preferred; duplicates removed by URL, canonical and identical title; every item URL verified (404/410/5xx/DNS/timeout excluded with the reason).</p></div></div></div>
-  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('rss_feed')} Existing feed detection</h6><p>Checks /feed/, /rss.xml, /rss/, /feed.xml, /atom.xml and rel="alternate" references. If a valid feed exists it is surfaced with Use Existing Feed, Generate New Feed and a full comparison — never silently duplicated.</p></div></div></div>
-  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('code')} Validated XML</h6><p>RSS 2.0 (optional genuine Atom 1.0) with correct escaping, CDATA for HTML content, RFC 822 dates, unique GUIDs, absolute URLs and only the namespaces actually used. The feed is not presented as valid unless validation passes.</p></div></div></div>
-  <div class="cell w-xs-12 w-sm-6 w-md-4"><div class="card card-hover"><div class="card-content"><h6>${icon('edit')} Manual control &amp; export</h6><p>Editable item table (title, URL, description, date, category, author, include/exclude, order), manual item addition, visual + XML previews, quality score with breakdown, and downloads: rss.xml, atom.xml, JSON article data.</p></div></div></div>
-</div></div>
-<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('forum')}<h4 style="margin:0;">Common Questions</h4></div><div class="faq-accordion">
-<details><summary>Does this tool use AI or an API?</summary><p>No. Discovery, classification, metadata extraction, date detection, deduplication, generation and validation are all deterministic code. No OpenAI, Gemini, Claude or paid RSS/SEO APIs, and no account.</p></details>
-<details><summary>What if the website already has a feed?</summary><p>The tool checks the standard locations plus rel="alternate" references. If a valid feed is found it shows <b>Existing RSS feed detected</b> with the URL and lets you Use Existing Feed, Generate New Feed, or Compare — it never modifies or replaces your feed automatically. On WordPress it notes the built-in /feed/ may already be sufficient.</p></details>
-<details><summary>What if a page has no publication date?</summary><p>No date is invented. The item is shown with "Unknown", excluded by default (toggle available), or can be assigned a date manually in the table. Sitemap lastmod is only used as a clearly-labelled fallback, never presented as a publication date.</p></details>
-<details><summary>Will a blocked or JavaScript-only site produce a feed?</summary><p>The tool reports what actually blocked it: robots.txt restrictions, bot protection (Cloudflare, CAPTCHA), 403/429, DNS, SSL or timeouts. A blocked site is never claimed to have "no articles". You can still add items manually.</p></details>
-<details><summary>Is the quality score an official score?</summary><p>No. It is a transparent tool-generated diagnostic computed from XML validity, URL validity, item completeness, date coverage, duplicate rate, broken-URL rate, canonical consistency and content relevance. It is not a Google score and publishing a feed never guarantees indexing or traffic.</p></details>
-<details><summary>Which sites work with this?</summary><p>Any public website — WordPress, WooCommerce, Next.js, React, Laravel, PHP, static HTML, Shopify, Webflow, Drupal, Joomla and more — using public HTTP/HTTPS only. Private IPs, localhost and metadata endpoints are refused, and every redirect is re-validated.</p></details>
-</div></div>`;
-  return layout('RSS Feed Generator — Free Website-to-RSS Tool | Huvanti', body, {
-    active: 'rss', canonical: 'https://huvanti.com/rss-feed-generator', meta, jsonLd,
-    scripts: ['/assets/js/common.js', '/assets/js/rss/browser.js', '/assets/js/rss/ui.js']
+${cards('What the generator does', 'verified', cardsList)}
+<div class="container section" style="padding-top:0"><div class="section-heading-row">${icon('tips_and_updates')}<h4 style="margin:0;">Running a feed worth subscribing to</h4></div>${lede('A feed is a quiet contract with your most committed readers. These are the practices that keep it healthy.')}${guideGrid(guides)}
+<p class="prose-block">Feeds, sitemaps and llms.txt are three faces of the same job. Generate the <a href="/xml-sitemap-generator">sitemap</a> and the <a href="/llms-txt-generator">llms.txt</a> from the same crawl, and check overall site health with the <a href="/">SEO audit</a>.</p></div>
+${faqSection(faqs)}`;
+  return layout('RSS Feed Generator | Free Website to RSS Tool | Huvanti', body, {
+    active:'rss', canonical:'https://huvanti.com/rss-feed-generator',
+    description:'Free RSS feed generator. Discover a website real content, extract accurate article metadata and download a validated RSS 2.0 or Atom feed. No account.',
+    scripts:['/assets/js/progress.js','/assets/js/common.js','/assets/js/rss/browser.js','/assets/js/rss/ui.js'],
+    jsonLd:[{'@context':'https://schema.org','@type':'WebApplication',name:'RSS Feed Generator',applicationCategory:'DeveloperApplication',operatingSystem:'Any',browserRequirements:'Requires JavaScript',offers:{'@type':'Offer','price':'0','priceCurrency':'USD'},description:'Free RSS and Atom feed generator with metadata extraction and XML validation.'}, faqLd(faqs)]
   });
 }
 
+/* ============================== STATIC PAGES ============================== */
 function page(name) {
   const pages = {
     About: {
       title: 'About Huvanti',
-      meta: '<meta name="description" content="Huvanti offers free, no account website tools built on deterministic analysis. No AI, no login, and no paid APIs.">',
-      html: `<p>Huvanti is a collection of free website tools that run in your browser without an account. Each tool works from publicly observable data and deterministic code, so results are repeatable and never fabricated.</p>
-<p>Start with the <a href="/">SEO Audit</a> for a technical review of any public site, or pick a task from the header menu. The tools cover ad network eligibility, WordPress theme detection, domain information, sitemap and broken link checks, llms.txt and RSS generation, AI crawler controls, and Core Web Vitals measurement.</p>
-<p>Most tools crawl the website you enter. Crawling respects robots.txt where possible, stays within safe request limits, and never touches private or internal addresses.</p>`
+      heading: 'About Huvanti',
+      description: 'Huvanti builds free, no account website tools: SEO auditing, ad network readiness, sitemaps, feeds, domain intelligence and AI bot control, all running in your browser.',
+      html: `<p>Huvanti started with a simple frustration: most website tools either want an account before they show you anything, or they hide the method behind a score. So we built tools that do the opposite. You paste a URL, the tool does real work, and it shows you exactly what was measured and how.</p>
+<h2>What we make</h2>
+<p>The <a href="/">SEO Audit</a> is the centerpiece: a full technical review of any public site. Around it sit twelve focused tools. Four check ad network readiness for <a href="/adsense-eligibility-checker">AdSense</a>, <a href="/ezoic-eligibility-checker">Ezoic</a>, <a href="/mediavine-eligibility-checker">Mediavine</a> and <a href="/raptive-eligibility-checker">Raptive</a>. The <a href="/wordpress-theme-detector">theme detector</a> and the <a href="/domain-information-checker">domain checker</a> look at how a site is built and hosted. The <a href="/xml-sitemap-generator">sitemap</a>, <a href="/rss-feed-generator">RSS</a> and <a href="/llms-txt-generator">llms.txt</a> generators cover discovery formats. The <a href="/broken-link-checker">broken link checker</a>, the <a href="/core-web-vitals-auditor">Core Web Vitals auditor</a> and the <a href="/ai-crawler-blocker">AI bot blocker</a> handle maintenance, speed and access control.</p>
+<h2>How the tools work</h2>
+<p>Everything runs from your browser against public pages, the way any visitor's browser would. When a server side fetch is genuinely needed, it requests only the URL you entered and keeps nothing. The analysis itself is deterministic: rules, measurements and statistics you can inspect, not a language model asked for an opinion. When a tool cannot verify something, it says so instead of inventing an answer, because a wrong confident answer is worse than an honest gap.</p>
+<h2>Who it is for</h2>
+<p>Website owners doing their own maintenance, freelancers checking client sites before a handover, publishers preparing ad network applications, and the curious who simply want to know what a site is made of. If something breaks or a result looks wrong, tell us through the <a href="/contact">contact page</a> with the URL you checked and what you expected.</p>`
     },
     Contact: {
       title: 'Contact',
-      meta: '<meta name="description" content="Get in touch with the Huvanti team about a bug, a feature request, or a question about the free website tools.">',
-      html: `<p>The fastest way to reach us is email at <a href="mailto:hello@huvanti.com">hello@huvanti.com</a>. Include the tool name, the URL you were checking, and a short description of what happened.</p>
-<p>If you are reporting a bug, tell us what you expected and what you saw instead. If you have a feature idea, explain the problem it would solve.</p>
-<p>We read every message but cannot promise a reply. We do not offer paid placement, link exchanges, or guest posts.</p>`
+      heading: 'Contact',
+      description: 'Contact the Huvanti team about a bug, a feature request or a question about the free website tools.',
+      html: `<p>The fastest way to reach us is email at <a href="mailto:hello@huvanti.com">hello@huvanti.com</a>. We read everything.</p>
+<h2>Reporting a bug</h2>
+<p>Include three things and you will get a much faster answer: the tool you were using, the URL you were checking, and what you expected versus what happened. If the tool showed an error code, send that too.</p>
+<h2>Suggesting a feature</h2>
+<p>The best feature requests describe a problem rather than a solution. Tell us what you were trying to accomplish when the tool fell short, and we will work out the cleanest way to get you there.</p>
+<h2>What we do not do</h2>
+<p>We do not offer paid placement, link exchanges, guest posts or sponsored reviews, and we cannot intercede with Google, AdSense or any ad network on your behalf. Questions about eligibility requirements are answered by the checkers themselves.</p>`
     },
     Privacy: {
       title: 'Privacy Policy',
-      meta: '<meta name="description" content="How Huvanti handles data. The tools run from your browser, no account is required, and nothing you submit is stored on our servers.">',
-      html: `<h2>What we collect</h2>
-<p>We do not require an account. The tools process the URL or text you submit in your own browser. For most tools nothing you enter is sent to our servers or stored.</p>
-<h2>When a server request is needed</h2>
-<p>A few tools must reach public services to work. When the server fetches a page it requests only the URL you entered and does not keep the result. Saved settings and recent audits live in your browser's local storage, which you can clear at any time.</p>
+      heading: 'Privacy Policy',
+      description: 'How Huvanti handles data: the tools run in your browser, no account is required, and nothing you submit is stored on our servers.',
+      html: `<p>This policy covers every page on huvanti.com. The short version: the tools run in your browser, we do not ask for an account, and we do not build profiles.</p>
+<h2>What the tools process</h2>
+<p>Most tools analyse the URL or text you submit directly in your browser. When a server side request is genuinely required, the request contains only what the tool needs, typically the URL you entered, and the result is not retained after your report is delivered.</p>
+<h2>What stays on your device</h2>
+<p>Saved settings, the dark mode preference and recent audit summaries for the compare feature live in your browser local storage. They never leave your device and you can remove them at any time by clearing site data in your browser.</p>
 <h2>Third parties</h2>
-<p>Pages load the Roboto and Material Icons fonts from Google Fonts. When a tool cannot reach a site directly it may use public read only relays to fetch the page. We do not sell data and we do not run third party trackers.</p>
-<h2>Your choices</h2>
-<p>Clear your browser data to remove saved settings and history. Email <a href="mailto:hello@huvanti.com">hello@huvanti.com</a> with any privacy questions.</p>`
+<p>Pages load the Roboto and Material Icons font families from Google Fonts, which sees the requests any web server logs. When a tool cannot reach a site directly, it may fetch the public page through a public relay service so the analysis can proceed; those services see the requested URL, not anything about you. If the site is later supported by advertising, ads will be served by a network that sets its own cookies, and this policy will be updated to say so plainly.</p>
+<h2>What we do not do</h2>
+<p>We do not sell data, we do not run third party trackers of our own, and we do not ask for credentials to your analytics, ad networks or hosting. Any tool that offers optional extras, such as entering your own traffic figures, labels them clearly and sends them nowhere except into the report you see.</p>
+<h2>Your choices and questions</h2>
+<p>Clear your browser data to remove everything stored locally. For any privacy question, write to <a href="mailto:hello@huvanti.com">hello@huvanti.com</a> and you will get a straight answer.</p>`
     },
     Terms: {
       title: 'Terms of Use',
-      meta: '<meta name="description" content="The terms for using the free Huvanti website tools, including the no guarantee disclaimer.">',
-      html: `<h2>Free to use</h2>
-<p>The tools are free for personal and commercial use. You may check any website you are entitled to inspect.</p>
-<h2>No guarantee</h2>
-<p>Results are provided as is, for informational purposes. Scores and status labels are our own diagnostics and are not official Google, Ezoic, Mediavine, or Raptive results. Eligibility and approval decisions always belong to the platform you are applying to.</p>
-<h2>Your responsibility</h2>
-<p>You are responsible for the sites you check and for how you use the output. Do not use the tools to probe systems you do not own or lack permission to test.</p>
-<h2>Availability</h2>
-<p>We aim to keep the tools available but do not guarantee uninterrupted access. Features may change without notice.</p>`
+      heading: 'Terms of Use',
+      description: 'The terms for using the free Huvanti website tools, including fair use, no guarantee and responsibility limits.',
+      html: `<p>These terms apply to every tool on huvanti.com. By using the site you accept them.</p>
+<h2>Free to use, within reason</h2>
+<p>The tools are free for personal and commercial use. Check sites you own or have permission to analyse, keep usage reasonable, and do not use the tools to probe, pressure or attack any system. We may rate limit or block usage that harms the service or other sites.</p>
+<h2>Results and their limits</h2>
+<p>Reports are informational. Scores and status labels are this project own diagnostics, produced from evidence a public check can see. They are not official results from Google, AdSense, Ezoic, Mediavine, Raptive or any other platform, and they do not guarantee approval, ranking, traffic or earnings. Eligibility and approval decisions always belong to the platform you are applying to.</p>
+<h2>Acceptance of output</h2>
+<p>You are responsible for changes you make to your website based on a report, including configuration the bot blocker generates. Test server and CDN configuration changes before relying on them, and keep backups before editing robots.txt or server rules.</p>
+<h2>Availability and changes</h2>
+<p>We aim to keep the tools available and accurate, but we do not promise uninterrupted access, and features may change or be withdrawn. The content on the site is provided as is, without warranties of any kind.</p>
+<h2>Contact</h2>
+<p>Questions about these terms are welcome at <a href="mailto:hello@huvanti.com">hello@huvanti.com</a>.</p>`
     }
   };
   const p = pages[name];
-  if (!p) return layout('Not found', '<div class="container notfound"><h1>404</h1><p>Page not found.</p><a class="btn" href="/">Back home</a></div>');
-  return layout(p.title, `<div class="container page"><h1 class="page-title">${esc(p.title)}</h1><div class="paper paper-padded page-copy">${p.html}</div></div>`, { meta: p.meta });
+  if (!p) return layout('Page not found | Huvanti', '<div class="container notfound"><h1>404</h1><p>The page you were looking for could not be found.</p><a class="btn" href="/">Back to the SEO audit</a></div>', { description: 'Page not found.' });
+  const faqs = [
+    ['Who is behind Huvanti?', 'Huvanti is an independent project building free browser based tools for website owners. See the <a href="/about">about page</a> for the full story.'],
+    ['Are the tools really free?', 'Yes, every tool on the site is free to use with no account.'],
+    ['Where can I ask a question?', 'Email <a href="mailto:hello@huvanti.com">hello@huvanti.com</a>. Bug reports that include the tool name, the URL checked and what happened get the fastest replies.']
+  ];
+  return layout(p.title, `<div class="container page"><h1 class="page-title">${esc(p.heading)}</h1><div class="paper paper-padded page-copy" style="max-width:860px">${p.html}</div></div>${faqSection(faqs, 'Quick Questions', 'help_center')}`, {
+    canonical: 'https://huvanti.com/' + name.toLowerCase(),
+    description: p.description,
+    scripts: ['/assets/js/progress.js','/assets/js/common.js'],
+    jsonLd: faqLd(faqs)
+  });
 }
-
 function readJson(req){ return new Promise(resolve=>{let b=''; req.on('data',d=>b+=d); req.on('end',()=>{try{resolve(JSON.parse(b||'{}'))}catch{resolve({})}});}); }
 
 /* Safety net: one bad request must never take the whole server down. */
 process.on('unhandledRejection', (e) => { console.error('unhandledRejection:', e && e.message); });
 process.on('uncaughtException', (e) => { console.error('uncaughtException:', e && e.message); });
 
+const PAGES = {
+  '/': home,
+  '/adsense-eligibility-checker': adsensePage,
+  '/ezoic-eligibility-checker': ezoicPage,
+  '/mediavine-eligibility-checker': mediavinePage,
+  '/raptive-eligibility-checker': raptivePage,
+  '/wordpress-theme-detector': wpthemePage,
+  '/domain-information-checker': domainInfoPage,
+  '/xml-sitemap-generator': sitemapPage,
+  '/broken-link-checker': brokenlinkPage,
+  '/llms-txt-generator': llmstxtPage,
+  '/ai-crawler-blocker': botblockerPage,
+  '/core-web-vitals-auditor': cwvPage,
+  '/rss-feed-generator': rssPage
+};
+
+const SITE_MAP = Object.values(TOOLS).map(t => 'https://huvanti.com' + (t.path === '/' ? '/' : t.path))
+  .concat(['https://huvanti.com/about','https://huvanti.com/contact','https://huvanti.com/privacy','https://huvanti.com/terms']);
+
 http.createServer(async (req,res)=>{
   const u = new URL(req.url, 'http://local');
   const p = decodeURIComponent(u.pathname).replace(/\/$/, '') || '/';
   try {
-  if (p === '/api/audit' && req.method === 'POST') {
-    const body = await readJson(req);
-    res.setHeader('content-type','application/json; charset=utf-8');
-    res.setHeader('cache-control','no-store');
-    res.end(JSON.stringify({limited:true,url:body.url||'',grade:'Browser crawl',score:null,summary:'Using browser-readable crawl.',stats:{pages:0,issues:0,ttfb:'n/a',htmlKb:'n/a'},groups:{},priorities:[],crawl:[]}));
-    return;
-  }
   if (p === '/api/ezoic-audit' && req.method === 'POST') {
     const body = await readJson(req);
     await ezoicApi.handle(req, res, body);
@@ -864,6 +1097,19 @@ http.createServer(async (req,res)=>{
     await cwvApi.handleAnalyze(req, res, body);
     return;
   }
+  if (p === '/robots.txt') {
+    send(req, res, 200, 'text/plain; charset=utf-8',
+      'User-agent: *\nAllow: /\n\nSitemap: https://huvanti.com/sitemap.xml\n', 'public, max-age=86400');
+    return;
+  }
+  if (p === '/sitemap.xml') {
+    const today = new Date().toISOString().slice(0, 10);
+    const xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+      SITE_MAP.map(url => '  <url><loc>' + url + '</loc><lastmod>' + today + '</lastmod></url>').join('\n') + '\n</urlset>\n';
+    send(req, res, 200, 'application/xml; charset=utf-8', xml, 'public, max-age=3600');
+    return;
+  }
+  if (p === '/favicon.ico') { res.statusCode = 204; res.end(); return; }
   if (p.startsWith('/assets/') || p.startsWith('/lib/botblocker/') || p.startsWith('/lib/cwv/')) {
     // Only expose the browser engine modules, not server-only or test files.
     if (p.startsWith('/lib/botblocker/') && /(selftest|uitest|api)\.js$/.test(p)) { res.statusCode = 404; res.end('Not found'); return; }
@@ -873,27 +1119,16 @@ http.createServer(async (req,res)=>{
     if (fs.existsSync(f) && fs.statSync(f).isFile()) {
       const ext = path.extname(f).toLowerCase();
       const type = {'.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.mjs':'application/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.avif':'image/avif','.svg':'image/svg+xml'}[ext] || 'application/octet-stream';
-      res.setHeader('content-type', type); res.setHeader('cache-control','no-store'); res.end(fs.readFileSync(f)); return;
+      send(req, res, 200, type, fs.readFileSync(f), 'public, max-age=86400');
+      return;
     }
     res.statusCode=404; res.end('Not found'); return;
   }
   let html; let status = 200;
-  if (p === '/') html = home();
-  else if (p === '/adsense-eligibility-checker') html = adsensePage();
-  else if (p === '/ezoic-eligibility-checker') html = ezoicPage();
-  else if (p === '/mediavine-eligibility-checker') html = mediavinePage();
-  else if (p === '/raptive-eligibility-checker') html = raptivePage();
-  else if (p === '/wordpress-theme-detector') html = wpthemePage();
-  else if (p === '/domain-information-checker') html = domainInfoPage();
-  else if (p === '/xml-sitemap-generator') html = sitemapPage();
-  else if (p === '/broken-link-checker') html = brokenlinkPage();
-  else if (p === '/llms-txt-generator') html = llmstxtPage();
-  else if (p === '/ai-crawler-blocker') html = botblockerPage();
-  else if (p === '/core-web-vitals-auditor') html = cwvPage();
-  else if (p === '/rss-feed-generator') html = rssPage();
+  if (PAGES[p]) html = PAGES[p]();
   else if (['/about','/contact','/privacy','/terms'].includes(p)) html = page(p.slice(1).replace(/^./,c=>c.toUpperCase()));
-  else { html = layout('Page not found | Huvanti', `<div class="container notfound"><h1>404</h1><p>The page you were looking for could not be found.</p><a class="btn" href="/">Back home</a></div>`); status = 404; }
-  res.statusCode = status; res.setHeader('content-type','text/html; charset=utf-8'); res.setHeader('cache-control','no-store'); res.end(html);
+  else { html = layout('Page not found | Huvanti', `<div class="container notfound"><h1>404</h1><p>The page you were looking for could not be found.</p><a class="btn" href="/">Back to the SEO audit</a></div>`, { description: 'Page not found.' }); status = 404; }
+  send(req, res, status, 'text/html; charset=utf-8', html);
   } catch (e) {
     console.error('request error:', p, e && e.message);
     try {
@@ -904,4 +1139,4 @@ http.createServer(async (req,res)=>{
       } else { try { res.end(); } catch {} }
     } catch {}
   }
-}).listen(process.env.PORT || 3000, '0.0.0.0', () => console.log('Huvanti preview running'));
+}).listen(process.env.PORT || 3000, '0.0.0.0', () => console.log('Huvanti running'));

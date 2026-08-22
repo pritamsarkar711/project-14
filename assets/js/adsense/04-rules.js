@@ -1,4 +1,4 @@
-/* huvanti AdSense checker — page types, essential pages, policy scanner, rule registry. */
+/* huvanti AdSense checker, page types, essential pages, policy scanner, rule registry. */
 (function (global) {
 'use strict';
 var A = global.Adsense = global.Adsense || {};

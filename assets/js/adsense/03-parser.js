@@ -1,4 +1,4 @@
-/* huvanti AdSense checker — HTML/DOM parser. */
+/* huvanti AdSense checker: HTML/DOM parser. */
 (function (global) {
 'use strict';
 var A = global.Adsense = global.Adsense || {};

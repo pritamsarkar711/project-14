@@ -1,4 +1,4 @@
-/* huvanti AdSense checker — transparent, evidence-driven weighted scoring. */
+/* huvanti AdSense checker, transparent, evidence-driven weighted scoring. */
 (function (global) {
 'use strict';
 var A = global.Adsense = global.Adsense || {};
@@ -19,7 +19,7 @@ function statusImpact(status){
   if(status==='medium')return 0.55;
   if(status==='high')return 0.2;
   if(status==='critical')return 0;
-  if(status==='info')return 0.75; // not measurable through proxy — neutral
+  if(status==='info')return 0.75; // not measurable through proxy, neutral
   return 1;
 }
 
@@ -52,7 +52,7 @@ A.scoreCategory=function(catKey, findings, inventory){
   var negW=neg.reduce(function(n,f){var impact=1-statusImpact(f.status),conf=(f.confidence==null?100:f.confidence)/100;return n+w(f)*impact*conf;},0);
   var posW=pos.reduce(function(n,f){return n+w(f);},0);
   var denom=posW+negW;
-  // If nothing measurable exists (e.g. headers hidden by CORS), do not penalise —
+  // If nothing measurable exists (e.g. headers hidden by CORS), do not penalise ,
   // the score is driven by the ratio/site-level findings only.
   var pagePct=denom?posW/denom:null;
 
@@ -106,13 +106,13 @@ A.scoreAll=function(findings,opts){
   var highPolicy=findings.filter(function(f){return f.category==='policy'&&f.status==='high';}).length;
   var noindexAll=findings.some(function(f){return f.id==='TECH_NOINDEX'&&f.page==='Site';});
   var httpsFail=findings.some(function(f){return f.id==='TECH_HTTPS'&&f.status!=='passed';});
-  if(criticalPolicy){total=Math.min(total,20);caps.push('Critical policy-risk signal detected — score capped at 20 pending manual review.');}
-  if(noindexAll){total=Math.min(total,10);caps.push('robots.txt blocks the entire site — score capped at 10.');}
-  if(highPolicy>=3&&!criticalPolicy){total=Math.min(total,40);caps.push('Multiple high-severity policy-risk signals — score capped at 40.');}
-  if(httpsFail){total=Math.min(total,Math.max(total-12,25));caps.push('Site is not served over HTTPS — 12-point penalty.');}
+  if(criticalPolicy){total=Math.min(total,20);caps.push('Critical policy-risk signal detected, score capped at 20 pending manual review.');}
+  if(noindexAll){total=Math.min(total,10);caps.push('robots.txt blocks the entire site, score capped at 10.');}
+  if(highPolicy>=3&&!criticalPolicy){total=Math.min(total,40);caps.push('Multiple high-severity policy-risk signals, score capped at 40.');}
+  if(httpsFail){total=Math.min(total,Math.max(total-12,25));caps.push('Site is not served over HTTPS, 12-point penalty.');}
   if(inventory&&inventory.contentPages>=3){
-    if(inventory.usefulPct<20){total=Math.min(total,40);caps.push('Fewer than 20% of content pages are useful — site appears thin overall.');}
-    else if(inventory.thinPct>=60){total=Math.min(total,50);caps.push('Most content pages are thin — site needs more depth before applying.');}
+    if(inventory.usefulPct<20){total=Math.min(total,40);caps.push('Fewer than 20% of content pages are useful, site appears thin overall.');}
+    else if(inventory.thinPct>=60){total=Math.min(total,50);caps.push('Most content pages are thin, site needs more depth before applying.');}
   }
   total=A.util.clamp(Math.round(total),0,maxTotal);
   var verdict='Likely Ready',cls='ready';

@@ -1,4 +1,4 @@
-/* huvanti WordPress Theme Detector — browser-relay collector.
+/* huvanti WordPress Theme Detector, browser-relay collector.
  *
  * Used when the scanner server cannot reach a website directly (blocked
  * egress, TLS reset, firewall, or the site refusing datacenter IPs).
@@ -8,10 +8,10 @@
  *   direct fetch → free public CORS relays (allorigins → corsproxy → codetabs)
  *
  * Resilience rules (a 403 from ONE path is never a verdict):
- *   - a 401/403/429/5xx response from one relay triggers the next relay —
+ *   - a 401/403/429/5xx response from one relay triggers the next relay ,
  *     different relays exit from different IPs and WAF rules differ
  *   - if the live homepage stays blocked, REST (?rest_route=) and robots.txt
- *     are still probed — WordPress can be provable without the homepage
+ *     are still probed: WordPress can be provable without the homepage
  *   - last resort: a clearly-labelled Wayback Machine snapshot (free, no key)
  *
  * The collected bundle is POSTed to /api/wptheme-analyze where the SAME
@@ -25,8 +25,8 @@
   var MAX_HTML = 400000;
   var MAX_FETCHES = 20;
   var SCAN_BUDGET_MS = 48000; /* hard wall-clock budget for the whole collection */
-  var PRIVATE = /^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[01])\.|\[?::1\]?$|fc00:|fd[0-9a-f]{2}:|fe80:|metadata\.google\.internal)/i;
-  /* Statuses that mean "this path was refused" — try the next transport. */
+  var PRIVATE = /^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[01])\.|\[?:1\]?$|fc00:|fd[0-9a-f]{2}:|fe80:|metadata\.google\.internal)/i;
+  /* Statuses that mean "this path was refused", try the next transport. */
   var RETRY_STATUSES = [401, 403, 429, 500, 502, 503, 504];
 
   var fetchCount = 0;
@@ -71,7 +71,7 @@
     return makeError('unreachable', 'Could not fetch the resource.');
   }
 
-  /* Direct fetch — works when the site sends CORS headers. */
+  /* Direct fetch, works when the site sends CORS headers. */
   function fetchDirect(url, opt, signal) {
     var t = withTimeout(signal);
     return fetch(url, { redirect: 'follow', signal: t.ctrl.signal, headers: { Accept: opt.accept || 'text/html,*/*;q=0.5' } })
@@ -142,7 +142,7 @@
         if (text.length > cap) text = text.slice(0, cap);
         res.text = text;
         res.bytes = text.length;
-        // A challenge wall is a challenge wall whatever status it ships with —
+        // A challenge wall is a challenge wall whatever status it ships with ,
         // remember it and try the next transport/IP.
         if (looksLikeChallenge(res.status, text)) {
           sawChallenge = true;
@@ -335,7 +335,7 @@
         home = { url: urlObj.href, finalUrl: urlObj.href, status: 200, text: pasted, via: 'user-paste', bytes: pasted.length, headers: {} };
         scanInfo.finalUrl = urlObj.href;
         scanInfo.status = 200;
-        scanInfo.notes.push('Homepage HTML was pasted manually by the user — the analysis ran on exactly that source.');
+        scanInfo.notes.push('Homepage HTML was pasted manually by the user, the analysis ran on exactly that source.');
         return Promise.resolve(null);
       }
       onProgress({ stage: 'connect', message: 'Fetching the homepage through your browser…' });
@@ -343,20 +343,20 @@
         if (looksLikeChallenge(res.status, res.text)) {
           homeBlocked = { status: res.status, code: 'challenge', message: 'bot challenge page' };
           scanInfo.status = res.status;
-          scanInfo.notes.push('Live homepage serves a bot-challenge wall — continuing with other public endpoints.');
-          onProgress({ stage: 'connect', message: 'Homepage shows a bot challenge — probing other endpoints…' });
+          scanInfo.notes.push('Live homepage serves a bot-challenge wall, continuing with other public endpoints.');
+          onProgress({ stage: 'connect', message: 'Homepage shows a bot challenge, probing other endpoints…' });
           return null;
         }
         home = res;
         scanInfo.finalUrl = res.finalUrl || urlObj.href;
         scanInfo.status = res.status;
         try { origin = new URL(scanInfo.finalUrl).origin; } catch (e) {}
-        if (res.via !== 'direct') scanInfo.notes.push('Homepage fetched via public relay (' + res.via + ') — exact HTTP headers were not available.');
+        if (res.via !== 'direct') scanInfo.notes.push('Homepage fetched via public relay (' + res.via + '), exact HTTP headers were not available.');
         else if (res.finalUrl && res.finalUrl !== urlObj.href) scanInfo.notes.push('Redirected to ' + res.finalUrl);
         return null;
       }, function (err) {
         if (['cancelled', 'budget', 'deadline', 'invalid_url', 'ssrf'].indexOf(err.code) >= 0) throw err;
-        // Homepage refused on every transport — try the www/non-www variant
+        // Homepage refused on every transport, try the www/non-www variant
         // (WAF rules are frequently configured for only one host), then move on
         // to other public endpoints.
         var altHref = altHostUrl(urlObj);
@@ -378,8 +378,8 @@
           if (altOk) return null;
           homeBlocked = { status: 403, code: err.code, message: err.message };
           scanInfo.status = 403;
-          scanInfo.notes.push('Live homepage refused every automated reader (' + err.message + ') — continuing with other public endpoints.');
-          onProgress({ stage: 'connect', message: 'Homepage blocked — probing other public endpoints…' });
+          scanInfo.notes.push('Live homepage refused every automated reader (' + err.message + '), continuing with other public endpoints.');
+          onProgress({ stage: 'connect', message: 'Homepage blocked, probing other public endpoints…' });
           return null;
         });
       });
@@ -398,7 +398,7 @@
             if (res.status !== 200 || !res.text || looksLikeChallenge(res.status, res.text)) return null;
             homeArchived = { timestamp: snap.timestamp || '', url: snap.url };
             home = { url: snap.url, finalUrl: scanInfo.finalUrl || urlObj.href, status: 200, text: res.text, via: 'wayback(' + res.via + ')', bytes: res.bytes };
-            scanInfo.notes.push('Homepage discovery used an archived snapshot (Wayback Machine' + (snap.timestamp ? ', ' + snap.timestamp.slice(0, 8) : '') + ') because the live site refused readers. Theme details were still read from the LIVE site — the discovered folder may lag behind reality.');
+            scanInfo.notes.push('Homepage discovery used an archived snapshot (Wayback Machine' + (snap.timestamp ? ', ' + snap.timestamp.slice(0, 8) : '') + ') because the live site refused readers. Theme details were still read from the LIVE site, the discovered folder may lag behind reality.');
             return home;
           });
         })
@@ -413,7 +413,7 @@
      */
     function tryInnerPages() {
       if (homeBlocked === null || home) return Promise.resolve(null);
-      onProgress({ stage: 'theme', message: 'Homepage blocked — trying sitemap and inner pages…' });
+      onProgress({ stage: 'theme', message: 'Homepage blocked, trying sitemap and inner pages…' });
       var indexes = [origin + '/sitemap.xml', origin + '/sitemap_index.xml', origin + '/wp-sitemap.xml', origin + '/feed/'];
       var pageUrls = [];
       var chain = Promise.resolve();
@@ -472,7 +472,7 @@
     /*
      * WordPress.org public theme-directory lookup (free, no key). Resolves the
      * official name/author/homepage/screenshot for FREE themes from the slug
-     * alone — valuable when the site's own style.css is blocked. Never used as
+     * alone, valuable when the site's own style.css is blocked. Never used as
      * the installed version (the directory lists the latest release).
      */
     function tryWporgLookup(slug) {
@@ -506,7 +506,7 @@
       return cssLoads(asset, signal).then(function (ok) {
         if (ok) {
           resourceProbe = { loaded: [asset] };
-          scanInfo.notes.push('A WordPress core asset (wp-includes block-library stylesheet) loaded directly in your browser — the homepage is walled, but the server is provably WordPress.');
+          scanInfo.notes.push('A WordPress core asset (wp-includes block-library stylesheet) loaded directly in your browser, the homepage is walled, but the server is provably WordPress.');
           return resourceProbe;
         }
         return null;
@@ -521,7 +521,7 @@
           robotsText = robotsRes.text;
           scanInfo.robots.checked = true;
           var wpPaths = [/wp-admin/i, /wp-content/i, /wp-includes/i].filter(function (re) { return re.test(robotsText); }).length;
-          if (wpPaths) scanInfo.robots.notes.push('robots.txt references WordPress paths (' + wpPaths + ' distinct) — supporting signal.');
+          if (wpPaths) scanInfo.robots.notes.push('robots.txt references WordPress paths (' + wpPaths + ' distinct), supporting signal.');
         } else if (homeBlocked && robotsRes && robotsRes.status === 403) {
           scanInfo.robots.notes.push('robots.txt was also blocked (HTTP 403).');
         }
@@ -600,7 +600,7 @@
       }
       var chain = Promise.resolve(phase);
       if (tmpl && /^[a-z0-9][a-z0-9 _.-]{0,78}$/.test(tmpl) && tmpl.indexOf('..') < 0) {
-        onProgress({ stage: 'parent', message: 'Child theme found — reading the parent theme…' });
+        onProgress({ stage: 'parent', message: 'Child theme found, reading the parent theme…' });
         phase.templateSlug = tmpl.replace(/ /g, '-');
         chain = softFetch(origin + '/wp-content/themes/' + phase.templateSlug + '/style.css', { cap: 262144, accept: 'text/css,*/*;q=0.1' })
           .then(function (r) { phase.parentCssRes = { attempted: true, status: r.status, text: r.text || '' }; return phase; });

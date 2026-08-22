@@ -1,10 +1,10 @@
-/* Browser fallback for Broken Link Checker — deeply thorough, deterministic, no AI */
+/* Browser fallback for Broken Link Checker, deeply thorough, deterministic, no AI */
 (function (global) {
   'use strict';
   var B = global.BrokenLinkBrowserRunner = {};
   var MAX_FETCHES = 200;
   var fetches = 0;
-  var PRIVATE = /^(localhost|127\.|0\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[01])\.|\[?::1\]?|fc00:|fd[0-9a-f]{2}:|fe80:|metadata\.google\.internal)/i;
+  var PRIVATE = /^(localhost|127\.|0\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[01])\.|\[?:1\]?|fc00:|fd[0-9a-f]{2}:|fe80:|metadata\.google\.internal)/i;
 
   function err(code, msg) { var e = new Error(msg); e.code = code; return e; }
   function esc(s) { return String(s).replace(/[&<>'\"]/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&apos;', '"': '&quot;' }[m]; }); }

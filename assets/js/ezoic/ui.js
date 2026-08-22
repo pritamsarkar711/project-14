@@ -1,4 +1,4 @@
-/* huvanti Ezoic Eligibility Checker — report UI (separate from AdSense). */
+/* huvanti Ezoic Eligibility Checker, report UI (separate from AdSense). */
 (function () {
   'use strict';
   var form = document.getElementById('ezoic-form');
@@ -56,23 +56,18 @@
     return a < b ? 'done' : a === b ? 'active' : 'wait';
   }
 
-  function progressUI(state) {
-    var items = STEPS.map(function (s) {
-      var st = stepState(s[0], state.stage);
-      var icon = st === 'done' ? 'check_circle' : st === 'active' ? 'autorenew' : 'hourglass_empty';
-      var label = s[1];
-      if (s[0] === 'crawler' && state.crawled != null) label = state.crawled + ' pages crawled' + (state.limit ? ' (limit ' + state.limit + ')' : '');
-      return '<li class="pi-' + st + '"><span class="material-icons ' + (st === 'active' ? 'pi-active' : st === 'done' ? 'pi-done' : 'pi-wait') + '">' + icon + '</span>' + esc(label) + '</li>';
-    }).join('');
-    var crawlNote = (state.stage === 'crawler' && state.crawled != null)
-      ? '<p class="muted">Real crawl progress: ' + state.crawled + ' of ' + (state.limit || '?') + ' page limit.</p>'
-      : '';
-    out.innerHTML = '<div class="paper paper-padded adsense-progress ezoic-progress"><h3>Checking Ezoic readiness…</h3>'
-      + crawlNote + '<ul class="progress-list">' + items + '</ul>'
-      + '<p class="muted" id="ezoic-progress-msg">' + esc(state.message || 'Working…') + '</p>'
-      + '<button class="btn" type="button" id="ezoic-cancel">Cancel</button></div>';
-    var b = document.getElementById('ezoic-cancel');
-    if (b) b.onclick = function () { if (abortCtrl) abortCtrl.abort(); };
+    function progressUI(state) {
+    var ICONS = {'connect': 'power', 'robots': 'rule', 'sitemap': 'account_tree', 'crawler': 'travel_explore', 'important': 'star', 'content': 'article', 'duplicates': 'merge_type', 'technical': 'build', 'policy': 'gpp_maybe', 'score': 'grading'};
+    var steps = STEPS.map(function (s) { return { key: s[0], label: s[1], icon: ICONS[s[0]] || 'radio_button_unchecked' }; });
+    var states = {};
+    STEPS.forEach(function (s) { states[s[0]] = stepState(s[0], state.stage); });
+    var p = window.ScanProgress.reuse(out, {
+      title: 'Checking Ezoic readiness', target: (urlInput && urlInput.value) || '', icon: 'insights', steps: steps,
+      note: state.message || 'Working\u2026',
+      onCancel: function () { if (abortCtrl) abortCtrl.abort(); }
+    });
+    p.set(states, state.message || 'Working\u2026', 8 + Math.round(Object.keys(states).filter(function (k) { return states[k] === 'done'; }).length / steps.length * 88));
+    if (state.crawled != null) p.label('crawler', state.crawled + (state.limit ? ' of ' + state.limit : '') + ' pages crawled');
   }
 
   function errorUI(err) {
@@ -122,7 +117,7 @@
   }
 
   function categoryBreakdown(r) {
-    return '<div class="cat-breakdown"><h3>Score breakdown — expand a category to see the calculation</h3>'
+    return '<div class="cat-breakdown"><h3>Score breakdown, expand a category to see the calculation</h3>'
       + r.score.categories.map(function (c, idx) {
         var neg = (c.lines || []).filter(function (l) { return l.delta < 0; }).length;
         var rows = (c.lines || []).map(function (l) {
@@ -131,11 +126,11 @@
           return '<div class="calc-line ' + cls + '"><span>' + sevPill(l.status) + ' ' + esc(l.name)
             + (l.page && l.page !== 'Site' ? ' · ' + esc(String(l.page).slice(0, 48)) : '')
             + (l.sourceType ? ' ' + sourceChip(l.sourceType) : '')
-            + '</span><b>' + (d < 0 ? ('−' + Math.abs(Math.round(d * 10) / 10)) : (l.status === 'passed' ? '+0' : '—'))
+            + '</span><b>' + (d < 0 ? ('−' + Math.abs(Math.round(d * 10) / 10)) : (l.status === 'passed' ? '+0' : ','))
             + ' / ' + l.weight + '</b></div>';
         }).join('');
         var manuals = (c.manuals || []).map(function (m) {
-          return '<div class="calc-line neutral"><span>' + sevPill('manual') + ' ' + esc(m.name) + ' — Unable to verify automatically</span><b>—</b></div>';
+          return '<div class="calc-line neutral"><span>' + sevPill('manual') + ' ' + esc(m.name) + ': Unable to verify automatically</span><b>,</b></div>';
         }).join('');
         return '<details class="cat-row" ' + (idx < 2 ? 'open' : '') + '><summary><span class="cat-gauge" style="--s:' + c.pct + ';background:conic-gradient(' + ringColor(c.pct) + ' calc(var(--s)*1%),var(--chip-bg) 0)"><b>' + c.score + '</b></span>'
           + '<span class="cat-meta">' + esc(c.label) + ' <small>' + c.score + '/' + c.max + ' points · ' + c.pct + '% · ' + neg + ' issue' + (neg === 1 ? '' : 's') + '</small></span>'
@@ -206,7 +201,7 @@
       return '<tr data-url="' + esc(p.url) + '"><td class="pt-url" title="' + esc(p.url) + '">' + esc(p.path) + '</td>'
         + '<td><span class="badge low">' + esc(p.type) + '</span></td>'
         + '<td><span class="status-pill s-' + st + '">' + (p.error ? 'ERR' : (p.status || '?')) + '</span></td>'
-        + '<td>' + (p.wordCount || '—') + '</td>'
+        + '<td>' + (p.wordCount || ',') + '</td>'
         + '<td>' + p.technical + '</td>'
         + '<td>' + p.ux + '</td>'
         + '<td>' + p.risk + '</td>'
@@ -257,7 +252,7 @@
       .slice(0, 12);
     if (!fix.length) return '<div class="priority passed"><b>No critical or high-priority automated issues detected</b><span>Public signals look relatively strong. Still complete the manual items (traffic, MCM, consent) with Ezoic.</span></div>';
     return fix.map(function (f) {
-      var label = { critical: 'Critical — fix before applying', high: 'High — strongly recommended', medium: 'Medium — improvement recommended' }[f.status];
+      var label = { critical: 'Critical, fix before applying', high: 'High, strongly recommended', medium: 'Medium, improvement recommended' }[f.status];
       return '<div class="priority ' + f.status + '"><b>' + esc(f.name) + ' · ' + esc(f.page) + '</b><span>' + esc(label) + ': ' + esc(f.fix || f.evidence) + '</span></div>';
     }).join('');
   }
@@ -280,7 +275,7 @@
     URL.revokeObjectURL(a.href);
   }
   function copySummary(r) {
-    var s = 'Ezoic Readiness Score: ' + r.score.total + '/100 — ' + r.verdict.label + '\n' + r.url + '\nNot an official Ezoic score.\n';
+    var s = 'Ezoic Readiness Score: ' + r.score.total + '/100, ' + r.verdict.label + '\n' + r.url + '\nNot an official Ezoic score.\n';
     r.score.categories.forEach(function (c) { s += '- ' + c.label + ': ' + c.score + '/' + c.max + '\n'; });
     if (navigator.clipboard) navigator.clipboard.writeText(s);
     toast('Summary copied');
@@ -294,8 +289,8 @@
       + '<button class="btn" type="button" id="ez-copy"><span class="material-icons">content_copy</span>Copy summary</button></div>';
     var inv = r.inventory || {};
     var insights = [
-      ['Website type', r.siteType || '—'],
-      ['Language', (r.language && r.language.name) || '—'],
+      ['Website type', r.siteType || ','],
+      ['Language', (r.language && r.language.name) || ','],
       ['Useful content pages', (inv.useful || 0) + ' / ' + (inv.contentPages || 0)],
       ['Thin pages', String(inv.thinPct || 0) + '%'],
       ['Near-duplicates', String(inv.dupPct || 0) + '%'],

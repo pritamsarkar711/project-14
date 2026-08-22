@@ -1,4 +1,4 @@
-/* huvanti Raptive Eligibility Checker — report UI (independent of AdSense, Ezoic & Mediavine). */
+/* huvanti Raptive Eligibility Checker, report UI (independent of AdSense, Ezoic & Mediavine). */
 (function () {
   'use strict';
   var form = document.getElementById('raptive-form');
@@ -57,20 +57,18 @@
     if (b < 0) return a === 0 ? 'active' : 'wait';
     return a < b ? 'done' : a === b ? 'active' : 'wait';
   }
-  function progressUI(state) {
-    var items = STEPS.map(function (s) {
-      var st = stepState(s[0], state.stage);
-      var icon = st === 'done' ? 'check_circle' : st === 'active' ? 'autorenew' : 'hourglass_empty';
-      var label = s[1];
-      if (s[0] === 'crawler' && state.crawled != null) label = state.crawled + ' pages crawled' + (state.limit ? ' (limit ' + state.limit + ')' : '');
-      return '<li class="pi-' + st + '"><span class="material-icons ' + (st === 'active' ? 'pi-active' : st === 'done' ? 'pi-done' : 'pi-wait') + '">' + icon + '</span>' + esc(label) + '</li>';
-    }).join('');
-    var crawlNote = (state.stage === 'crawler' && state.crawled != null) ? '<p class="muted">Real crawl progress: ' + state.crawled + ' of ' + (state.limit || '?') + ' page limit.</p>' : '';
-    out.innerHTML = '<div class="paper paper-padded adsense-progress raptive-progress"><h3>Checking Raptive readiness…</h3>' + crawlNote
-      + '<ul class="progress-list">' + items + '</ul><p class="muted">' + esc(state.message || 'Working…') + '</p>'
-      + '<button class="btn" type="button" id="raptive-cancel">Cancel</button></div>';
-    var b = document.getElementById('raptive-cancel');
-    if (b) b.onclick = function () { if (abortCtrl) abortCtrl.abort(); };
+    function progressUI(state) {
+    var ICONS = {'connect': 'power', 'robots': 'rule', 'sitemap': 'account_tree', 'crawler': 'travel_explore', 'important': 'star', 'content': 'article', 'duplicates': 'merge_type', 'longform': 'notes', 'brand': 'verified_user', 'technical': 'build', 'advertising': 'campaign', 'score': 'grading'};
+    var steps = STEPS.map(function (s) { return { key: s[0], label: s[1], icon: ICONS[s[0]] || 'radio_button_unchecked' }; });
+    var states = {};
+    STEPS.forEach(function (s) { states[s[0]] = stepState(s[0], state.stage); });
+    var p = window.ScanProgress.reuse(out, {
+      title: 'Checking Raptive readiness', target: (urlInput && urlInput.value) || '', icon: 'campaign', steps: steps,
+      note: state.message || 'Working\u2026',
+      onCancel: function () { if (abortCtrl) abortCtrl.abort(); }
+    });
+    p.set(states, state.message || 'Working\u2026', 8 + Math.round(Object.keys(states).filter(function (k) { return states[k] === 'done'; }).length / steps.length * 88));
+    if (state.crawled != null) p.label('crawler', state.crawled + (state.limit ? ' of ' + state.limit : '') + ' pages crawled');
   }
 
   function errorUI(err) {
@@ -124,7 +122,7 @@
   }
 
   function categoryBreakdown(r) {
-    return '<div class="cat-breakdown"><h3>Readiness score breakdown — expand a category to see the calculation</h3>'
+    return '<div class="cat-breakdown"><h3>Readiness score breakdown, expand a category to see the calculation</h3>'
       + r.score.categories.map(function (c, idx) {
         var neg = (c.lines || []).filter(function (l) { return l.delta < 0; }).length;
         var rows = (c.lines || []).map(function (l) {
@@ -133,9 +131,9 @@
           return '<div class="calc-line ' + cls + '"><span>' + sevPill(l.status) + ' ' + esc(l.name)
             + (l.page && l.page !== 'Site' ? ' · ' + esc(String(l.page).slice(0, 48)) : '')
             + (l.sourceType ? ' ' + sourceChip(l.sourceType) : '')
-            + '</span><b>' + (d < 0 ? ('−' + Math.abs(Math.round(d * 10) / 10)) : (l.status === 'passed' ? '+0' : '—')) + ' / ' + l.weight + '</b></div>';
+            + '</span><b>' + (d < 0 ? ('−' + Math.abs(Math.round(d * 10) / 10)) : (l.status === 'passed' ? '+0' : ',')) + ' / ' + l.weight + '</b></div>';
         }).join('');
-        var manuals = (c.manuals || []).map(function (m) { return '<div class="calc-line neutral"><span>' + sevPill('manual') + ' ' + esc(m.name) + ' — Manual Verification Required</span><b>—</b></div>'; }).join('');
+        var manuals = (c.manuals || []).map(function (m) { return '<div class="calc-line neutral"><span>' + sevPill('manual') + ' ' + esc(m.name) + ': Manual Verification Required</span><b>,</b></div>'; }).join('');
         return '<details class="cat-row" ' + (idx < 2 ? 'open' : '') + '><summary><span class="cat-gauge" style="--s:' + c.pct + ';background:conic-gradient(' + ringColor(c.pct) + ' calc(var(--s)*1%),var(--chip-bg) 0)"><b>' + c.score + '</b></span>'
           + '<span class="cat-meta">' + esc(c.label) + ' <small>' + c.score + '/' + c.max + ' points · ' + c.pct + '% · ' + neg + ' issue' + (neg === 1 ? '' : 's') + '</small></span>'
           + '<span class="material-icons cat-arrow">expand_more</span></summary>'
@@ -153,7 +151,7 @@
       + (r.officialRequirements || []).map(function (a) {
         return '<tr><td><b>' + esc(a.name) + '</b><br><span class="muted">' + esc((a.requirement || '').slice(0, 180)) + '</span></td>'
           + '<td>' + statusChip(a.status) + '</td><td class="muted">' + esc(a.evidence) + '</td>'
-          + '<td class="muted">' + (a.sourceUrl ? '<a href="' + esc(a.sourceUrl) + '" target="_blank" rel="noopener">Raptive</a> · ' + esc(a.lastVerified || '') : '—') + '</td></tr>';
+          + '<td class="muted">' + (a.sourceUrl ? '<a href="' + esc(a.sourceUrl) + '" target="_blank" rel="noopener">Raptive</a> · ' + esc(a.lastVerified || '') : ',') + '</td></tr>';
       }).join('') + '</tbody></table></div></div>';
   }
 
@@ -205,7 +203,7 @@
       return '<tr data-url="' + esc(p.url) + '"><td class="pt-url" title="' + esc(p.url) + '">' + esc(p.path) + '</td>'
         + '<td><span class="badge low">' + esc(p.type) + '</span></td>'
         + '<td><span class="status-pill s-' + st + '">' + (p.error ? 'ERR' : (p.status || '?')) + '</span></td>'
-        + '<td>' + (p.wordCount || '—') + '</td>'
+        + '<td>' + (p.wordCount || ',') + '</td>'
         + '<td>' + p.content + '</td>'
         + '<td>' + p.originality + '</td>'
         + '<td>' + p.ux + '</td>'
@@ -237,7 +235,7 @@
     var lf = r.longForm || {};
     return '<div class="audit-panel"><h3>Long-form coverage</h3><div class="insight-row">'
       + [['Eligible content pages', String(lf.eligible || 0)], ['Long-form pages', String(lf.longForm || 0)],
-         ['Coverage', (lf.coverage != null ? lf.coverage + '%' : '—')], ['Majority (≥50%)', lf.majority ? 'yes' : 'no']
+         ['Coverage', (lf.coverage != null ? lf.coverage + '%' : ',')], ['Majority (≥50%)', lf.majority ? 'yes' : 'no']
         ].map(function (x) { return '<div class="insight-card"><span>' + esc(x[0]) + '</span><b>' + esc(x[1]) + '</b></div>'; }).join('')
       + '</div><p class="muted">' + (lf.longForm || 0) + ' of ' + (lf.eligible || 0) + ' eligible content pages contain substantial long-form content. Privacy, terms, contact, about, search, login and utility pages are excluded. Word count is not used alone.</p></div>';
   }
@@ -258,11 +256,11 @@
     var d = r.domainAge || {};
     return '<div class="audit-panel wide"><h3>Google Analytics detection &amp; domain age</h3><div class="insight-row">'
       + [['Tracking code', a.detected ? 'detected' : 'not detected'],
-         ['GA4 IDs', (a.ga4Ids && a.ga4Ids.length) ? a.ga4Ids.join(', ') : '—'],
-         ['GTM', (a.gtmIds && a.gtmIds.length) ? a.gtmIds.join(', ') : '—'],
+         ['GA4 IDs', (a.ga4Ids && a.ga4Ids.length) ? a.ga4Ids.join(', ') : ','],
+         ['GTM', (a.gtmIds && a.gtmIds.length) ? a.gtmIds.join(', ') : ','],
          ['Configuration verified', 'no'],
          ['Domain age', d.verified ? ('~' + d.ageMonths + ' months') : 'Unable to verify'],
-         ['RDAP date', d.verified ? String(d.registeredAt || '').slice(0, 10) : '—']
+         ['RDAP date', d.verified ? String(d.registeredAt || '').slice(0, 10) : ',']
         ].map(function (x) { return '<div class="insight-card"><span>' + esc(x[0]) + '</span><b>' + esc(String(x[1])) + '</b></div>'; }).join('')
       + '</div><p class="muted">Tracking code detected is not the same as Analytics configuration verified. Domain dates are never invented when RDAP fails.</p></div>';
   }
@@ -331,7 +329,7 @@
       .slice(0, 12);
     if (!fix.length) return '<div class="priority passed"><b>No critical or high-priority automated issues detected</b><span>Public signals look relatively strong. Complete the manual verification items before applying.</span></div>';
     return fix.map(function (f) {
-      var label = { critical: 'Critical — fix before applying', high: 'High — strongly recommended', medium: 'Medium — improvement recommended' }[f.status];
+      var label = { critical: 'Critical, fix before applying', high: 'High, strongly recommended', medium: 'Medium, improvement recommended' }[f.status];
       return '<div class="priority ' + f.status + '"><b>' + esc(f.name) + ' · ' + esc(f.page) + '</b><span>' + esc(label) + ': ' + esc(f.fix || f.evidence) + '</span></div>';
     }).join('');
   }
@@ -344,7 +342,7 @@
     var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'raptive-eligibility.csv'; a.click(); URL.revokeObjectURL(a.href);
   }
   function copySummary(r) {
-    var s = 'Raptive Readiness Score: ' + r.score.total + '/100 — ' + r.verdict.label + '\nApplication eligibility: ' + r.applicationEligibility.status + '\n' + r.url + '\nNot an official Raptive score.\n';
+    var s = 'Raptive Readiness Score: ' + r.score.total + '/100, ' + r.verdict.label + '\nApplication eligibility: ' + r.applicationEligibility.status + '\n' + r.url + '\nNot an official Raptive score.\n';
     r.score.categories.forEach(function (c) { s += '- ' + c.label + ': ' + c.score + '/' + c.max + '\n'; });
     if (navigator.clipboard) navigator.clipboard.writeText(s);
     toast('Summary copied');
@@ -364,7 +362,7 @@
       + '<div class="audit-panel wide"><h3>Ad readiness &amp; performance</h3><div class="insight-row">'
       + [['Networks', (r.advertising && r.advertising.networks && r.advertising.networks.length) ? esc(r.advertising.networks.join(', ')) : 'none'],
          ['Ad pages', String((r.advertising && r.advertising.adPages) || 0)],
-         ['Avg TTFB', (r.performance && r.performance.avgTtfb != null) ? r.performance.avgTtfb + 'ms' : '—'],
+         ['Avg TTFB', (r.performance && r.performance.avgTtfb != null) ? r.performance.avgTtfb + 'ms' : ','],
          ['Compression', (r.performance && r.performance.compressionPct) + '%'],
          ['ads.txt', (r.crawl && r.crawl.adsTxt && r.crawl.adsTxt.present) ? 'present' : 'not found']
         ].map(function (x) { return '<div class="insight-card"><span>' + esc(x[0]) + '</span><b>' + String(x[1]) + '</b></div>'; }).join('')
@@ -421,7 +419,7 @@
       var url = b.getAttribute('data-url');
       var f = r.findings.filter(function (x) { return x.page === '/' + (url.split('/').filter(Boolean).join('/')) || (x.urls || []).indexOf(url) >= 0; });
       var det = document.getElementById('rp-page-detail');
-      det.innerHTML = '<h5>Details — ' + esc(url) + '</h5>' + (f.length ? renderIssues(f, 'all', '') : '<p class="muted">No findings for this page.</p>');
+      det.innerHTML = '<h5>Details, ' + esc(url) + '</h5>' + (f.length ? renderIssues(f, 'all', '') : '<p class="muted">No findings for this page.</p>');
       det.style.display = 'block';
     });
     out.scrollIntoView({ behavior: 'smooth', block: 'start' });

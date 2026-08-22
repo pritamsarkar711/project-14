@@ -1,1 +1,0 @@
-</main><footer class="foot"><p>© huvanti. 1000+ useful browser tools.</p><p><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p></footer><script src="/assets/js/data.js"></script><script src="/assets/js/common.js"></script><script src="/assets/js/engines/main.js"></script></body></html>

@@ -1,4 +1,4 @@
-/* Broken Link Checker — UI (production-grade, inherits existing design system) */
+/* Broken Link Checker: UI (production-grade, inherits existing design system) */
 (function () {
   'use strict';
   var form = document.getElementById('brokenlink-form');
@@ -62,6 +62,7 @@
   }
 
   maxPagesSel.addEventListener('change', function () {
+    if (!maxPagesCustom) return;
     if (maxPagesSel.value === 'custom') {
       maxPagesCustom.style.display = '';
       maxPagesCustom.focus();
@@ -80,42 +81,43 @@
 
   var STEPS_ORDER = ['validate','url_validated','connect','connected','robots','robots_analyzed','sitemap','sitemap_discovered','crawl_start','crawl','crawl_done','normalize','deduplicated','checking','checking_done','canonical','report','done'];
 
-  function progressUI(state) {
+    function progressUI(state) {
+    var ICONS = {'url': 'link', 'robots': 'rule', 'sitemap': 'account_tree', 'discovered': 'radio_button_unchecked', 'scanned': 'radio_button_unchecked', 'links': 'radio_button_unchecked', 'unique': 'merge_type', 'checked': 'radio_button_unchecked', 'report': 'grading'};
     var stage = state.stage || 'init';
-    var msg = state.message || 'Working...';
-    var discovered = state.discovered != null ? state.discovered : null;
-    var crawled = state.crawled != null ? state.crawled : null;
-    var checked = state.checked != null ? state.checked : null;
-    var total = state.total != null ? state.total : null;
-    var duplicateRefs = state.duplicateRefs != null ? state.duplicateRefs : null;
-    var unique = state.unique != null ? state.unique : null;
-
-    var steps = [
-      { key: 'url_validated', label: 'URL validated', done: STEPS_ORDER.indexOf(stage) > STEPS_ORDER.indexOf('validate') },
-      { key: 'robots', label: 'robots.txt analyzed', done: STEPS_ORDER.indexOf(stage) >= STEPS_ORDER.indexOf('robots_analyzed') },
-      { key: 'sitemap', label: state.sitemaps ? ('Sitemap discovered (' + state.sitemaps + ' sitemaps)') : 'Sitemap discovered', done: STEPS_ORDER.indexOf(stage) >= STEPS_ORDER.indexOf('sitemap_discovered') },
-      { key: 'crawl', label: discovered != null ? (discovered + ' pages discovered') : 'Pages discovered', done: STEPS_ORDER.indexOf(stage) >= STEPS_ORDER.indexOf('crawl_done'), active: stage === 'crawl' || stage === 'crawl_start' },
-      { key: 'scanned', label: crawled != null ? (crawled + ' pages scanned') : 'Pages scanned', done: STEPS_ORDER.indexOf(stage) >= STEPS_ORDER.indexOf('crawl_done'), active: stage === 'crawl' },
-      { key: 'links', label: state.links != null ? (state.links + ' links discovered') : 'Links discovered', done: STEPS_ORDER.indexOf(stage) >= STEPS_ORDER.indexOf('normalize') },
-      { key: 'unique', label: unique != null ? (unique + ' unique destinations' + (duplicateRefs ? (' · ' + duplicateRefs + ' duplicate refs removed') : '')) : 'Unique destinations', done: STEPS_ORDER.indexOf(stage) >= STEPS_ORDER.indexOf('deduplicated') },
-      { key: 'checked', label: checked != null && total != null ? (checked + '/' + total + ' destinations checked') : (checked != null ? (checked + ' destinations checked') : 'Checking links...'), done: STEPS_ORDER.indexOf(stage) >= STEPS_ORDER.indexOf('checking_done'), active: stage === 'checking' },
-      { key: 'report', label: 'Generating report', done: stage === 'done', active: stage === 'report' }
+    var STEPS = [
+      { key: 'url', label: 'URL validated' },
+      { key: 'robots', label: 'robots.txt analyzed' },
+      { key: 'sitemap', label: state.sitemaps ? 'Sitemap discovered (' + state.sitemaps + ')' : 'Sitemap discovered' },
+      { key: 'discovered', label: state.discovered != null ? state.discovered + ' pages discovered' : 'Pages discovered' },
+      { key: 'scanned', label: state.crawled != null ? state.crawled + ' pages scanned' : 'Pages scanned' },
+      { key: 'links', label: state.links != null ? state.links + ' links discovered' : 'Links discovered' },
+      { key: 'unique', label: state.unique != null ? state.unique + ' unique destinations' : 'Unique destinations' },
+      { key: 'checked', label: state.checked != null && state.total != null ? state.checked + ' of ' + state.total + ' destinations checked' : 'Checking link destinations' },
+      { key: 'report', label: 'Generating report' }
     ];
-
-    var html = '<div class="paper paper-padded sitemap-progress bl-progress"><h3>' + icon('link') + ' Scanning...</h3><ul class="progress-list">';
-    steps.forEach(function (s) {
-      var st = s.done ? 'done' : s.active ? 'active' : 'wait';
-      var ic = st === 'done' ? 'check_circle' : st === 'active' ? 'autorenew' : 'hourglass_empty';
-      html += '<li class="pi-' + st + '"><span class="material-icons pi-' + st + '">' + ic + '</span>' + esc(s.label) + '</li>';
+    var ORDER = ['init','validate','url_validated','connect','connected','robots','robots_analyzed','sitemap','sitemap_discovered','crawl_start','crawl','crawl_done','normalize','deduplicated','checking','checking_done','canonical','report','done'];
+    var PROGRESS_KEYS = ['url','robots','sitemap','discovered','scanned','links','unique','checked','report'];
+    var si = Math.max(0, ORDER.indexOf(stage));
+    var states = {};
+    STEPS.forEach(function (st, i) {
+      var reached = ORDER.indexOf(['url_validated','robots_analyzed','sitemap_discovered','crawl_done','crawl_done','normalize','deduplicated','checking_done','report'][i]);
+      if (stage === 'done') states[st.key] = 'done';
+      else if (si > reached) states[st.key] = 'done';
+      else if (si === reached) states[st.key] = 'active';
+      else if ((st.key === 'discovered' || st.key === 'scanned') && (stage === 'crawl' || stage === 'crawl_start')) states[st.key] = 'active';
+      else if (st.key === 'checked' && stage === 'checking') states[st.key] = 'active';
+      else if (st.key === 'report' && stage === 'report') states[st.key] = 'active';
+      else states[st.key] = 'wait';
     });
-    html += '</ul><p class="muted">' + esc(msg) + '</p>';
-    if (discovered != null || crawled != null || checked != null) {
-      html += '<div class="progress-bar"><i style="width:' + (checked != null && total ? Math.round(checked / total * 100) : (crawled != null && discovered ? Math.round(crawled / discovered * 100) : 30)) + '%"></i></div>';
-    }
-    html += '<button class="btn" type="button" id="bl-cancel">Cancel</button></div>';
-    out.innerHTML = html;
-    var b = document.getElementById('bl-cancel');
-    if (b) b.onclick = function () { if (abortCtrl) abortCtrl.abort(); };
+    var pct = 8;
+    if (state.checked != null && state.total) pct = 15 + Math.round(state.checked / state.total * 78);
+    else if (state.crawled != null && state.discovered) pct = 12 + Math.round(state.crawled / Math.max(1, state.discovered) * 45);
+    var p = window.ScanProgress.reuse(out, {
+      title: 'Scanning for broken links', target: (document.getElementById('bl-url') || {}).value || '', icon: 'link_off', steps: STEPS,
+      note: state.message || 'Working\u2026',
+      onCancel: function () { if (abortCtrl) abortCtrl.abort(); }
+    });
+    p.set(states, state.message || 'Working\u2026', pct);
   }
 
   function errorUI(err) {
@@ -124,15 +126,15 @@
     var friendlyMap = {
       invalid_url: 'Please enter a valid public URL (e.g. https://example.com).',
       ssrf: 'That address cannot be scanned (private, localhost, or cloud metadata).',
-      dns: 'DNS resolution failed — the domain does not exist or cannot be resolved.',
-      tls: 'SSL/TLS handshake failed — the site has an invalid or expired certificate.',
+      dns: 'DNS resolution failed, the domain does not exist or cannot be resolved.',
+      tls: 'SSL/TLS handshake failed, the site has an invalid or expired certificate.',
       timeout: 'The website took too long to respond.',
       robots: 'Crawling blocked by robots.txt for the start URL.',
       busy: 'The checker is busy. Please try again shortly.',
       ratelimit: 'Too many scans from this network. Please wait a few minutes.',
       cancelled: 'The scan was cancelled.',
       fetch_failed: 'Could not connect to the website. It may be offline or blocking scanners.',
-      unreachable: 'Server could not reach the website — trying browser fallback...',
+      unreachable: 'Server could not reach the website, trying browser fallback...',
       redirect_loop: 'Redirect loop detected.',
       too_large: 'A response was too large to analyze safely.'
     };
@@ -160,8 +162,8 @@
     var breakdownHtml = (s.breakdown || []).map(function (b) {
       return '<div class="calc-line neg"><span>' + esc(b.factor) + ' (' + b.count + ')</span><b>-' + b.penalty + '</b></div><small class="muted">' + esc(b.detail) + '</small>';
     }).join('');
-    if (!breakdownHtml) breakdownHtml = '<p class="muted">No penalties — no confirmed broken links detected.</p>';
-    return '<div class="score-card"><div class="score-ring" style="--score:' + s.score + ';background:conic-gradient(' + col + ' calc(var(--score)*1%),var(--chip-bg) 0)"><b style="color:' + col + '">' + s.score + '</b></div><div class="score-summary"><h2>Broken Link Health Score: ' + s.score + '/100</h2><p class="muted">' + esc(s.grade) + ' — ' + esc((s.explanation || '').split('.')[0] + '.') + '</p><details><summary>How this score was calculated</summary><div style="margin-top:10px">' + breakdownHtml + '<div class="calc-note">' + icon('info') + '<span>' + esc(s.explanation || '') + '</span></div></div></details></div></div>';
+    if (!breakdownHtml) breakdownHtml = '<p class="muted">No penalties, no confirmed broken links detected.</p>';
+    return '<div class="score-card"><div class="score-ring" style="--score:' + s.score + ';background:conic-gradient(' + col + ' calc(var(--score)*1%),var(--chip-bg) 0)"><b style="color:' + col + '">' + s.score + '</b></div><div class="score-summary"><h2>Broken Link Health Score: ' + s.score + '/100</h2><p class="muted">' + esc(s.grade) + ', ' + esc((s.explanation || '').split('.')[0] + '.') + '</p><details><summary>How this score was calculated</summary><div style="margin-top:10px">' + breakdownHtml + '<div class="calc-note">' + icon('info') + '<span>' + esc(s.explanation || '') + '</span></div></div></details></div></div>';
   }
 
   function renderSummary(report) {
@@ -243,7 +245,7 @@
     issues.slice(0, 500).forEach(function (iss, idx) {
       var res = iss.result || {};
       var cls = iss.classification || {};
-      html += '<tr class="bl-row" data-idx="' + idx + '"><td class="url-cell">' + wrapUrl(iss.source) + '</td><td class="url-cell">' + wrapUrl(iss.destination) + '</td><td><span class="status-pill s-' + (res.status >= 200 && res.status < 300 ? 'ok' : res.status >= 300 && res.status < 400 ? 'redir' : res.status >= 400 ? 'err' : 'unk') + '">' + esc(res.status || '—') + '</span></td><td><span class="chip">' + esc(iss.linkType) + '</span> ' + (iss.isInternal ? '<span class="chip chip-primary">internal</span>' : '<span class="chip">external</span>') + '</td><td>' + esc((iss.anchorText || '').slice(0, 40)) + '</td><td>' + classificationPill(cls) + '<br><small class="muted">' + esc((cls.reason || '').slice(0, 80)) + '</small></td><td>' + severityBadge(iss.severity || 'low') + '</td><td>' + iss.occurrences + '</td></tr>';
+      html += '<tr class="bl-row" data-idx="' + idx + '"><td class="url-cell">' + wrapUrl(iss.source) + '</td><td class="url-cell">' + wrapUrl(iss.destination) + '</td><td><span class="status-pill s-' + (res.status >= 200 && res.status < 300 ? 'ok' : res.status >= 300 && res.status < 400 ? 'redir' : res.status >= 400 ? 'err' : 'unk') + '">' + esc(res.status || ',') + '</span></td><td><span class="chip">' + esc(iss.linkType) + '</span> ' + (iss.isInternal ? '<span class="chip chip-primary">internal</span>' : '<span class="chip">external</span>') + '</td><td>' + esc((iss.anchorText || '').slice(0, 40)) + '</td><td>' + classificationPill(cls) + '<br><small class="muted">' + esc((cls.reason || '').slice(0, 80)) + '</small></td><td>' + severityBadge(iss.severity || 'low') + '</td><td>' + iss.occurrences + '</td></tr>';
       html += '<tr class="bl-detail" id="bl-detail-' + idx + '" style="display:none"><td colspan="8"><div class="bl-detail-box">';
       html += '<div class="calc-line"><span>Source</span><b>' + wrapUrl(iss.source) + '</b></div>';
       html += '<div class="calc-line"><span>Destination</span><b>' + wrapUrl(iss.destination) + '</b></div>';
@@ -252,10 +254,10 @@
       }
       html += '<div class="calc-line"><span>Final URL</span><b>' + wrapUrl(res.finalUrl || iss.destination) + '</b></div>';
       html += '<div class="calc-line"><span>Status</span><b>' + esc(res.status) + '</b></div>';
-      html += '<div class="calc-line"><span>Classification</span><b>' + esc(cls.classification) + ' — ' + esc(cls.reason || '') + '</b></div>';
+      html += '<div class="calc-line"><span>Classification</span><b>' + esc(cls.classification) + ', ' + esc(cls.reason || '') + '</b></div>';
       html += '<div class="calc-line"><span>Link type</span><b>' + esc(iss.linkType) + ' · ' + (iss.isInternal ? 'internal' : 'external') + '</b></div>';
       html += '<div class="calc-line"><span>Crawl depth</span><b>' + esc(iss.depth != null ? iss.depth : '0') + '</b></div>';
-      html += '<div class="calc-line"><span>Occurrences</span><b>' + iss.occurrences + ' — found on ' + iss.sources.length + ' pages</b></div>';
+      html += '<div class="calc-line"><span>Occurrences</span><b>' + iss.occurrences + ', found on ' + iss.sources.length + ' pages</b></div>';
       if (iss.sources.length > 1) {
         html += '<details><summary>Show all ' + iss.sources.length + ' source pages</summary><div class="bl-sources">' + iss.sources.map(function (s) { return '<div>' + wrapUrl(s) + '</div>'; }).join('') + '</div></details>';
       }
@@ -277,10 +279,10 @@
         html += '<div class="calc-note">' + icon('shield') + '<span>Bot protection detected: ' + esc(res.botProtection.provider) + ' (' + esc(res.botProtection.type) + ')</span></div>';
       }
       if (res.tls) {
-        html += '<div class="calc-note">' + icon('lock') + '<span>TLS: ' + esc(res.tls.status) + ' — ' + esc(res.tls.reason || '') + '</span></div>';
+        html += '<div class="calc-note">' + icon('lock') + '<span>TLS: ' + esc(res.tls.status) + ', ' + esc(res.tls.reason || '') + '</span></div>';
       }
       if (res.dns) {
-        html += '<div class="calc-note">' + icon('dns') + '<span>DNS: ' + esc(res.dns.code) + ' — ' + esc(res.dns.error || '') + '</span></div>';
+        html += '<div class="calc-note">' + icon('dns') + '<span>DNS: ' + esc(res.dns.code) + ', ' + esc(res.dns.error || '') + '</span></div>';
       }
       if (iss.anchorIssue) {
         html += '<div class="calc-note">' + icon('anchor') + '<span>Anchor: ' + esc(iss.anchorIssue.reason) + '</span></div>';
@@ -342,7 +344,7 @@
       '<div class="calc-line"><span>Duration</span><b>' + (Math.round(st.durationMs / 100) / 10) + 's</b></div>' +
       (report.robots ? '<div class="calc-line"><span>robots.txt</span><b>' + (report.robots.exists ? 'Found' : 'Not found') + '</b></div>' : '') +
       (report.sitemaps ? '<div class="calc-line"><span>Sitemaps</span><b>' + report.sitemaps.count + ' found, ' + report.sitemaps.pageUrls + ' URLs</b></div>' : '') +
-      (report.browserFallback ? '<div class="calc-note">' + icon('computer') + '<span>Browser fallback used — server could not reach site directly.</span></div>' : '') +
+      (report.browserFallback ? '<div class="calc-note">' + icon('computer') + '<span>Browser fallback used, server could not reach site directly.</span></div>' : '') +
       '</div>';
 
     html += '<div class="audit-panel"><h3>Internal Link Health</h3>' +
@@ -358,10 +360,10 @@
 
     html += '<div class="audit-panel wide"><h3>Scan Complete</h3><p class="muted">Found ' + confirmedBroken.length + ' confirmed broken links, ' + redirects.length + ' redirects, ' + blocked.length + ' blocked/unable to verify.</p></div>';
 
-    if (confirmedBroken.length) html += '<div class="audit-panel wide"><h3>Confirmed Broken Links (' + confirmedBroken.length + ')</h3><p class="muted">Most important — 404, 410, persistent 5xx, DNS failure, persistent connection failure after retries.</p></div>';
-    if (redirectLoops.length) html += '<div class="audit-panel wide"><h3>Redirect Loops (' + redirectLoops.length + ')</h3><p class="muted">A → B → A detected — critical.</p></div>';
+    if (confirmedBroken.length) html += '<div class="audit-panel wide"><h3>Confirmed Broken Links (' + confirmedBroken.length + ')</h3><p class="muted">Most important, 404, 410, persistent 5xx, DNS failure, persistent connection failure after retries.</p></div>';
+    if (redirectLoops.length) html += '<div class="audit-panel wide"><h3>Redirect Loops (' + redirectLoops.length + ')</h3><p class="muted">A → B → A detected, critical.</p></div>';
     if (redirects.length) html += '<div class="audit-panel wide"><h3>Redirect Issues (' + redirects.length + ')</h3><p class="muted">Single redirects, chains, cross-domain, HTTP→HTTPS, www variations. Single 301 is not broken.</p></div>';
-    if (blocked.length) html += '<div class="audit-panel wide"><h3>Blocked / Unable to Verify (' + blocked.length + ')</h3><p class="muted">401, 403, 429, bot protection, CAPTCHA, Cloudflare challenge — not classified as broken.</p></div>';
+    if (blocked.length) html += '<div class="audit-panel wide"><h3>Blocked / Unable to Verify (' + blocked.length + ')</h3><p class="muted">401, 403, 429, bot protection, CAPTCHA, Cloudflare challenge, not classified as broken.</p></div>';
     if (dns.length || ssl.length || timeouts.length) html += '<div class="audit-panel wide"><h3>Network Issues</h3><p class="muted">DNS: ' + dns.length + ' · SSL: ' + ssl.length + ' · Timeouts: ' + timeouts.length + '</p></div>';
     if (anchors.length) html += '<div class="audit-panel wide"><h3>Anchor Issues (' + anchors.length + ')</h3><p class="muted">Fragment targets that do not exist.</p></div>';
     if (report.sitemapIssues && report.sitemapIssues.length) {

@@ -1,4 +1,4 @@
-/* Core Web Vitals & INP Auditor — report rendering.
+/* Core Web Vitals & INP Auditor, report rendering.
  * Renders the server-produced report with the site's existing design
  * system classes only (score-card, audit-panel, ad-stat, mini-table,
  * audit-fold, issue, badge, page-table…). No new fonts or color scheme. */
@@ -45,11 +45,11 @@
     var s = report.lab.score;
     if (!s) return '';
     var ringColor = s.value == null ? '#607d8b' : (s.value >= 90 ? '#2e7d32' : s.value >= 50 ? '#ed6c02' : '#d32f2f');
-    var html = '<div class="score-card cwv-scorecard"><div class="score-ring" style="--score:' + (s.value == null ? 0 : s.value) + ';background:conic-gradient(' + ringColor + ' calc(var(--score)*1%),var(--chip-bg) 0)"><b>' + (s.value == null ? '—' : s.value) + '</b></div><div class="score-summary"><h2>' + esc(s.label) + '</h2>';
+    var html = '<div class="score-card cwv-scorecard"><div class="score-ring" style="--score:' + (s.value == null ? 0 : s.value) + ';background:conic-gradient(' + ringColor + ' calc(var(--score)*1%),var(--chip-bg) 0)"><b>' + (s.value == null ? ',' : s.value) + '</b></div><div class="score-summary"><h2>' + esc(s.label) + '</h2>';
     if (s.grade) html += '<p>' + statusPill(s.value >= 90 ? 'good' : s.value >= 50 ? 'needs-improvement' : 'poor', s.grade) + '</p>';
     html += '<p class="source-chip">' + esc(s.disclaimer) + '</p></div></div>';
     html += panel('Score breakdown (transparent)', 'functions',
-      '<p class="muted">Weighted components from measured values. Components without data are excluded and shown below — the score is renormalised over measured components only.</p>' +
+      '<p class="muted">Weighted components from measured values. Components without data are excluded and shown below, the score is renormalised over measured components only.</p>' +
       '<div class="mini-table-wrap"><table class="mini-table cwv-scoretable"><thead><tr><th>Component</th><th>Weight</th><th>Value / note</th><th>Score</th></tr></thead><tbody>' +
       s.breakdown.map(function (p) {
         return '<tr><td>' + esc(p.label) + (p.advisory ? ' <small class="muted">(advisory)</small>' : '') + '</td><td>' + p.weight + '%</td><td class="cwv-note-cell">' + esc(p.note || p.detail || '') + '</td><td>' + (p.score == null ? '<span class="muted">excluded</span>' : '<b>' + p.score + '</b>') + '</td></tr>';
@@ -108,7 +108,7 @@
       });
     }
     html += '<p class="muted">' + (inp.limitations || []).map(function (l) { return esc(l); }).join('<br>') + '</p>';
-    return panel('INP Analysis — interaction-level detail', 'touch_app', html, 'cwv-wide');
+    return panel('INP Analysis, interaction-level detail', 'touch_app', html, 'cwv-wide');
   }
 
   /* ================= LCP ================= */
@@ -187,7 +187,7 @@
         html += '<h6 class="cwv-subhead">Largest shift cluster (' + fmtCls(cls.largestWindow.value) + ')</h6>';
         cls.largestWindow.shifts.forEach(function (s, i) {
           var src = (s.sources || [])[0];
-          html += '<div class="cwv-shift"><b>Shift ' + (i + 1) + ' — score ' + fmtCls(s.value) + ' at ' + fmtMs(s.startTime) + '</b>';
+          html += '<div class="cwv-shift"><b>Shift ' + (i + 1) + ', score ' + fmtCls(s.value) + ' at ' + fmtMs(s.startTime) + '</b>';
           if (src && src.selector) {
             html += '<div class="cwv-evidence">Element: ' + esc(src.selector) + '</div>';
             if (src.prevRect && src.curRect) {
@@ -206,7 +206,7 @@
   }
   function shiftCause(src) {
     if (!src) return 'Unattributed shift.';
-    if (src.tag === 'img') return 'Image without reserved space (missing width/height) — layout moves when it loads.';
+    if (src.tag === 'img') return 'Image without reserved space (missing width/height), layout moves when it loads.';
     return 'Content inserted or resized after first render (dynamic content, fonts, banners). Reserve space for the element.';
   }
 
@@ -222,7 +222,7 @@
         return '<div class="cwv-cause"><b>' + esc(c.label) + '</b><p class="muted">' + esc(c.evidence) + '</p></div>';
       }).join('');
     }
-    return panel('FCP — First Contentful Paint', 'visibility', html);
+    return panel('FCP: First Contentful Paint', 'visibility', html);
   }
 
   function ttfbSection(report) {
@@ -240,7 +240,7 @@
         '</div>';
     }
     (ttfb.notes || []).forEach(function (n) { html += '<p class="muted">' + esc(n) + '</p>'; });
-    html += '<p class="muted">TTFB alone does not prove a specific backend problem — a slow server-response phase indicates likely server-side latency worth profiling.</p>';
+    html += '<p class="muted">TTFB alone does not prove a specific backend problem, a slow server-response phase indicates likely server-side latency worth profiling.</p>';
     return panel('TTFB Analysis', 'swap_vert', html);
   }
 
@@ -274,7 +274,7 @@
           }).join('') + '</tbody></table></div>');
       }
       if (lt.potentialInpImpact && lt.potentialInpImpact.length) {
-        html += '<div class="calc-note"><span class="material-icons" aria-hidden="true">info</span>' + lt.potentialInpImpact.length + ' long task(s) overlapped tested interactions — a potential INP impact (correlation, not proven cause).</div>';
+        html += '<div class="calc-note"><span class="material-icons" aria-hidden="true">info</span>' + lt.potentialInpImpact.length + ' long task(s) overlapped tested interactions, a potential INP impact (correlation, not proven cause).</div>';
       }
     }
     return panel('Long Task Detection', 'hourglass_top', html);
@@ -297,13 +297,13 @@
       html += '<p>' + comp + ' of ' + total + ' text resource(s) served compressed' + (total ? ' (' + Math.round(comp / total * 100) + '%)' : '') + '.</p>';
       if (r.compression.uncompressed && r.compression.uncompressed.length) {
         html += '<div class="mini-table-wrap"><table class="mini-table"><thead><tr><th>Uncompressed text resource</th><th>Size</th></tr></thead><tbody>' +
-          r.compression.uncompressed.map(function (u) { return '<tr><td class="cwv-target-cell">' + mono(u.url) + '</td><td>' + (u.bytes != null ? bytes(u.bytes) : '—') + '</td></tr>'; }).join('') + '</tbody></table></div>';
+          r.compression.uncompressed.map(function (u) { return '<tr><td class="cwv-target-cell">' + mono(u.url) + '</td><td>' + (u.bytes != null ? bytes(u.bytes) : ',') + '</td></tr>'; }).join('') + '</tbody></table></div>';
       }
     } else {
       html += '<p class="muted">' + esc(r.compression.note) + '</p>';
     }
-    html += '<p class="muted">HTTP/1.1 is reported as an observation, not automatically a fault — it matters most with many small requests and no connection reuse.</p>';
-    return panel('Network Efficiency — Protocol &amp; Compression', 'settings_ethernet', html);
+    html += '<p class="muted">HTTP/1.1 is reported as an observation, not automatically a fault, it matters most with many small requests and no connection reuse.</p>';
+    return panel('Network Efficiency: Protocol &amp; Compression', 'settings_ethernet', html);
   }
 
   /* ================= waterfall ================= */
@@ -328,7 +328,7 @@
       return '<div class="cwv-wf-row" data-name="' + esc(String(r.url).toLowerCase()) + '" data-type="' + esc(r.type) + '">' +
         '<div class="cwv-wf-label" title="' + esc(r.url) + '"><span class="cwv-wf-dot" style="background:' + color + '"></span>' + esc(shortUrl(r.url)) + '</div>' +
         '<div class="cwv-wf-track">' + (r.startTime == null ? '<span class="muted">timing not exposed</span>' : '<i style="left:' + left + '%;width:' + width + '%;background:' + color + '"></i>') + '</div>' +
-        '<div class="cwv-wf-meta">' + (r.duration != null ? fmtMs(r.duration) : '—') + ' · ' + (r.transferSize != null ? bytes(r.transferSize) : '?') + (r.protocol ? ' · ' + esc(r.protocol) : '') + '</div>' +
+        '<div class="cwv-wf-meta">' + (r.duration != null ? fmtMs(r.duration) : ',') + ' · ' + (r.transferSize != null ? bytes(r.transferSize) : '?') + (r.protocol ? ' · ' + esc(r.protocol) : '') + '</div>' +
         '</div>';
     }).join('') + '</div>';
     return panel('Network Waterfall', 'waterfall_chart', html, 'cwv-wide');
@@ -357,7 +357,7 @@
     }
     var html = '<div class="cwv-tree">' + nodeHtml(dep.root, 0) + '</div>';
     if (dep.longestChain) {
-      html += '<div class="calc-note"><span class="material-icons" aria-hidden="true">info</span>Longest dependency chain: <b>' + dep.longestChain.length + '</b> hops — ' + esc(dep.longestChain.path.map(shortUrl).join(' → ')) + '</div>';
+      html += '<div class="calc-note"><span class="material-icons" aria-hidden="true">info</span>Longest dependency chain: <b>' + dep.longestChain.length + '</b> hops, ' + esc(dep.longestChain.path.map(shortUrl).join(' → ')) + '</div>';
     }
     if (dep.hints) {
       var hints = [];
@@ -432,7 +432,7 @@
     if (im.issues && im.issues.length) {
       html += '<h6 class="cwv-subhead">Image findings (evidence-based)</h6>';
       im.issues.forEach(function (i) {
-        html += '<div class="cwv-inline-issue"><b>' + sevBadge(i.severity) + ' ' + esc(i.title) + '</b><p>' + esc(i.detail) + '</p><small class="cwv-evidence">' + esc(i.evidence) + (i.savings ? ' — ' + esc(i.savings.label) : '') + '</small></div>';
+        html += '<div class="cwv-inline-issue"><b>' + sevBadge(i.severity) + ' ' + esc(i.title) + '</b><p>' + esc(i.detail) + '</p><small class="cwv-evidence">' + esc(i.evidence) + (i.savings ? ', ' + esc(i.savings.label) : '') + '</small></div>';
       });
     } else {
       html += '<p class="muted">No image findings in the measured set.</p>';
@@ -513,7 +513,7 @@
     if (r.longAnimationFrames.frames && r.longAnimationFrames.frames.length) {
       html += '<h6 class="cwv-subhead">Long animation frames</h6><div class="mini-table-wrap"><table class="mini-table"><thead><tr><th>Duration</th><th>Scripts</th></tr></thead><tbody>' +
         r.longAnimationFrames.frames.map(function (f) {
-          return '<tr><td><b>' + fmtMs(f.duration) + '</b></td><td class="cwv-target-cell">' + (f.scripts || []).map(function (s) { return esc(s.name || '(inline)') + (s.duration ? ' (' + fmtMs(s.duration) + ')' : ''); }).join('<br>') || '<span class="muted">—</span>' + '</td></tr>';
+          return '<tr><td><b>' + fmtMs(f.duration) + '</b></td><td class="cwv-target-cell">' + (f.scripts || []).map(function (s) { return esc(s.name || '(inline)') + (s.duration ? ' (' + fmtMs(s.duration) + ')' : ''); }).join('<br>') || '<span class="muted">,</span>' + '</td></tr>';
         }).join('') + '</tbody></table></div>';
     }
     html += '<div class="calc-note"><span class="material-icons" aria-hidden="true">info</span>' + esc(r.forcedReflow.note) + '</div>';
@@ -598,8 +598,8 @@
   CWV.Report.render = function (container, report) {
     var html = '';
     if (report.meta && report.meta.transport === 'direct-iframe') {
-      html += '<div class="cwv-field-box"><span class="material-icons" aria-hidden="true">info</span><div><b>Limited measurement mode — direct page load</b>' +
-        '<p>All fetch transports (server proxy and public relays) were unavailable, so the page was loaded directly in a cross-origin iframe. Browsers block access to page internals — Core Web Vitals, interactions and resources cannot be measured from this transport and are shown as Not Available. Only the iframe load time is real. This is a sandboxed-preview limitation; on a normally hosted server the full pipeline runs.</p></div></div>';
+      html += '<div class="cwv-field-box"><span class="material-icons" aria-hidden="true">info</span><div><b>Limited measurement mode, direct page load</b>' +
+        '<p>All fetch transports (server proxy and public relays) were unavailable, so the page was loaded directly in a cross-origin iframe. Browsers block access to page internals: Core Web Vitals, interactions and resources cannot be measured from this transport and are shown as Not Available. Only the iframe load time is real. This is a sandboxed-preview limitation; on a normally hosted server the full pipeline runs.</p></div></div>';
     }
     html += '<div class="cwv-report-head">' +
       '<div class="cwv-head-row"><h2 class="cwv-report-title">' + esc(report.meta && report.meta.finalUrl ? shortUrl(report.meta.finalUrl) : '') + '</h2></div>' +
