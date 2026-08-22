@@ -970,3 +970,6 @@ html,body{max-width:100%;overflow-x:clip}
 .faq-accordion summary::after{content:"expand_more";font-family:"Material Icons";font-size:22px;color:var(--text-secondary);flex:0 0 auto;transition:transform .2s}
 .faq-accordion details[open] summary::after{transform:rotate(180deg)}
 .faq-accordion summary b{font-weight:700}
+
+/* Footer tools column flows in multiple columns so the block stays compact */
+@media(min-width:900px){.footer-grid>div:nth-child(2) .footer-links{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:4px 20px;align-content:start}}
