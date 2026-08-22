@@ -73,21 +73,34 @@ async function fetchUrl(rawUrl, signal, timeoutMs=12000){
 
 // Lightweight reachability/status probe for links & images (HEAD where possible).
 async function probeStatus(url, signal){
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),7000);
+  const abort=()=>ctrl.abort();
+  signal?.addEventListener('abort',abort,{once:true});
   try{
-    const r=await fetch('https://corsproxy.io/?url='+encodeURIComponent(url),{method:'HEAD',mode:'cors',signal,cache:'no-store'});
-    return {status:r.status,headers:headersToObj(r.headers),via:'head'};
-  }catch{}
-  try{
-    const r=await fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(url),{method:'HEAD',signal,cache:'no-store'});
-    return {status:r.status,headers:headersToObj(r.headers),via:'head'};
-  }catch{}
-  return {status:null,unavailable:true};
+    try{
+      const r=await fetch('https://corsproxy.io/?url='+encodeURIComponent(url),{method:'HEAD',mode:'cors',signal:ctrl.signal,cache:'no-store'});
+      return {status:r.status,headers:headersToObj(r.headers),via:'head'};
+    }catch{}
+    try{
+      const r=await fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(url),{method:'HEAD',signal:ctrl.signal,cache:'no-store'});
+      return {status:r.status,headers:headersToObj(r.headers),via:'head'};
+    }catch{}
+    return {status:null,unavailable:true};
+  }finally{
+    clearTimeout(timer);
+    signal?.removeEventListener('abort',abort);
+  }
 }
 
 async function poolMap(items, limit, fn){
   const out=[], rest=[...items]; let idx=0;
   await Promise.all(Array.from({length:Math.min(limit,items.length)},async()=>{
-    while(rest.length){ const i=idx++; const it=rest.shift(); try{out[i]=await fn(it,i)}catch(e){out[i]={error:e.message}} }
+    while(rest.length){
+      const i=idx++; const it=rest.shift();
+      try{out[i]=await fn(it,i)}
+      catch(e){if(e&&e.name==='AbortError')throw e;out[i]={error:e.message}}
+    }
   }));
   return out;
 }
@@ -175,8 +188,8 @@ async function readSitemap(sm,origin,signal,depth=0){
   try{
     const txt=(await fetchUrl(sm,signal,10000)).text||'';
     const locs=[...txt.matchAll(/<loc>([^<]+)<\/loc>/gi)].map(m=>m[1].trim()).filter(u=>sameSite(u,origin)&&!isAsset(u));
-    const nested=[...txt.matchAll(/<loc>([^<]+sitemap[^<]*)<\/loc>/gi)].map(m=>m[1].trim());
-    return {urls:locs,nested};
+    const nested=locs.filter(u=>/\bsitemap(?:[_./-]|$)|sitemap\.xml/i.test(u));
+    return {urls:locs.filter(u=>!nested.includes(u)),nested};
   }catch{return {urls:[],nested:[]}}
 }
 
@@ -272,52 +285,87 @@ function grade(s){return s>=90?'Excellent':s>=75?'Good':s>=60?'Needs work':s>=40
 
 /* ----------------------------- main audit ----------------------------- */
 async function audit(rawUrl,progress,signal){
-  let start=rawUrl.trim(); if(!/^https?:\/\//i.test(start))start='https://'+start;
-  const startUrl=new URL(start), origin=startUrl.origin;
+  let start=rawUrl.trim();
+  if(!start)throw new Error('Enter a public website URL.');
+  if(!/^https?:\/\//i.test(start))start='https://'+start;
+  let startUrl;
+  try{startUrl=new URL(start)}catch{throw new Error('Enter a valid http or https website URL.')}
+  if(!/^https?:$/.test(startUrl.protocol)||!startUrl.hostname)throw new Error('Enter a valid http or https website URL.');
+  const origin=startUrl.origin;
   const limit=clamp(parseInt(limitSel?.value||'6',10)||6,1,50);
   progress('Discovering site…');
 
   const robotsTxt=await fetchRobots(origin,signal);
   const robots=parseRobots(robotsTxt);
-  let sitemapUrls=[];
-  for(const sm of robots.sitemaps.slice(0,3)){
-    if(signal.aborted)throw new DOMException('aborted','AbortError');
-    progress('Reading sitemap…');
-    const r=await readSitemap(sm,origin,signal);
-    sitemapUrls.push(...r.urls);
-    for(const n of r.nested.slice(0,2)){const rr=await readSitemap(n,origin,signal,2);sitemapUrls.push(...rr.urls)}
-  }
+  const sitemapCandidates=(robots.sitemaps.length?robots.sitemaps:[origin+'/sitemap.xml']).slice(0,3);
+  progress('Reading sitemap…');
+  const sitemapRoots=await Promise.all(sitemapCandidates.map(sm=>readSitemap(sm,origin,signal)));
+  const nestedCandidates=sitemapRoots.flatMap(r=>r.nested.slice(0,2)).slice(0,6);
+  const nestedResults=await Promise.all(nestedCandidates.map(sm=>readSitemap(sm,origin,signal,2)));
+  let sitemapUrls=[...sitemapRoots,...nestedResults].flatMap(r=>r.urls);
   sitemapUrls=[...new Set(sitemapUrls)].filter(u=>!isAsset(u));
 
-  // BFS crawl starting from the entered URL, seeded with sitemap URLs.
-  const visited=new Set(); const queue=[start,...sitemapUrls.filter(u=>u!==start)];
-  const pages=[]; const errors=[];
-  const headers=[];
+  // The start page is read first so its summary stays stable. Later pages use
+  // a small bounded queue, which cuts wait time without flooding a site.
+  const visited=new Set(), queued=new Set(), queue=[];
+  const pages=[], errors=[], headers=[];
   let firstInfo=null;
-  while(visited.size<limit && queue.length){
+  function enqueue(raw){
+    try{
+      const u=new URL(raw,origin); u.hash='';
+      const key=u.href;
+      if(!sameSite(key,origin)||isAsset(key)||visited.has(key)||queued.has(key))return;
+      queue.push(key); queued.add(key);
+    }catch{}
+  }
+  enqueue(start);
+  sitemapUrls.forEach(enqueue);
+  async function crawlOne(key){
     if(signal.aborted)throw new DOMException('aborted','AbortError');
-    const u=new URL(queue.shift(),origin); u.hash=''; const key=u.href;
-    if(visited.has(key))continue; visited.add(key);
-    progress(`Crawling ${visited.size}/${Math.min(limit,visited.size+queue.length)}: ${pathOf(key)}`);
+    visited.add(key);
+    progress(`Crawling ${visited.size}/${limit}: ${pathOf(key)}`);
     let info;
-    try{ info=await fetchUrl(key,signal,12000); }
-    catch(e){ errors.push({url:key,error:e.message}); continue; }
+    try{info=await fetchUrl(key,signal,12000)}
+    catch(e){errors.push({url:key,error:e.message});return}
     if(!firstInfo)firstInfo=info;
     headers.push({url:key,status:info.status,via:info.via,ms:info.ms||null,
       server:info.headers['server']||'',viaHdr:info.headers['via']||'',
       encoding:info.headers['content-encoding']||'',cache:info.headers['cache-control']||'',
       type:info.headers['content-type']||'',redirected:info.redirected,finalUrl:info.finalUrl});
-    // Only parse HTML responses
     const ctype=info.headers['content-type']||'';
-    if(info.text && /html|xml|text\/plain/i.test(ctype)||info.text && !/\x00/.test(info.text.slice(0,200))){
+    if(info.text&&(/html|xml|text\/plain/i.test(ctype)||!/\x00/.test(info.text.slice(0,200)))){
       const page=extractPage(info.text,info.finalUrl||key,info);
       page.status=info.status; page.finalUrl=info.finalUrl; page.via=info.via;
       pages.push(page);
-      // discover internal links (BFS)
-      for(const l of page.links){if(l.internal&&!visited.has(l.href)&&!isAsset(l.href)&&!queue.includes(l.href)&&sameSite(l.href,origin))queue.push(l.href)}
+      page.links.forEach(link=>{if(link.internal)enqueue(link.href)});
     }
   }
-  if(!pages.length&&errors.length)throw new Error('No pages could be read. '+errors[0].error);
+  await new Promise((resolve,reject)=>{
+    let active=0, settled=false, initialCrawl=true;
+    const finish=error=>{if(settled)return;settled=true;error?reject(error):resolve()};
+    const run=key=>{
+      active++;
+      crawlOne(key).then(()=>{active--;schedule()}).catch(error=>{active--;finish(error)});
+    };
+    const schedule=()=>{
+      if(settled)return;
+      if(signal.aborted){finish(new DOMException('aborted','AbortError'));return}
+      if(initialCrawl){
+        initialCrawl=false;
+        const key=queue.shift(); queued.delete(key);
+        run(key);
+        return;
+      }
+      while(active<3&&visited.size<limit&&queue.length){
+        const key=queue.shift(); queued.delete(key);
+        if(visited.has(key))continue;
+        run(key);
+      }
+      if(active===0&&(!queue.length||visited.size>=limit))finish();
+    };
+    schedule();
+  });
+  if(!pages.length)throw new Error(errors.length?'No pages could be read. '+errors[0].error:'No readable page was returned by the website.');
   const home=pages[0];
   const issues=[];
   const I=(g,s,p,c,v,w,f,wt)=>addTo(issues,g,s,p,c,v,w,f,wt);
@@ -706,36 +754,18 @@ async function audit(rawUrl,progress,signal){
   const isolated=pages.filter(p=>(inLinks.get(p.url)?.size||0)===0&&p!==home);
   isolated.slice(0,8).forEach(p=>I('Architecture','warning',pathOf(p.url),'Isolated page','No incoming internal links found in crawl','Isolated pages are effectively orphaned within the crawl.','Add links from related content.',2));
 
-  /* ----------------------------- scoring ----------------------------- */
-  const scored=issues.filter(x=>x.severity!=='info'&&x.weight>0);
-  const max=scored.reduce((n,x)=>n+x.weight,0)*100||1;
-  const got=scored.reduce((n,x)=>n+x.weight*sevScore(x.severity),0);
-  const score=Math.round(got/max*100);
-  const cats=['Technical','On-page','Content','Images','Performance','Mobile','Schema','Internal linking','External links','International','Security','AI Search','Architecture'];
-  const scores={};
-  cats.forEach(g=>{
-    const list=issues.filter(x=>x.group===g&&x.severity!=='info'&&x.weight>0);
-    if(list.length){const m=list.reduce((n,x)=>n+x.weight,0)*100;scores[g]=Math.round(list.reduce((n,x)=>n+x.weight*sevScore(x.severity),0)/m)}
-  });
-  const priorities=issues.filter(x=>x.severity!=='pass'&&x.severity!=='info').sort((a,b)=>{
-    const order={critical:0,warning:1}; return (order[a.severity]-order[b.severity])||(b.weight-a.weight);
-  }).slice(0,40);
-  const counts={critical:0,warning:0,pass:0,info:0};
-  issues.forEach(x=>counts[x.severity]++);
-
   const internalCount=pages.reduce((n,p)=>n+p.links.filter(l=>l.internal).length,0);
   const externalCount=pages.reduce((n,p)=>n+p.links.filter(l=>!l.internal).length,0);
-  const brokenLinks=0; // link probes (best effort)
   // probe a few links for broken detection
   const linkProbeTargets=[...new Set(pages.flatMap(p=>p.links.map(l=>l.href)).filter(u=>u))].slice(0,15);
   const linkResults=await poolMap(linkProbeTargets,4,(u)=>probeStatus(u,signal));
   const brokenList=[];
   linkResults.forEach((r,i)=>{if(r&&r.status&&r.status>=400)brokenList.push(linkProbeTargets[i]);});
-  brokenList.slice(0,10).forEach(u=>{const p=pages.find(p=>p.links.some(l=>l.href===u));I(p?'Internal linking':'External links','warning',p?pathOf(p.url):'Site',(p?'Broken internal link':'Broken external link'),trim(u,70),'Broken links waste crawl budget and hurt UX.','Fix or remove the link.',3)});
-
-  // build groups for UI
-  const groups={};
-  issues.forEach(x=>{const st=statusOf(x.severity);(groups[x.group]=groups[x.group]||[]).push({status:st,title:`${x.check} · ${x.page}`,detail:x.value,why:x.why,fix:x.fix,impact:x.weight})});
+  brokenList.slice(0,10).forEach(u=>{
+    const source=pages.find(page=>page.links.some(link=>link.href===u));
+    const internal=sameSite(u,origin);
+    I(internal?'Internal linking':'External links','warning',source?pathOf(source.url):'Site',internal?'Broken internal link':'Broken external link',trim(u,70),'Broken links waste crawl budget and hurt user experience.','Fix or remove the link.',3);
+  });
 
   const noFollowExt=pages.reduce((n,p)=>n+p.links.filter(l=>!l.internal&&l.isNoFollow).length,0);
   const sponsored=pages.reduce((n,p)=>n+p.links.filter(l=>l.isSponsored).length,0);
@@ -755,6 +785,32 @@ async function audit(rawUrl,progress,signal){
     'Links opening new tabs without rel="noopener" are a tab-nabbing security risk.','Add rel="noopener" (or noreferrer).',2);
   if(externalLinks.length>80)I('External links','warning','Site','Excessive external links',`${externalLinks.length}`,
     'Too many outbound links can look spammy and dilute focus.','Link out selectively.',2);
+
+  // Score and render only after every measured check has been added. This keeps
+  // the score, priorities, counters, and visible groups in agreement.
+  const scored=issues.filter(x=>x.severity!=='info'&&x.weight>0);
+  const max=scored.reduce((n,x)=>n+x.weight,0)*100||1;
+  const got=scored.reduce((n,x)=>n+x.weight*sevScore(x.severity),0);
+  const score=Math.round(got/max*100);
+  const cats=['Technical','On-page','Content','Images','Performance','Mobile','Schema','Internal linking','External links','International','Security','AI Search','Architecture'];
+  const scores={};
+  cats.forEach(group=>{
+    const list=issues.filter(issue=>issue.group===group&&issue.severity!=='info'&&issue.weight>0);
+    if(list.length){
+      const total=list.reduce((sum,issue)=>sum+issue.weight,0)*100;
+      scores[group]=Math.round(list.reduce((sum,issue)=>sum+issue.weight*sevScore(issue.severity),0)/total);
+    }
+  });
+  const priorities=issues.filter(issue=>issue.severity!=='pass'&&issue.severity!=='info').sort((a,b)=>{
+    const order={critical:0,warning:1}; return (order[a.severity]-order[b.severity])||(b.weight-a.weight);
+  }).slice(0,40);
+  const counts={critical:0,warning:0,pass:0,info:0};
+  issues.forEach(issue=>counts[issue.severity]++);
+  const groups={};
+  issues.forEach(issue=>{
+    const status=statusOf(issue.severity);
+    (groups[issue.group]=groups[issue.group]||[]).push({status,title:`${issue.check} · ${issue.page}`,detail:issue.value,why:issue.why,fix:issue.fix,impact:issue.weight});
+  });
 
   return {
     url:start,score,grade:grade(score),
